@@ -1,20 +1,20 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
-import Login from './components/Auth/Login';
-import AdminDashboard from './components/Admin/Dashboard';
-import UserManagement from './components/Admin/UserManagement';
+import { AuthProvider } from './context/AuthContext.jsx';
+import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
+import Login from './components/Auth/Login.jsx';
+import AdminDashboard from './components/Admin/Dashboard.jsx';
+import UserManagement from './components/Admin/UserManagement.jsx';
 import QuarterSetUp from './components/Admin/QuarterSetUp.jsx';
-import ClassManagement from './components/Admin/ClassManagement';
-import SecretaryDashboard from './components/Secretary/Dashboard';
-import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry';
-import WeeklyReport from './components/Reports/WeeklyReport';
-import QuarterlyReport from './components/Reports/QuarterlyReport';
-import FinancialReport from './components/Reports/FinancialReport';
-import Layout from './components/Layout/Layout';
-import { useIsPWA } from './hooks/usePWA';
-import PWAInstallButton from './components/PWAInstallButton';
+import ClassManagement from './components/Admin/ClassManagement.jsx';
+import SecretaryDashboard from './components/Secretary/Dashboard.jsx';
+import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry.jsx';
+import WeeklyReport from './components/Reports/WeeklyReport.jsx';
+import QuarterlyReport from './components/Reports/QuarterlyReport.jsx';
+import FinancialReport from './components/Reports/FinancialReport.jsx';
+import Layout from './components/Layout/Layout.jsx';
+import { useIsPWA } from './hooks/usePWA.js';
+import PWAInstallButton from './components/PWAInstallButton.jsx';
 
 function AppContent() {
   const isPWA = useIsPWA();
