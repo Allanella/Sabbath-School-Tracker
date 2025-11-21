@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
 import Login from './components/Auth/Login.jsx';
@@ -21,40 +21,38 @@ function AppContent() {
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
-      <Router>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              {/* Admin Routes */}
-              <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-              <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
-              <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetUp /></ProtectedRoute>} />
-              <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
-              
-              {/* Secretary Routes */}
-              <Route path="/secretary" element={<ProtectedRoute roles={['secretary']}><SecretaryDashboard /></ProtectedRoute>} />
-              <Route path="/secretary/entry" element={<ProtectedRoute roles={['admin', 'secretary']}><WeeklyDataEntry /></ProtectedRoute>} />
-              
-              {/* Report Routes */}
-              <Route path="/reports/weekly" element={<WeeklyReport />} />
-              <Route path="/reports/quarterly" element={<QuarterlyReport />} />
-              <Route path="/reports/financial" element={<FinancialReport />} />
-              
-              {/* Default Routes */}
-              <Route path="/" element={<Navigate to="/login" replace />} />
-              <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
-            </Route>
-            
-            {/* Fallback route */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-          
-          {/* PWA Install Button - shows when installable */}
-          <PWAInstallButton />
-        </AuthProvider>
-      </Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            {/* Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
+            <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetUp /></ProtectedRoute>} />
+            <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
+
+            {/* Secretary Routes */}
+            <Route path="/secretary" element={<ProtectedRoute roles={['secretary']}><SecretaryDashboard /></ProtectedRoute>} />
+            <Route path="/secretary/entry" element={<ProtectedRoute roles={['admin', 'secretary']}><WeeklyDataEntry /></ProtectedRoute>} />
+
+            {/* Report Routes */}
+            <Route path="/reports/weekly" element={<WeeklyReport />} />
+            <Route path="/reports/quarterly" element={<QuarterlyReport />} />
+            <Route path="/reports/financial" element={<FinancialReport />} />
+
+            {/* Default Routes */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
+          </Route>
+
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+
+        {/* PWA Install Button */}
+        <PWAInstallButton />
+      </AuthProvider>
     </div>
   );
 }
