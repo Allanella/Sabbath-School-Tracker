@@ -5,7 +5,7 @@ import ProtectedRoute from './components/Auth/ProtectedRoute';
 import Login from './components/Auth/Login';
 import AdminDashboard from './components/Admin/Dashboard';
 import UserManagement from './components/Admin/UserManagement';
-import QuarterSetup from './components/Admin/QuarterSetup';
+import QuarterSetUp from './components/Admin/QuarterSetUp.jsx';
 import ClassManagement from './components/Admin/ClassManagement';
 import SecretaryDashboard from './components/Secretary/Dashboard';
 import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry';
@@ -30,7 +30,7 @@ function AppContent() {
               {/* Admin Routes */}
               <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
               <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
-              <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetup /></ProtectedRoute>} />
+              <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetUp /></ProtectedRoute>} />
               <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
               
               {/* Secretary Routes */}
