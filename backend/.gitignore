@@ -1,0 +1,26 @@
+# ============================================
+# ENVIRONMENT VARIABLES (CRITICAL!)
+# ============================================
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+*.env.backup
+*.env.old
+
+# ============================================
+# DEPENDENCIES
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Package locks (optional)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

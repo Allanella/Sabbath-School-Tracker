@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#1e40af" rx="25"/>
+  <circle cx="256" cy="200" r="80" fill="white"/>
+  <path d="M256 120 L326 280 L186 280 Z" fill="#1e40af"/>
+  <text x="256" y="380" text-anchor="middle" fill="white" font-family="Arial" font-size="42" font-weight="bold">SDA</text>
+  <text x="256" y="430" text-anchor="middle" fill="white" font-family="Arial" font-size="24">Tracker</text>
+</svg>

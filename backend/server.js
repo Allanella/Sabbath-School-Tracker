@@ -1,4 +1,4 @@
-// server.js - Main entry point for the backend
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -24,11 +24,52 @@ const PORT = process.env.PORT || 5000;
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+// DYNAMIC CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-    : 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+    
+    // In production: only allow the specific frontend URL
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [process.env.FRONTEND_URL];
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
+      } else {
+        console.log('Blocked by CORS in production:', origin);
+        return callback(new Error('Not allowed by CORS'), false);
+      }
+    }
+    
+    // In development: allow all localhost ports and common dev URLs
+    const allowedDevOrigins = [
+      /^http:\/\/localhost(:\d+)?$/, // localhost with any port
+      /^http:\/\/127.0.0.1(:\d+)?$/, // 127.0.0.1 with any port
+      /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/, // Local network IPs
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:3000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174'
+    ];
+    
+    // Check if the origin matches any allowed pattern
+    const isAllowed = allowedDevOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return origin === allowedOrigin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS in development:', origin);
+      callback(new Error('Not allowed by CORS'), false);
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -86,6 +127,7 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌐 CORS: Allowing dynamic localhost origins in development`);
 });
 
 // Handle unhandled promise rejections

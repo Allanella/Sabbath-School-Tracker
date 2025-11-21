@@ -1,3 +1,5 @@
+const supabase = require('../config/database');
+
 const classController = {
   // Create new class
   create: async (req, res, next) => {
