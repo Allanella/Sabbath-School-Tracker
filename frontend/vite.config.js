@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: './', // use relative paths for production build
+  base: '/', // use root-relative paths for Vercel
   plugins: [
     react(),
     VitePWA({
@@ -23,21 +23,21 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
-        scope: './',
-        start_url: './',
+        scope: '/',        // root-relative
+        start_url: '/',    // root-relative
         categories: ['business', 'education', 'productivity'],
         lang: 'en-US',
         dir: 'ltr',
         icons: [
-          { src: './icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable any' },
-          { src: './icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable any' },
+          { src: '/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable any' },
+          { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable any' },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,ttf}'],
         skipWaiting: true,
         clientsClaim: true,
-        navigateFallback: './index.html',
+        navigateFallback: '/index.html', // root-relative
       },
       devOptions: { enabled: true },
     }),
