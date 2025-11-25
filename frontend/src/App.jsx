@@ -16,49 +16,36 @@ import Layout from './components/Layout/Layout.jsx';
 import { useIsPWA } from './hooks/usePWA.js';
 import PWAInstallButton from './components/PWAInstallButton.jsx';
 
-// Service Worker management to fix CSS caching issues
-const useServiceWorkerCleanup = () => {
+// Simple Service Worker registration - only in production
+const useServiceWorker = () => {
   useEffect(() => {
-    const cleanupServiceWorkers = async () => {
-      // Only run in production (Vercel) environment
-      const isProduction = process.env.NODE_ENV === 'production' && 
-                          !window.location.hostname.includes('localhost');
-      
-      if (isProduction && 'serviceWorker' in navigator) {
-        try {
-          // Unregister all service workers
+    const registerSW = async () => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        const isLocalhost = window.location.hostname.includes('localhost');
+        
+        if (!isLocalhost) {
+          // Production - register simple SW
+          try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('SW registered:', registration);
+          } catch (error) {
+            console.log('SW registration failed:', error);
+          }
+        } else {
+          // Development - unregister any existing SW
           const registrations = await navigator.serviceWorker.getRegistrations();
-          for (let registration of registrations) {
-            await registration.unregister();
-            console.log('Service Worker unregistered to fix CSS issues');
-          }
-          
-          // Clear all caches
-          const cacheNames = await caches.keys();
-          await Promise.all(
-            cacheNames.map(cacheName => caches.delete(cacheName))
-          );
-          console.log('All caches cleared');
-          
-          // Force reload to apply fresh CSS (only if we found old SW)
-          if (registrations.length > 0) {
-            window.location.reload();
-          }
-        } catch (error) {
-          console.log('Error during Service Worker cleanup:', error);
+          registrations.forEach(registration => registration.unregister());
         }
       }
     };
 
-    cleanupServiceWorkers();
+    registerSW();
   }, []);
 };
 
 function AppContent() {
   const isPWA = useIsPWA();
-  
-  // Apply Service Worker cleanup on every load to ensure fresh CSS
-  useServiceWorkerCleanup();
+  useServiceWorker(); // Initialize service worker
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
