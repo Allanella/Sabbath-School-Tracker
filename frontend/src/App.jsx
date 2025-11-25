@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
@@ -16,8 +16,49 @@ import Layout from './components/Layout/Layout.jsx';
 import { useIsPWA } from './hooks/usePWA.js';
 import PWAInstallButton from './components/PWAInstallButton.jsx';
 
+// Service Worker management to fix CSS caching issues
+const useServiceWorkerCleanup = () => {
+  useEffect(() => {
+    const cleanupServiceWorkers = async () => {
+      // Only run in production (Vercel) environment
+      const isProduction = process.env.NODE_ENV === 'production' && 
+                          !window.location.hostname.includes('localhost');
+      
+      if (isProduction && 'serviceWorker' in navigator) {
+        try {
+          // Unregister all service workers
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (let registration of registrations) {
+            await registration.unregister();
+            console.log('Service Worker unregistered to fix CSS issues');
+          }
+          
+          // Clear all caches
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => caches.delete(cacheName))
+          );
+          console.log('All caches cleared');
+          
+          // Force reload to apply fresh CSS (only if we found old SW)
+          if (registrations.length > 0) {
+            window.location.reload();
+          }
+        } catch (error) {
+          console.log('Error during Service Worker cleanup:', error);
+        }
+      }
+    };
+
+    cleanupServiceWorkers();
+  }, []);
+};
+
 function AppContent() {
   const isPWA = useIsPWA();
+  
+  // Apply Service Worker cleanup on every load to ensure fresh CSS
+  useServiceWorkerCleanup();
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
