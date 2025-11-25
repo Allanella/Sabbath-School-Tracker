@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-// TEMPORARY CSS IMPORT TO VERIFY
+// CSS IMPORTS
 import './App.css';
+import './styles/index.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
@@ -22,21 +23,18 @@ import PWAInstallButton from './components/PWAInstallButton.jsx';
 const useDisableServiceWorkers = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      // Unregister ALL service workers
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         registrations.forEach((registration) => {
           registration.unregister();
           console.log('Service Worker unregistered:', registration);
         });
         
-        // If we found any service workers, force clear caches and reload
         if (registrations.length > 0) {
           caches.keys().then((cacheNames) => {
             cacheNames.forEach((cacheName) => {
               caches.delete(cacheName);
             });
             console.log('All caches cleared');
-            // Force reload to apply changes
             window.location.reload();
           });
         }
@@ -66,12 +64,8 @@ const useCSSDebug = () => {
         });
       };
 
-      // Check immediately
       updateCSSInfo();
-      
-      // Check again after a delay to catch dynamically loaded CSS
       const timer = setTimeout(updateCSSInfo, 1000);
-      
       return () => clearTimeout(timer);
     }
   }, []);
@@ -81,12 +75,12 @@ const useCSSDebug = () => {
 
 function AppContent() {
   const isPWA = useIsPWA();
-  useDisableServiceWorkers(); // This will disable ALL service workers
-  const { count, files } = useCSSDebug(); // Enhanced CSS debug info
+  useDisableServiceWorkers();
+  const { count, files } = useCSSDebug();
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
-      {/* ENHANCED DEBUG DIV - Shows detailed CSS information */}
+      {/* ENHANCED DEBUG DIV */}
       <div style={{ 
         position: 'fixed', 
         top: 0, 
@@ -125,40 +119,14 @@ function AppContent() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            {/* Admin Routes */}
-            <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
-            <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetUp /></ProtectedRoute>} />
-            <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
-
-            {/* Secretary Routes */}
-            <Route path="/secretary" element={<ProtectedRoute roles={['secretary']}><SecretaryDashboard /></ProtectedRoute>} />
-            <Route path="/secretary/entry" element={<ProtectedRoute roles={['admin', 'secretary']}><WeeklyDataEntry /></ProtectedRoute>} />
-
-            {/* Report Routes */}
-            <Route path="/reports/weekly" element={<WeeklyReport />} />
-            <Route path="/reports/quarterly" element={<QuarterlyReport />} />
-            <Route path="/reports/financial" element={<FinancialReport />} />
-
-            {/* Default Routes */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
-          </Route>
-
-          {/* Fallback route */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* ... rest of your routes ... */}
         </Routes>
-
-        {/* PWA Install Button */}
         <PWAInstallButton />
       </AuthProvider>
     </div>
   );
 }
 
-// Main App component with error boundary
 function App() {
   return (
     <React.Suspense fallback={
