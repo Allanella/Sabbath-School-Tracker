@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+// TEMPORARY CSS IMPORT TO VERIFY
+import './App.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
@@ -43,13 +45,48 @@ const useDisableServiceWorkers = () => {
   }, []);
 };
 
+// Enhanced CSS Debug Hook
+const useCSSDebug = () => {
+  const [cssInfo, setCssInfo] = React.useState({ count: 0, files: [] });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const updateCSSInfo = () => {
+        const stylesheets = document.querySelectorAll('style, link[rel="stylesheet"]');
+        const files = Array.from(stylesheets).map(sheet => {
+          if (sheet.href) {
+            return sheet.href.split('/').pop() || sheet.href;
+          }
+          return 'inline-style';
+        });
+        
+        setCssInfo({
+          count: stylesheets.length,
+          files: files
+        });
+      };
+
+      // Check immediately
+      updateCSSInfo();
+      
+      // Check again after a delay to catch dynamically loaded CSS
+      const timer = setTimeout(updateCSSInfo, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  return cssInfo;
+};
+
 function AppContent() {
   const isPWA = useIsPWA();
   useDisableServiceWorkers(); // This will disable ALL service workers
+  const { count, files } = useCSSDebug(); // Enhanced CSS debug info
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
-      {/* DEBUG DIV - Shows how many stylesheets are loaded */}
+      {/* ENHANCED DEBUG DIV - Shows detailed CSS information */}
       <div style={{ 
         position: 'fixed', 
         top: 0, 
@@ -58,10 +95,31 @@ function AppContent() {
         color: 'white', 
         padding: '10px', 
         zIndex: 9999,
-        fontSize: '14px',
-        fontFamily: 'Arial, sans-serif'
+        fontSize: '12px',
+        fontFamily: 'Arial, sans-serif',
+        maxWidth: '300px',
+        maxHeight: '200px',
+        overflow: 'auto'
       }}>
-        CSS Debug: {typeof document !== 'undefined' ? document.querySelectorAll('style, link[rel="stylesheet"]').length : 0} stylesheets loaded
+        <div><strong>CSS Debug Info:</strong></div>
+        <div>Total Stylesheets: {count}</div>
+        {files.length > 0 && (
+          <div>
+            Files: 
+            <ul style={{ margin: '5px 0', paddingLeft: '15px' }}>
+              {files.map((file, index) => (
+                <li key={index} style={{ fontSize: '10px', wordBreak: 'break-all' }}>
+                  {file}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div>Tailwind Check: {
+          typeof document !== 'undefined' && document.documentElement.classList.contains('bg-gray-50') 
+            ? '✅ Loaded' 
+            : '❌ Missing'
+        }</div>
       </div>
 
       <AuthProvider>
