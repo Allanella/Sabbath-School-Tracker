@@ -16,39 +16,54 @@ import Layout from './components/Layout/Layout.jsx';
 import { useIsPWA } from './hooks/usePWA.js';
 import PWAInstallButton from './components/PWAInstallButton.jsx';
 
-// Simple Service Worker registration - only in production
-const useServiceWorker = () => {
+// COMPLETELY DISABLE SERVICE WORKERS
+const useDisableServiceWorkers = () => {
   useEffect(() => {
-    const registerSW = async () => {
-      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-        const isLocalhost = window.location.hostname.includes('localhost');
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      // Unregister ALL service workers
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => {
+          registration.unregister();
+          console.log('Service Worker unregistered:', registration);
+        });
         
-        if (!isLocalhost) {
-          // Production - register simple SW
-          try {
-            const registration = await navigator.serviceWorker.register('/sw.js');
-            console.log('SW registered:', registration);
-          } catch (error) {
-            console.log('SW registration failed:', error);
-          }
-        } else {
-          // Development - unregister any existing SW
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          registrations.forEach(registration => registration.unregister());
+        // If we found any service workers, force clear caches and reload
+        if (registrations.length > 0) {
+          caches.keys().then((cacheNames) => {
+            cacheNames.forEach((cacheName) => {
+              caches.delete(cacheName);
+            });
+            console.log('All caches cleared');
+            // Force reload to apply changes
+            window.location.reload();
+          });
         }
-      }
-    };
-
-    registerSW();
+      });
+    }
   }, []);
 };
 
 function AppContent() {
   const isPWA = useIsPWA();
-  useServiceWorker(); // Initialize service worker
+  useDisableServiceWorkers(); // This will disable ALL service workers
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
+      {/* DEBUG DIV - Shows how many stylesheets are loaded */}
+      <div style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        background: 'red', 
+        color: 'white', 
+        padding: '10px', 
+        zIndex: 9999,
+        fontSize: '14px',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        CSS Debug: {typeof document !== 'undefined' ? document.querySelectorAll('style, link[rel="stylesheet"]').length : 0} stylesheets loaded
+      </div>
+
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
