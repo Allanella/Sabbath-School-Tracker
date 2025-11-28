@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-// CSS IMPORTS
-import './App.css';
-import './styles/index.css';
+// TEMPORARILY COMMENT OUT CUSTOM CSS - TESTING ONLY
+// import './App.css';
+// import './styles/index.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
@@ -60,17 +60,75 @@ const useDisableServiceWorkers = () => {
   }, []);
 };
 
-// Remove CSS Debug to clean up screen
+// CSS DEBUG COMPONENT
+const CSSDebugger = () => {
+  const [cssStatus, setCssStatus] = React.useState('checking...');
+
+  useEffect(() => {
+    // Check if Tailwind CSS is loaded
+    const checkTailwind = () => {
+      const testElement = document.createElement('div');
+      testElement.className = 'bg-red-500 hidden';
+      document.body.appendChild(testElement);
+      
+      const computedStyle = window.getComputedStyle(testElement);
+      const bgColor = computedStyle.backgroundColor;
+      
+      document.body.removeChild(testElement);
+      
+      if (bgColor === 'rgb(239, 68, 68)') { // Tailwind red-500
+        setCssStatus('✅ Tailwind CSS LOADED');
+      } else {
+        setCssStatus('❌ Tailwind CSS NOT LOADED');
+      }
+    };
+
+    setTimeout(checkTailwind, 1000);
+  }, []);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: '10px',
+      right: '10px',
+      background: 'blue',
+      color: 'white',
+      padding: '10px',
+      zIndex: 9999,
+      fontSize: '14px',
+      borderRadius: '5px',
+      border: '2px solid white'
+    }}>
+      <div>CSS Status: {cssStatus}</div>
+      <div>Page: {window.location.pathname}</div>
+    </div>
+  );
+};
+
+// TEST COMPONENT - Simple styling check
+const StyleTest = () => (
+  <div className="p-4 m-4 border-4 border-green-500 bg-yellow-100">
+    <h1 className="text-2xl font-bold text-blue-600">🎯 STYLE TEST</h1>
+    <p className="text-red-500 font-semibold">If you see colors, CSS is working!</p>
+    <div className="flex gap-2 mt-2">
+      <button className="px-4 py-2 bg-blue-500 text-white rounded">Blue Button</button>
+      <button className="px-4 py-2 bg-red-500 text-white rounded">Red Button</button>
+      <button className="px-4 py-2 bg-green-500 text-white rounded">Green Button</button>
+    </div>
+  </div>
+);
+
 function AppContent() {
   const isPWA = useIsPWA();
   useDisableServiceWorkers();
 
   return (
-    // ADDED explicit styles to ensure CSS works on Vercel
-    <div 
-      className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}
-      style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }} // Fallback styles
-    >
+    <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
+      {/* DEBUG COMPONENTS */}
+      <CSSDebugger />
+      <StyleTest />
+      
+      {/* ORIGINAL APP CONTENT */}
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -107,22 +165,10 @@ function AppContent() {
 function App() {
   return (
     <React.Suspense fallback={
-      // ADDED explicit fallback styles
-      <div 
-        className="min-h-screen bg-gray-50 flex items-center justify-center"
-        style={{ minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      >
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div 
-            className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"
-            style={{ animation: 'spin 1s linear infinite', borderRadius: '50%', height: '3rem', width: '3rem', borderBottom: '2px solid #2563eb', margin: '0 auto' }}
-          ></div>
-          <p 
-            className="mt-4 text-gray-600"
-            style={{ marginTop: '1rem', color: '#4b5563' }}
-          >
-            Loading Sabbath School Tracker...
-          </p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading Sabbath School Tracker...</p>
         </div>
       </div>
     }>
