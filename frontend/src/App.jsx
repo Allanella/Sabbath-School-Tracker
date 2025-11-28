@@ -17,111 +17,84 @@ import QuarterlyReport from './components/Reports/QuarterlyReport.jsx';
 import FinancialReport from './components/Reports/FinancialReport.jsx';
 import Layout from './components/Layout/Layout.jsx';
 import { useIsPWA } from './hooks/usePWA.js';
-import PWAInstallButton from './components/PWAInstallButton.jsx';
 
-// COMPLETELY DISABLE SERVICE WORKERS
+// COMPLETELY DISABLE SERVICE WORKERS - FIXED VERSION
 const useDisableServiceWorkers = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      console.log('Disabling service workers...');
+      
+      // Method 1: Unregister all service workers
       navigator.serviceWorker.getRegistrations().then((registrations) => {
         registrations.forEach((registration) => {
-          registration.unregister();
-          console.log('Service Worker unregistered:', registration);
-        });
-        
-        if (registrations.length > 0) {
-          caches.keys().then((cacheNames) => {
-            cacheNames.forEach((cacheName) => {
-              caches.delete(cacheName);
-            });
-            console.log('All caches cleared');
-            window.location.reload();
+          registration.unregister().then(success => {
+            console.log('ServiceWorker unregistered:', success);
           });
+        });
+      });
+
+      // Method 2: Clear all caches
+      caches.keys().then((cacheNames) => {
+        cacheNames.forEach((cacheName) => {
+          caches.delete(cacheName);
+        });
+        console.log('All caches cleared');
+      });
+
+      // Method 3: Prevent future registrations
+      const originalRegister = navigator.serviceWorker.register;
+      navigator.serviceWorker.register = () => {
+        console.log('Service worker registration blocked');
+        return Promise.reject(new Error('Service workers disabled by app'));
+      };
+
+      // Force reload if we found any service workers
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        if (registrations.length > 0) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
         }
       });
     }
   }, []);
 };
 
-// Enhanced CSS Debug Hook
-const useCSSDebug = () => {
-  const [cssInfo, setCssInfo] = React.useState({ count: 0, files: [] });
-
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const updateCSSInfo = () => {
-        const stylesheets = document.querySelectorAll('style, link[rel="stylesheet"]');
-        const files = Array.from(stylesheets).map(sheet => {
-          if (sheet.href) {
-            return sheet.href.split('/').pop() || sheet.href;
-          }
-          return 'inline-style';
-        });
-        
-        setCssInfo({
-          count: stylesheets.length,
-          files: files
-        });
-      };
-
-      updateCSSInfo();
-      const timer = setTimeout(updateCSSInfo, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
-  return cssInfo;
-};
-
+// Remove CSS Debug to clean up screen
 function AppContent() {
   const isPWA = useIsPWA();
   useDisableServiceWorkers();
-  const { count, files } = useCSSDebug();
 
   return (
     <div className={`min-h-screen bg-gray-50 ${isPWA ? 'pwa-mode' : ''}`}>
-      {/* ENHANCED DEBUG DIV */}
-      <div style={{ 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        background: 'red', 
-        color: 'white', 
-        padding: '10px', 
-        zIndex: 9999,
-        fontSize: '12px',
-        fontFamily: 'Arial, sans-serif',
-        maxWidth: '300px',
-        maxHeight: '200px',
-        overflow: 'auto'
-      }}>
-        <div><strong>CSS Debug Info:</strong></div>
-        <div>Total Stylesheets: {count}</div>
-        {files.length > 0 && (
-          <div>
-            Files: 
-            <ul style={{ margin: '5px 0', paddingLeft: '15px' }}>
-              {files.map((file, index) => (
-                <li key={index} style={{ fontSize: '10px', wordBreak: 'break-all' }}>
-                  {file}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div>Tailwind Check: {
-          typeof document !== 'undefined' && document.documentElement.classList.contains('bg-gray-50') 
-            ? '✅ Loaded' 
-            : '❌ Missing'
-        }</div>
-      </div>
-
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
-          {/* ... rest of your routes ... */}
+
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            {/* Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
+            <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetUp /></ProtectedRoute>} />
+            <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
+
+            {/* Secretary Routes */}
+            <Route path="/secretary" element={<ProtectedRoute roles={['secretary']}><SecretaryDashboard /></ProtectedRoute>} />
+            <Route path="/secretary/entry" element={<ProtectedRoute roles={['admin', 'secretary']}><WeeklyDataEntry /></ProtectedRoute>} />
+
+            {/* Report Routes */}
+            <Route path="/reports/weekly" element={<WeeklyReport />} />
+            <Route path="/reports/quarterly" element={<QuarterlyReport />} />
+            <Route path="/reports/financial" element={<FinancialReport />} />
+
+            {/* Default Routes */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
+          </Route>
+
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-        <PWAInstallButton />
       </AuthProvider>
     </div>
   );
