@@ -4,49 +4,35 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-    
-    <!-- Theme Color for Mobile Browsers -->
-    <meta name="theme-color" content="#1e40af" />
-    
-    <!-- iOS Safari Specific -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Sabbath Tracker">
-    <link rel="apple-touch-icon" href="/icon-192x192.png">
-    
-    <!-- Splash Screen for iOS -->
-    <link rel="apple-touch-startup-image" href="/splash-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
-    
-    <!-- Windows Metro -->
-    <meta name="msapplication-TileImage" content="/icon-144x144.png">
-    <meta name="msapplication-TileColor" content="#1e40af">
-    <meta name="msapplication-config" content="/browserconfig.xml">
-    
-    <!-- PWA Meta Tags -->
-    <meta name="application-name" content="Sabbath School Tracker">
-    <meta name="mobile-web-app-capable" content="yes">
-    
     <title>Sabbath School Tracker</title>
+    <meta name="description" content="Sabbath School data tracking for Kanyanya SDA Church">
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
-    <!-- Register Service Worker -->
+    <!-- Service Worker Blocker -->
     <script>
+      // Completely disable service workers
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js')
-            .then(function(registration) {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            })
-            .catch(function(error) {
-              console.log('ServiceWorker registration failed: ', error);
-            });
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister();
+            console.log('ServiceWorker unregistered');
+          }
         });
+        
+        // Clear all caches
+        caches.keys().then(function(cacheNames) {
+          cacheNames.forEach(function(cacheName) {
+            caches.delete(cacheName);
+          });
+        });
+        
+        // Block future registrations
+        navigator.serviceWorker.register = function() {
+          return Promise.reject(new Error('Service workers disabled'));
+        };
       }
     </script>
   </body>
