@@ -2,30 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-gray-50 text-gray-900;
-  }
+/* KEEP your base styles but make them more specific */
+html body {
+  @apply bg-gray-50 text-gray-900;
 }
 
+/* KEEP all your component classes but ensure they work */
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition;
+    @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition;
+    @apply bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors;
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-sm p-6;
+    @apply bg-white rounded-lg shadow-sm p-6 border border-gray-100;
   }
   
   .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none;
   }
   
   .label {
     @apply block text-sm font-medium text-gray-700 mb-2;
   }
+}
+
+/* ADD explicit utility classes that might be missing */
+.bg-red-500 {
+  background-color: #ef4444 !important;
+}
+
+.text-white {
+  color: #ffffff !important;
+}
+
+.min-h-screen {
+  min-height: 100vh !important;
 }
