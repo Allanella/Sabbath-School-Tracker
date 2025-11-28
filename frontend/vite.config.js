@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  base: './',  // ← CHANGED from '/' to './' for Vercel compatibility
+  base: '/',  // ← CHANGED from '/' to './' for Vercel compatibility
   plugins: [
     react(),
   ],
