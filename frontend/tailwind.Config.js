@@ -3,6 +3,13 @@ export default {
   content: [
     './index.html',
     './src/**/*.{js,jsx,ts,tsx}',
+    // ADD EXPLICIT PATHS FOR VERBOSE MATCHING
+    './src/components/**/*.{js,jsx,ts,tsx}',
+    './src/context/**/*.{js,jsx,ts,tsx}',
+    './src/hooks/**/*.{js,jsx,ts,tsx}',
+    './src/pages/**/*.{js,jsx,ts,tsx}',
+    './src/layouts/**/*.{js,jsx,ts,tsx}',
+    './src/utils/**/*.{js,jsx,ts,tsx}',
   ],
   theme: {
     extend: {
