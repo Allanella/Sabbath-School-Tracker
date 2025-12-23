@@ -1,9 +1,10 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     './index.html',
     './src/**/*.{js,jsx,ts,tsx}',
-    // ADD EXPLICIT PATHS FOR VERBOSE MATCHING
+
+    // Explicit paths (safe but optional)
     './src/components/**/*.{js,jsx,ts,tsx}',
     './src/context/**/*.{js,jsx,ts,tsx}',
     './src/hooks/**/*.{js,jsx,ts,tsx}',
@@ -11,6 +12,7 @@ export default {
     './src/layouts/**/*.{js,jsx,ts,tsx}',
     './src/utils/**/*.{js,jsx,ts,tsx}',
   ],
+
   theme: {
     extend: {
       colors: {
@@ -33,23 +35,28 @@ export default {
           green: '#059669',
         },
       },
+
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         heading: ['Poppins', 'system-ui', 'sans-serif'],
       },
+
       spacing: {
-        '18': '4.5rem',
-        '88': '22rem',
-        '128': '32rem',
+        18: '4.5rem',
+        88: '22rem',
+        128: '32rem',
       },
+
       boxShadow: {
         church: '0 4px 14px 0 rgba(30, 64, 175, 0.1)',
         'church-lg': '0 10px 28px 0 rgba(30, 64, 175, 0.15)',
       },
+
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
       },
+
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
@@ -62,5 +69,6 @@ export default {
       },
     },
   },
+
   plugins: [],
 };
