@@ -1,48 +1,48 @@
-import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext.jsx';
-import ProtectedRoute from './components/Auth/ProtectedRoute.jsx';
-import Layout from './components/Layout/Layout.jsx';
-
-// DEBUG COMPONENT
-const CSSDebugger = () => {
-  const [status, setStatus] = React.useState('Checking...');
-
-  useEffect(() => {
-    const el = document.createElement('div');
-    el.className = 'bg-red-500 hidden';
-    document.body.appendChild(el);
-
-    const color = getComputedStyle(el).backgroundColor;
-    document.body.removeChild(el);
-
-    setStatus(color === 'rgb(239, 68, 68)' ? '✅ Tailwind Loaded' : '❌ Tailwind NOT Loaded');
-  }, []);
-
-  return <div className="fixed top-2 right-2 bg-black text-white p-3 z-50 rounded">{status}</div>;
-};
-
-// TEST COMPONENT
-const StyleTest = () => (
-  <div className="p-6 m-6 bg-yellow-100 border-4 border-green-500">
-    <h1 className="text-2xl font-bold text-blue-600">TAILWIND TEST</h1>
-    <p className="text-red-500">If this is colored, Tailwind works.</p>
-    <button className="mt-3 px-4 py-2 bg-blue-500 text-white rounded">Button</button>
-  </div>
-);
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
+import Login from './components/Auth/Login';
+import AdminDashboard from './components/Admin/Dashboard';
+import UserManagement from './components/Admin/UserManagement';
+import QuarterSetup from './components/Admin/QuarterSetup';
+import ClassManagement from './components/Admin/ClassManagement';
+import SecretaryDashboard from './components/Secretary/Dashboard';
+import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry';
+import WeeklyReport from './components/Reports/WeeklyReport';
+import QuarterlyReport from './components/Reports/QuarterlyReport';
+import FinancialReport from './components/Reports/FinancialReport';
+import Layout from './components/Layout/Layout';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <CSSDebugger />
-      <StyleTest />
-
+    <Router>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/login" element={<Login />} />
+          
+          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+            {/* Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
+            <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetup /></ProtectedRoute>} />
+            <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
+            
+            {/* Secretary Routes */}
+            <Route path="/secretary" element={<ProtectedRoute roles={['secretary']}><SecretaryDashboard /></ProtectedRoute>} />
+            <Route path="/secretary/entry" element={<ProtectedRoute roles={['admin', 'secretary']}><WeeklyDataEntry /></ProtectedRoute>} />
+            
+            {/* Report Routes */}
+            <Route path="/reports/weekly" element={<WeeklyReport />} />
+            <Route path="/reports/quarterly" element={<QuarterlyReport />} />
+            <Route path="/reports/financial" element={<FinancialReport />} />
+            
+            {/* Default Routes */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+          </Route>
         </Routes>
       </AuthProvider>
-    </div>
+    </Router>
   );
 }
 
