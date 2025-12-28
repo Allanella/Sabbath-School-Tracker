@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  Menu, 
-  X, 
-  Home, 
-  Users, 
-  Calendar, 
-  BookOpen, 
-  FileText, 
+import {
+  Menu,
+  X,
+  Home,
+  Users,
+  Calendar,
+  BookOpen,
+  FileText,
   DollarSign,
   LogOut,
   BarChart3
@@ -50,34 +50,44 @@ const Layout = () => {
   const currentNav = navigation[user?.role] || navigation.viewer;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile sidebar backdrop */}
+    <div className="min-h-screen bg-gray-100">
+      {/* Mobile overlay */}
       {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-20 lg:hidden"
+        <div
+          className="fixed inset-0 bg-black bg-opacity-40 z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed top-0 left-0 z-30 h-screen w-64 bg-primary-800 text-white transition-transform
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div className="flex items-center justify-between p-4 border-b border-primary-700">
+      <aside
+        className={`
+          fixed top-0 left-0 z-30 h-screen w-64
+          bg-indigo-800 text-white
+          transform transition-transform duration-300
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        {/* Sidebar header */}
+        <div className="flex items-center justify-between p-4 border-b border-indigo-700">
           <h1 className="text-xl font-bold">SS Tracker</h1>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden"
+          >
             <X className="h-6 w-6" />
           </button>
         </div>
 
+        {/* Navigation */}
         <nav className="p-4 space-y-2">
           {currentNav.map((item) => (
             <Link
               key={item.name}
               to={item.href}
               onClick={() => setSidebarOpen(false)}
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-primary-700 transition"
+              className="flex items-center space-x-3 px-4 py-3 rounded-lg
+                         hover:bg-indigo-700 transition"
             >
               <item.icon className="h-5 w-5" />
               <span>{item.name}</span>
@@ -85,15 +95,21 @@ const Layout = () => {
           ))}
         </nav>
 
-        <div className="absolute bottom-0 w-full p-4 border-t border-primary-700">
+        {/* User info + logout */}
+        <div className="absolute bottom-0 w-full p-4 border-t border-indigo-700">
           <div className="mb-4">
-            <p className="text-sm text-primary-200">Logged in as</p>
-            <p className="font-medium">{user?.full_name}</p>
-            <p className="text-xs text-primary-300 capitalize">{user?.role}</p>
+            <p className="text-sm text-indigo-200">Logged in as</p>
+            <p className="font-semibold">{user?.full_name}</p>
+            <p className="text-xs text-indigo-300 capitalize">
+              {user?.role}
+            </p>
           </div>
+
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-2 w-full px-4 py-2 bg-primary-700 rounded-lg hover:bg-primary-600 transition"
+            className="flex items-center space-x-2 w-full
+                       px-4 py-2 bg-indigo-700 rounded-lg
+                       hover:bg-indigo-600 transition"
           >
             <LogOut className="h-5 w-5" />
             <span>Logout</span>
@@ -104,18 +120,20 @@ const Layout = () => {
       {/* Main content */}
       <div className="lg:ml-64">
         {/* Top bar */}
-        <header className="bg-white shadow-sm sticky top-0 z-10">
+        <header className="bg-white shadow sticky top-0 z-10">
           <div className="flex items-center justify-between px-4 py-4">
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden"
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-6 w-6 text-gray-700" />
             </button>
+
             <h2 className="text-xl font-semibold text-gray-800">
               {import.meta.env.VITE_CHURCH_NAME || 'Sabbath School Tracker'}
             </h2>
-            <div className="w-10" /> {/* Spacer for mobile */}
+
+            <div className="w-10" />
           </div>
         </header>
 

@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
+
 // Import routes
 const authRoutes = require('./src/routes/auth.routes');
 const userRoutes = require('./src/routes/user.routes');
@@ -33,7 +34,7 @@ const corsOptions = {
     if (process.env.NODE_ENV === 'production') {
       const allowedOrigins = [
         process.env.FRONTEND_URL,
-        'https://sabbath-school-tracker.vercel.app', // Your main Vercel domain
+        'https://https://sabbath-school-tracker.vercel.app/login', // Your main Vercel domain
         /\.vercel\.app$/, // Allow all Vercel preview deployments
         /\.vercel\.app$/  // Allow Vercel deployments
       ];
