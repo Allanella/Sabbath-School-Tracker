@@ -1,21 +1,25 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
+// Resolve paths relative to this file
+const ROUTES_PATH = path.join(__dirname, 'src', 'routes');
+const MIDDLEWARE_PATH = path.join(__dirname, 'src', 'middleware');
 
 // Import routes
-const authRoutes = require('./src/routes/auth.routes');
-const userRoutes = require('./src/routes/user.routes');
-const classRoutes = require('./src/routes/class.routes');
-const quarterRoutes = require('./src/routes/quarter.routes');
-const weeklyDataRoutes = require('./src/routes/weeklyData.routes');
-const reportRoutes = require('./src/routes/report.routes');
+const authRoutes = require(path.join(ROUTES_PATH, 'auth.routes'));
+const userRoutes = require(path.join(ROUTES_PATH, 'user.routes'));
+const classRoutes = require(path.join(ROUTES_PATH, 'class.routes'));
+const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
+const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
+const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
 
 // Import middleware
-const errorHandler = require('./src/middleware/errorHandler');
+const errorHandler = require(path.join(MIDDLEWARE_PATH, 'errorHandler'));
 
 // Initialize express app
 const app = express();
@@ -24,111 +28,73 @@ const PORT = process.env.PORT || 5000;
 // Security middleware
 app.use(helmet());
 
-// DYNAMIC CORS configuration
+// Dynamic CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
-    
-    // In production: only allow the specific frontend URL and Vercel preview URLs
+
     if (process.env.NODE_ENV === 'production') {
       const allowedOrigins = [
         process.env.FRONTEND_URL,
-        'https://https://sabbath-school-tracker.vercel.app/login', // Your main Vercel domain
-        /\.vercel\.app$/, // Allow all Vercel preview deployments
-        /\.vercel\.app$/  // Allow Vercel deployments
+        /\.vercel\.app$/, // Allow all Vercel deployments
       ];
-      
-      const isAllowed = allowedOrigins.some(allowedOrigin => {
-        if (typeof allowedOrigin === 'string') {
-          return origin === allowedOrigin;
-        } else if (allowedOrigin instanceof RegExp) {
-          return allowedOrigin.test(origin);
-        }
-        return false;
-      });
-      
-      if (isAllowed) {
-        return callback(null, true);
-      } else {
-        console.log('🚫 Blocked by CORS in production:', origin);
-        return callback(new Error('Not allowed by CORS'), false);
-      }
+      const isAllowed = allowedOrigins.some(o =>
+        typeof o === 'string' ? origin === o : o.test(origin)
+      );
+      return isAllowed
+        ? callback(null, true)
+        : callback(new Error('Not allowed by CORS'), false);
     }
-    
-    // In development: allow all localhost ports and common dev URLs
+
+    // Development allowed origins
     const allowedDevOrigins = [
-      /^http:\/\/localhost(:\d+)?$/, // localhost with any port
-      /^http:\/\/127.0.0.1(:\d+)?$/, // 127.0.0.1 with any port
-      /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/, // Local network IPs
+      /^http:\/\/localhost(:\d+)?$/,
+      /^http:\/\/127\.0\.0\.1(:\d+)?$/,
       'http://localhost:5173',
       'http://localhost:5174',
-      'http://localhost:3000',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:5174'
     ];
-    
-    // Check if the origin matches any allowed pattern
-    const isAllowed = allowedDevOrigins.some(allowedOrigin => {
-      if (typeof allowedOrigin === 'string') {
-        return origin === allowedOrigin;
-      } else if (allowedOrigin instanceof RegExp) {
-        return allowedOrigin.test(origin);
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.log('🚫 Blocked by CORS in development:', origin);
-      callback(new Error('Not allowed by CORS'), false);
-    }
+    const isAllowed = allowedDevOrigins.some(o =>
+      typeof o === 'string' ? origin === o : o.test(origin)
+    );
+    return isAllowed
+      ? callback(null, true)
+      : callback(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
 
-// Rate limiting - more permissive in production
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 200 : 100, // Higher limit in production
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: 900 // 15 minutes in seconds
-  },
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 200 : 100,
+  message: { error: 'Too many requests from this IP, try again later.' },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
-// Body parser middleware with limits
+// Body parser middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging middleware with production format
+// Logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined')); // Use 'combined' format in production for more details
+  app.use(morgan('combined'));
 }
 
-// Enhanced health check endpoint
+// Health check
 app.get('/health', (req, res) => {
   const healthCheck = {
     status: 'OK',
     message: 'Sabbath School Tracker API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    church: process.env.CHURCH_NAME || 'Not configured'
+    church: process.env.CHURCH_NAME || 'Not configured',
   };
-  
-  // Add database health check in production
-  if (process.env.NODE_ENV === 'production') {
-    healthCheck.database = 'Connected'; // You can add actual DB health check here
-  }
-  
   res.status(200).json(healthCheck);
 });
 
@@ -146,20 +112,16 @@ app.get('/', (req, res) => {
     message: 'Sabbath School Tracker API',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
-    docs: '/health'
+    docs: '/health',
   });
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found',
-    path: req.path
-  });
+  res.status(404).json({ success: false, message: 'Route not found', path: req.path });
 });
 
-// Error handling middleware (must be last)
+// Error handling middleware
 app.use(errorHandler);
 
 // Start server
@@ -167,23 +129,18 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🏥 Health check: http://0.0.0.0:${PORT}/health`);
-  console.log(`🌐 CORS: ${process.env.NODE_ENV === 'production' ? 'Production mode' : 'Development mode'}`);
   console.log(`⛪ Church: ${process.env.CHURCH_NAME || 'Not configured'}`);
 });
 
-// Enhanced error handling
-process.on('unhandledRejection', (err) => {
+// Graceful error handling
+process.on('unhandledRejection', err => {
   console.error('💥 Unhandled Promise Rejection:', err);
-  // Graceful shutdown
   process.exit(1);
 });
-
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', err => {
   console.error('💥 Uncaught Exception:', err);
   process.exit(1);
 });
-
-// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM received, shutting down gracefully');
   process.exit(0);
