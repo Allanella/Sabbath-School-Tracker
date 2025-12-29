@@ -4,8 +4,8 @@ const { generateToken } = require('../utils/jwtHelper');
 
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'none',
+  secure: true,       // 🔥 REQUIRED for HTTPS
+  sameSite: 'none',   // 🔥 REQUIRED for cross-domain
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
@@ -59,8 +59,8 @@ const authController = {
           },
         },
       });
-    } catch (error) {
-      next(error);
+    } catch (err) {
+      next(err);
     }
   },
 
@@ -105,13 +105,18 @@ const authController = {
           },
         },
       });
-    } catch (error) {
-      next(error);
+    } catch (err) {
+      next(err);
     }
   },
 
   logout: (req, res) => {
-    res.clearCookie('token', cookieOptions);
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+    });
+
     res.json({ success: true, message: 'Logged out successfully' });
   },
 
@@ -124,20 +129,19 @@ const authController = {
         .single();
 
       res.json({ success: true, data: user });
-    } catch (error) {
-      next(error);
+    } catch (err) {
+      next(err);
     }
   },
 
   changePassword: async (req, res, next) => {
     try {
       const { current_password, new_password } = req.body;
-      const userId = req.user.userId;
 
       const { data: user } = await supabase
         .from('users')
         .select('password_hash')
-        .eq('id', userId)
+        .eq('id', req.user.userId)
         .single();
 
       const valid = await comparePassword(current_password, user.password_hash);
@@ -153,11 +157,11 @@ const authController = {
       await supabase
         .from('users')
         .update({ password_hash: new_hash })
-        .eq('id', userId);
+        .eq('id', req.user.userId);
 
       res.json({ success: true, message: 'Password changed successfully' });
-    } catch (error) {
-      next(error);
+    } catch (err) {
+      next(err);
     }
   },
 };
