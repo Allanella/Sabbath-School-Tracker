@@ -1,25 +1,18 @@
-const { verifyToken } = require('../utils/jwtHelper');
+const jwt = require('jsonwebtoken');
 
-const authenticate = (req, res, next) => {
+module.exports = (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+    const token = req.cookies.token;
+
     if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Access denied. No token provided.' 
-      });
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const decoded = verifyToken(token);
-    req.user = decoded; // Attach user info to request
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+
     next();
-  } catch (error) {
-    res.status(401).json({ 
-      success: false, 
-      message: 'Invalid or expired token' 
-    });
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 };
-
-module.exports = authenticate;

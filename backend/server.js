@@ -5,6 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 // -------------------- PATHS --------------------
 const ROUTES_PATH = path.join(__dirname, 'src', 'routes');
@@ -27,29 +28,32 @@ const PORT = process.env.PORT || 5000;
 
 // -------------------- SECURITY --------------------
 app.use(helmet());
+app.use(cookieParser());
 
 // -------------------- CORS --------------------
 const allowedOrigins = [
-  process.env.FRONTEND_URL,          // Vercel frontend
+  process.env.FRONTEND_URL,
   'https://sabbath-school-tracker.vercel.app',
 ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow Postman / server calls
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
 
-    if (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.vercel.app') ||
-      origin.startsWith('http://localhost')
-    ) {
-      return callback(null, true);
-    }
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.startsWith('http://localhost')
+      ) {
+        return callback(null, true);
+      }
 
-    callback(new Error('CORS not allowed'));
-  },
-  credentials: true,
-}));
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
 
 // -------------------- RATE LIMIT --------------------
 app.use(
@@ -109,10 +113,9 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // -------------------- START SERVER --------------------
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🏥 Health: /health`);
 });
 
 // -------------------- GRACEFUL SHUTDOWN --------------------
