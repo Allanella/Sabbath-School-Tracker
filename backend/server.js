@@ -6,11 +6,11 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-// Resolve paths relative to this file
+// -------------------- PATHS --------------------
 const ROUTES_PATH = path.join(__dirname, 'src', 'routes');
 const MIDDLEWARE_PATH = path.join(__dirname, 'src', 'middleware');
 
-// Import routes
+// -------------------- ROUTES --------------------
 const authRoutes = require(path.join(ROUTES_PATH, 'auth.routes'));
 const userRoutes = require(path.join(ROUTES_PATH, 'user.routes'));
 const classRoutes = require(path.join(ROUTES_PATH, 'class.routes'));
@@ -18,87 +18,68 @@ const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
 const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
 const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
 
-// Import middleware
+// -------------------- MIDDLEWARE --------------------
 const errorHandler = require(path.join(MIDDLEWARE_PATH, 'errorHandler'));
 
-// Initialize express app
+// -------------------- APP INIT --------------------
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security middleware
+// -------------------- SECURITY --------------------
 app.use(helmet());
 
-// Dynamic CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+// -------------------- CORS --------------------
+const allowedOrigins = [
+  process.env.FRONTEND_URL,          // Vercel frontend
+  'https://sabbath-school-tracker.vercel.app',
+];
 
-    if (process.env.NODE_ENV === 'production') {
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        /\.vercel\.app$/, // Allow all Vercel deployments
-      ];
-      const isAllowed = allowedOrigins.some(o =>
-        typeof o === 'string' ? origin === o : o.test(origin)
-      );
-      return isAllowed
-        ? callback(null, true)
-        : callback(new Error('Not allowed by CORS'), false);
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // allow Postman / server calls
+
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.startsWith('http://localhost')
+    ) {
+      return callback(null, true);
     }
 
-    // Development allowed origins
-    const allowedDevOrigins = [
-      /^http:\/\/localhost(:\d+)?$/,
-      /^http:\/\/127\.0\.0\.1(:\d+)?$/,
-      'http://localhost:5173',
-      'http://localhost:5174',
-    ];
-    const isAllowed = allowedDevOrigins.some(o =>
-      typeof o === 'string' ? origin === o : o.test(origin)
-    );
-    return isAllowed
-      ? callback(null, true)
-      : callback(new Error('Not allowed by CORS'), false);
+    callback(new Error('CORS not allowed'));
   },
   credentials: true,
-  optionsSuccessStatus: 200,
-};
-app.use(cors(corsOptions));
+}));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 200 : 100,
-  message: { error: 'Too many requests from this IP, try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', limiter);
+// -------------------- RATE LIMIT --------------------
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: process.env.NODE_ENV === 'production' ? 200 : 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
-// Body parser middleware
+// -------------------- BODY PARSER --------------------
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Logging
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+// -------------------- LOGGING --------------------
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Health check
+// -------------------- HEALTH CHECK --------------------
 app.get('/health', (req, res) => {
-  const healthCheck = {
+  res.status(200).json({
     status: 'OK',
     message: 'Sabbath School Tracker API is running',
-    timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    church: process.env.CHURCH_NAME || 'Not configured',
-  };
-  res.status(200).json(healthCheck);
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// API Routes
+// -------------------- API ROUTES --------------------
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/classes', classRoutes);
@@ -106,44 +87,43 @@ app.use('/api/quarters', quarterRoutes);
 app.use('/api/weekly-data', weeklyDataRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Root endpoint
+// -------------------- ROOT --------------------
 app.get('/', (req, res) => {
   res.json({
-    message: 'Sabbath School Tracker API',
+    name: 'Sabbath School Tracker API',
     version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    docs: '/health',
+    health: '/health',
   });
 });
 
-// 404 handler
+// -------------------- 404 --------------------
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found', path: req.path });
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.originalUrl,
+  });
 });
 
-// Error handling middleware
+// -------------------- ERROR HANDLER --------------------
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
+// -------------------- START SERVER --------------------
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🏥 Health check: http://0.0.0.0:${PORT}/health`);
-  console.log(`⛪ Church: ${process.env.CHURCH_NAME || 'Not configured'}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🏥 Health: /health`);
 });
 
-// Graceful error handling
+// -------------------- GRACEFUL SHUTDOWN --------------------
 process.on('unhandledRejection', err => {
-  console.error('💥 Unhandled Promise Rejection:', err);
+  console.error('Unhandled Rejection:', err);
   process.exit(1);
 });
+
 process.on('uncaughtException', err => {
-  console.error('💥 Uncaught Exception:', err);
+  console.error('Uncaught Exception:', err);
   process.exit(1);
-});
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully');
-  process.exit(0);
 });
 
 module.exports = app;
