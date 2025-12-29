@@ -4,16 +4,18 @@ const { generateToken } = require('../utils/jwtHelper');
 
 const cookieOptions = {
   httpOnly: true,
-  secure: true,       // 🔥 REQUIRED for HTTPS
-  sameSite: 'none',   // 🔥 REQUIRED for cross-domain
-  maxAge: 7 * 24 * 60 * 60 * 1000,
+  secure: true,        // Required for HTTPS (Render)
+  sameSite: 'none',    // Required for cross-domain cookies
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
 const authController = {
+  // -------------------- REGISTER --------------------
   register: async (req, res, next) => {
     try {
       const { email, password, full_name, role } = req.body;
 
+      // Check if user exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
@@ -27,24 +29,22 @@ const authController = {
         });
       }
 
+      // Hash password
       const password_hash = await hashPassword(password);
 
+      // Insert new user
       const { data: newUser, error } = await supabase
         .from('users')
-        .insert([
-          {
-            email,
-            password_hash,
-            full_name,
-            role: role || 'viewer',
-          },
-        ])
+        .insert([{ email, password_hash, full_name, role: role || 'viewer' }])
         .select()
         .single();
 
       if (error) throw error;
 
+      // Generate JWT token
       const token = generateToken(newUser.id, newUser.email, newUser.role);
+
+      // Set cookie
       res.cookie('token', token, cookieOptions);
 
       res.status(201).json({
@@ -64,24 +64,27 @@ const authController = {
     }
   },
 
+  // -------------------- LOGIN --------------------
   login: async (req, res, next) => {
     try {
       const { email, password } = req.body;
 
-      const { data: user } = await supabase
+      // Get user from Supabase
+      const { data: user, error } = await supabase
         .from('users')
         .select('*')
         .eq('email', email)
         .eq('is_active', true)
         .single();
 
-      if (!user) {
+      if (error || !user) {
         return res.status(401).json({
           success: false,
           message: 'Invalid email or password',
         });
       }
 
+      // Verify password
       const valid = await comparePassword(password, user.password_hash);
       if (!valid) {
         return res.status(401).json({
@@ -90,6 +93,7 @@ const authController = {
         });
       }
 
+      // Generate token
       const token = generateToken(user.id, user.email, user.role);
       res.cookie('token', token, cookieOptions);
 
@@ -110,23 +114,22 @@ const authController = {
     }
   },
 
+  // -------------------- LOGOUT --------------------
   logout: (req, res) => {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-    });
-
+    res.clearCookie('token', cookieOptions);
     res.json({ success: true, message: 'Logged out successfully' });
   },
 
+  // -------------------- GET PROFILE --------------------
   getProfile: async (req, res, next) => {
     try {
-      const { data: user } = await supabase
+      const { data: user, error } = await supabase
         .from('users')
         .select('id, email, full_name, role, created_at')
         .eq('id', req.user.userId)
         .single();
+
+      if (error || !user) throw new Error('User not found');
 
       res.json({ success: true, data: user });
     } catch (err) {
@@ -134,22 +137,25 @@ const authController = {
     }
   },
 
+  // -------------------- CHANGE PASSWORD --------------------
   changePassword: async (req, res, next) => {
     try {
       const { current_password, new_password } = req.body;
+      const userId = req.user.userId;
 
-      const { data: user } = await supabase
+      const { data: user, error } = await supabase
         .from('users')
         .select('password_hash')
-        .eq('id', req.user.userId)
+        .eq('id', userId)
         .single();
+
+      if (error || !user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
 
       const valid = await comparePassword(current_password, user.password_hash);
       if (!valid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password incorrect',
-        });
+        return res.status(400).json({ success: false, message: 'Current password incorrect' });
       }
 
       const new_hash = await hashPassword(new_password);
@@ -157,7 +163,7 @@ const authController = {
       await supabase
         .from('users')
         .update({ password_hash: new_hash })
-        .eq('id', req.user.userId);
+        .eq('id', userId);
 
       res.json({ success: true, message: 'Password changed successfully' });
     } catch (err) {

@@ -4,7 +4,10 @@ const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     if (response.data.success) {
-      localStorage.setItem('token', response.data.data.token);
+      // Remove this line - no token in response body
+      // localStorage.setItem('token', response.data.data.token);
+      
+      // Keep this - store user info
       localStorage.setItem('user', JSON.stringify(response.data.data.user));
     }
     return response.data;
@@ -12,12 +15,21 @@ const authService = {
 
   register: async (userData) => {
     const response = await api.post('/auth/register', userData);
+    if (response.data.success) {
+      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+    }
     return response.data;
   },
 
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
   },
 
   getCurrentUser: () => {
@@ -27,11 +39,14 @@ const authService = {
 
   getProfile: async () => {
     const response = await api.get('/auth/profile');
+    if (response.data.success) {
+      localStorage.setItem('user', JSON.stringify(response.data.data));
+    }
     return response.data;
   },
 
   changePassword: async (currentPassword, newPassword) => {
-    const response = await api.post('/auth/change-password', {
+    const response = await api.put('/auth/change-password', {
       current_password: currentPassword,
       new_password: newPassword
     });

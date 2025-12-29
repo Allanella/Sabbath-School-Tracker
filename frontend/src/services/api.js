@@ -5,9 +5,10 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // ⚠️ CRITICAL FIX - This enables cookies for cross-domain requests
 });
 
-// Request interceptor to add token
+// Request interceptor (keeping your token logic for backwards compatibility)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
