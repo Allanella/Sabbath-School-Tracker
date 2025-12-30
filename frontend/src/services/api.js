@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: `${import.meta.env.VITE_API_URL}/api` || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // ⚠️ CRITICAL FIX - This enables cookies for cross-domain requests
+  withCredentials: true, // ← Keep this!
 });
 
 // Request interceptor (keeping your token logic for backwards compatibility)
