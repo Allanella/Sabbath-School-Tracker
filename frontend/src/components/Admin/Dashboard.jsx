@@ -23,7 +23,7 @@ const AdminDashboard = () => {
       ]);
 
       setStats({
-        activeQuarter: quarterRes.data,
+        activeQuarter: quarterRes.data || null,
         totalClasses: classesRes.data?.length || 0,
         loading: false
       });
@@ -67,7 +67,7 @@ const AdminDashboard = () => {
   if (stats.loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
@@ -79,7 +79,7 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {cards.map((card) => (
           <Link key={card.title} to={card.link}>
-            <div className="card hover:shadow-md transition cursor-pointer">
+            <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">{card.title}</p>
@@ -95,7 +95,7 @@ const AdminDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
+        <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
           <div className="space-y-3">
             <Link to="/admin/quarters" className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
@@ -106,6 +106,10 @@ const AdminDashboard = () => {
               <p className="font-medium">Add New Class</p>
               <p className="text-sm text-gray-600">Register Sabbath School classes</p>
             </Link>
+            <Link to="/admin/users" className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+              <p className="font-medium">Manage Users</p>
+              <p className="text-sm text-gray-600">Add secretaries and viewers</p>
+            </Link>
             <Link to="/reports/quarterly" className="block p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
               <p className="font-medium">View Reports</p>
               <p className="text-sm text-gray-600">Access quarterly and weekly reports</p>
@@ -113,7 +117,7 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="card">
+        <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">System Information</h2>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b">
@@ -126,9 +130,13 @@ const AdminDashboard = () => {
                 {stats.activeQuarter ? `${stats.activeQuarter.name} ${stats.activeQuarter.year}` : 'None'}
               </span>
             </div>
-            <div className="flex justify-between py-2">
+            <div className="flex justify-between py-2 border-b">
               <span className="text-gray-600">Total Classes:</span>
               <span className="font-medium">{stats.totalClasses}</span>
+            </div>
+            <div className="flex justify-between py-2">
+              <span className="text-gray-600">Developer:</span>
+              <span className="font-medium">Baliddawa Allan</span>
             </div>
           </div>
         </div>
