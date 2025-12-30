@@ -8,9 +8,30 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check if user exists in localStorage
     const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
+    
+    if (currentUser) {
+      // User exists in localStorage, set it immediately
+      setUser(currentUser);
+      setLoading(false);
+      
+      // Optional: Verify session with backend in background
+      authService.getProfile()
+        .then((response) => {
+          if (response.success) {
+            setUser(response.data);
+          }
+        })
+        .catch((error) => {
+          // If session is invalid, clear localStorage
+          console.error('Session verification failed:', error);
+          authService.logout();
+          setUser(null);
+        });
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const login = async (email, password) => {
@@ -19,8 +40,8 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
-  const logout = () => {
-    authService.logout();
+  const logout = async () => {
+    await authService.logout();
     setUser(null);
   };
 
