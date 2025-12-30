@@ -21,16 +21,17 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           
+          {/* Protected routes with Layout */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             {/* Admin Routes */}
-            <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>} />
-            <Route path="/admin/quarters" element={<ProtectedRoute roles={['admin']}><QuarterSetup /></ProtectedRoute>} />
-            <Route path="/admin/classes" element={<ProtectedRoute roles={['admin']}><ClassManagement /></ProtectedRoute>} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/quarters" element={<QuarterSetup />} />
+            <Route path="/admin/classes" element={<ClassManagement />} />
             
             {/* Secretary Routes */}
-            <Route path="/secretary" element={<ProtectedRoute roles={['secretary']}><SecretaryDashboard /></ProtectedRoute>} />
-            <Route path="/secretary/entry" element={<ProtectedRoute roles={['admin', 'secretary']}><WeeklyDataEntry /></ProtectedRoute>} />
+            <Route path="/secretary" element={<SecretaryDashboard />} />
+            <Route path="/secretary/entry" element={<WeeklyDataEntry />} />
             
             {/* Report Routes */}
             <Route path="/reports/weekly" element={<WeeklyReport />} />
@@ -38,7 +39,7 @@ function App() {
             <Route path="/reports/financial" element={<FinancialReport />} />
             
             {/* Default Routes */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Navigate to="/admin" replace />} />
           </Route>
         </Routes>
       </AuthProvider>
