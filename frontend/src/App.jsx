@@ -19,18 +19,11 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          {/* Public route */}
+          {/* Public Login Route */}
           <Route path="/login" element={<Login />} />
           
-          {/* All protected routes */}
-          <Route 
-            path="/*" 
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
+          {/* Protected Routes with Layout */}
+          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             {/* Admin Routes */}
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/users" element={<UserManagement />} />
@@ -46,9 +39,12 @@ function App() {
             <Route path="reports/quarterly" element={<QuarterlyReport />} />
             <Route path="reports/financial" element={<FinancialReport />} />
             
-            {/* Root redirect */}
-            <Route index element={<Navigate to="/admin" replace />} />
+            {/* Root Redirect */}
+            <Route index element={<Navigate to="admin" replace />} />
           </Route>
+          
+          {/* Catch all - redirect to login */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
     </Router>
