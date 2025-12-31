@@ -19,27 +19,35 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
+          {/* Public route */}
           <Route path="/login" element={<Login />} />
           
-          {/* Protected routes with Layout */}
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          {/* All protected routes */}
+          <Route 
+            path="/*" 
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
             {/* Admin Routes */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<UserManagement />} />
-            <Route path="/admin/quarters" element={<QuarterSetup />} />
-            <Route path="/admin/classes" element={<ClassManagement />} />
+            <Route path="admin" element={<AdminDashboard />} />
+            <Route path="admin/users" element={<UserManagement />} />
+            <Route path="admin/quarters" element={<QuarterSetup />} />
+            <Route path="admin/classes" element={<ClassManagement />} />
             
             {/* Secretary Routes */}
-            <Route path="/secretary" element={<SecretaryDashboard />} />
-            <Route path="/secretary/entry" element={<WeeklyDataEntry />} />
+            <Route path="secretary" element={<SecretaryDashboard />} />
+            <Route path="secretary/entry" element={<WeeklyDataEntry />} />
             
             {/* Report Routes */}
-            <Route path="/reports/weekly" element={<WeeklyReport />} />
-            <Route path="/reports/quarterly" element={<QuarterlyReport />} />
-            <Route path="/reports/financial" element={<FinancialReport />} />
+            <Route path="reports/weekly" element={<WeeklyReport />} />
+            <Route path="reports/quarterly" element={<QuarterlyReport />} />
+            <Route path="reports/financial" element={<FinancialReport />} />
             
-            {/* Default Routes */}
-            <Route path="/" element={<Navigate to="/admin" replace />} />
+            {/* Root redirect */}
+            <Route index element={<Navigate to="/admin" replace />} />
           </Route>
         </Routes>
       </AuthProvider>
