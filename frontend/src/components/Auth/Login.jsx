@@ -163,15 +163,18 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Bottom decoration */}
-        <div className="text-center mt-6">
+        {/* Bottom decoration with developer credit */}
+        <div className="text-center mt-6 space-y-2">
           <p className="text-sm text-white font-medium drop-shadow-lg">
             Secure login • Protected by encryption 🔒
+          </p>
+          <p className="text-xs text-white/90 drop-shadow-md font-medium">
+            Developed by <span className="font-bold">Baliddawa Allan</span> • 2025
           </p>
         </div>
       </div>
 
-      {/* Only shake animation - no blobs */}
+      {/* Only shake animation */}
       <style>{`
         @keyframes shake {
           0%, 100% {
