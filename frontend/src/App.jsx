@@ -19,6 +19,96 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
+          {/* ========== TEST ROUTES - CHECK THESE FIRST ========== */}
+          
+          {/* Test 1: Basic Route - No Auth Required */}
+          <Route path="/test-basic" element={
+            <div style={{padding: '50px', background: '#e8f5e9', minHeight: '100vh'}}>
+              <h1 style={{color: '#2e7d32', fontSize: '2em'}}>✅ TEST 1: BASIC ROUTE WORKS!</h1>
+              <p style={{fontSize: '1.2em'}}>If you see this, React Router is working correctly.</p>
+              <hr style={{margin: '20px 0'}} />
+              <h3>User Data from localStorage:</h3>
+              <pre style={{background: 'white', padding: '15px', borderRadius: '5px'}}>
+                {JSON.stringify(JSON.parse(localStorage.getItem('user') || 'null'), null, 2)}
+              </pre>
+              <button 
+                onClick={() => window.location.href = '/test-protected'}
+                style={{padding: '10px 20px', fontSize: '1em', margin: '10px 5px', cursor: 'pointer'}}
+              >
+                Test Protected Route →
+              </button>
+              <button 
+                onClick={() => window.location.href = '/admin'}
+                style={{padding: '10px 20px', fontSize: '1em', margin: '10px 5px', cursor: 'pointer'}}
+              >
+                Go to Admin →
+              </button>
+            </div>
+          } />
+
+          {/* Test 2: Protected Route - Requires Auth */}
+          <Route path="/test-protected" element={
+            <ProtectedRoute>
+              <div style={{padding: '50px', background: '#e3f2fd', minHeight: '100vh'}}>
+                <h1 style={{color: '#1565c0', fontSize: '2em'}}>✅ TEST 2: PROTECTED ROUTE WORKS!</h1>
+                <p style={{fontSize: '1.2em'}}>If you see this, ProtectedRoute is working correctly.</p>
+                <hr style={{margin: '20px 0'}} />
+                <h3>Authenticated User:</h3>
+                <pre style={{background: 'white', padding: '15px', borderRadius: '5px'}}>
+                  {JSON.stringify(JSON.parse(localStorage.getItem('user') || 'null'), null, 2)}
+                </pre>
+                <button 
+                  onClick={() => window.location.href = '/test-dashboard'}
+                  style={{padding: '10px 20px', fontSize: '1em', margin: '10px 5px', cursor: 'pointer'}}
+                >
+                  Test Dashboard →
+                </button>
+                <button 
+                  onClick={() => window.location.href = '/admin'}
+                  style={{padding: '10px 20px', fontSize: '1em', margin: '10px 5px', cursor: 'pointer'}}
+                >
+                  Go to Admin →
+                </button>
+              </div>
+            </ProtectedRoute>
+          } />
+
+          {/* Test 3: Dashboard Without Layout */}
+          <Route path="/test-dashboard" element={
+            <ProtectedRoute>
+              <div style={{padding: '50px', background: '#fff3e0', minHeight: '100vh'}}>
+                <h1 style={{color: '#e65100', fontSize: '2em'}}>✅ TEST 3: DASHBOARD COMPONENT</h1>
+                <p style={{fontSize: '1.2em'}}>Testing AdminDashboard component directly (no Layout)</p>
+                <hr style={{margin: '20px 0'}} />
+                <div style={{border: '2px solid #e65100', padding: '20px', borderRadius: '5px'}}>
+                  <AdminDashboard />
+                </div>
+                <button 
+                  onClick={() => window.location.href = '/test-layout'}
+                  style={{padding: '10px 20px', fontSize: '1em', margin: '10px 5px', cursor: 'pointer'}}
+                >
+                  Test With Layout →
+                </button>
+              </div>
+            </ProtectedRoute>
+          } />
+
+          {/* Test 4: With Layout */}
+          <Route path="/test-layout" element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route index element={
+              <div style={{padding: '20px'}}>
+                <h1 style={{color: '#9c27b0'}}>✅ TEST 4: LAYOUT + OUTLET WORKS!</h1>
+                <p>If you see the sidebar AND this message, Layout with Outlet is working.</p>
+              </div>
+            } />
+          </Route>
+
+          {/* ========== ACTUAL APP ROUTES ========== */}
+          
           {/* Public Login Route */}
           <Route path="/login" element={<Login />} />
           
@@ -43,7 +133,7 @@ function App() {
             <Route index element={<Navigate to="admin" replace />} />
           </Route>
           
-          {/* Catch all - redirect to login */}
+          {/* Catch all */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
