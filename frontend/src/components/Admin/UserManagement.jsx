@@ -1,7 +1,6 @@
 // src/components/Admin/UserManagement.jsx
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import classService from '../../services/classService';
 import { 
   Users, 
   Plus, 
@@ -17,7 +16,6 @@ import {
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
-  const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -27,13 +25,11 @@ const UserManagement = () => {
     email: '',
     password: '',
     full_name: '',
-    role: 'viewer',
-    assigned_class_id: null
+    role: 'viewer'
   });
 
   useEffect(() => {
     loadUsers();
-    loadClasses();
   }, []);
 
   const loadUsers = async () => {
@@ -47,15 +43,6 @@ const UserManagement = () => {
     }
   };
 
-  const loadClasses = async () => {
-    try {
-      const response = await classService.getAll();
-      setClasses(response.data || []);
-    } catch (error) {
-      console.error('Failed to load classes:', error);
-    }
-  };
-
   const handleOpenModal = (user = null) => {
     if (user) {
       setEditingUser(user);
@@ -63,8 +50,7 @@ const UserManagement = () => {
         email: user.email,
         password: '',
         full_name: user.full_name,
-        role: user.role,
-        assigned_class_id: user.assigned_class_id || null
+        role: user.role
       });
     } else {
       setEditingUser(null);
@@ -72,8 +58,7 @@ const UserManagement = () => {
         email: '',
         password: '',
         full_name: '',
-        role: 'viewer',
-        assigned_class_id: null
+        role: 'viewer'
       });
     }
     setShowModal(true);
@@ -87,8 +72,7 @@ const UserManagement = () => {
       email: '',
       password: '',
       full_name: '',
-      role: 'viewer',
-      assigned_class_id: null
+      role: 'viewer'
     });
   };
 
@@ -96,9 +80,7 @@ const UserManagement = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value,
-      // Clear assigned_class_id if role is not class_secretary
-      ...(name === 'role' && value !== 'class_secretary' ? { assigned_class_id: null } : {})
+      [name]: value
     }));
   };
 
@@ -112,12 +94,6 @@ const UserManagement = () => {
       // Validation
       if (!submitData.password && !editingUser) {
         setMessage({ type: 'error', text: 'Password is required for new users' });
-        return;
-      }
-
-      // Validate class_secretary has assigned class
-      if (submitData.role === 'class_secretary' && !submitData.assigned_class_id) {
-        setMessage({ type: 'error', text: 'Please select a class for the class secretary' });
         return;
       }
 
@@ -180,8 +156,6 @@ const UserManagement = () => {
         return 'bg-purple-100 text-purple-800';
       case 'ss_secretary':
         return 'bg-blue-100 text-blue-800';
-      case 'class_secretary':
-        return 'bg-indigo-100 text-indigo-800';
       case 'viewer':
         return 'bg-gray-100 text-gray-800';
       default:
@@ -195,8 +169,6 @@ const UserManagement = () => {
         return 'Admin';
       case 'ss_secretary':
         return 'SS Secretary';
-      case 'class_secretary':
-        return 'Class Secretary';
       case 'viewer':
         return 'Viewer';
       default:
@@ -335,7 +307,7 @@ const UserManagement = () => {
       {/* Add/Edit User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="flex justify-between items-center p-6 border-b">
               <h3 className="text-xl font-semibold text-gray-900">
                 {editingUser ? 'Edit User' : 'Add New User'}
@@ -412,36 +384,9 @@ const UserManagement = () => {
                 >
                   <option value="viewer">Viewer - View reports only</option>
                   <option value="ss_secretary">SS Secretary - Enter data for all classes</option>
-                  <option value="class_secretary">Class Secretary - Enter data for assigned class</option>
                   <option value="admin">Admin - Full system access</option>
                 </select>
               </div>
-
-              {/* Show Class Selection ONLY if role is class_secretary */}
-              {formData.role === 'class_secretary' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Assigned Class <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="assigned_class_id"
-                    value={formData.assigned_class_id || ''}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
-                    required
-                  >
-                    <option value="">Select a class</option>
-                    {classes.map(cls => (
-                      <option key={cls.id} value={cls.id}>
-                        {cls.class_name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    This secretary will only be able to enter data for this specific class
-                  </p>
-                </div>
-              )}
 
               {/* Role Descriptions */}
               <div className="p-4 bg-gray-50 rounded-lg">
@@ -456,14 +401,15 @@ const UserManagement = () => {
                     <span>Can enter weekly data for ALL classes and generate reports</span>
                   </li>
                   <li className="flex items-start">
-                    <span className="font-semibold text-indigo-600 mr-2">📝 Class Secretary:</span>
-                    <span>Can enter data ONLY for their assigned class</span>
-                  </li>
-                  <li className="flex items-start">
                     <span className="font-semibold text-purple-600 mr-2">👨‍💼 Admin:</span>
                     <span>Full access - manage users, classes, and all data</span>
                   </li>
                 </ul>
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 italic">
+                    💡 Class secretaries don't need user accounts - just enter their names when creating a class
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
