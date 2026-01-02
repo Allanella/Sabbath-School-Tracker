@@ -28,7 +28,7 @@ router.get('/secretaries', async (req, res, next) => {
     const { data, error } = await supabase
       .from('users')
       .select('id, full_name, email')
-      .eq('role', 'secretary')
+      .eq('role', 'ss_secretary')  // Changed from 'secretary' to 'ss_secretary'
       .eq('is_active', true)
       .order('full_name');
 
@@ -59,6 +59,51 @@ router.put('/:id', checkRole('admin'), async (req, res, next) => {
       success: true, 
       message: 'User updated successfully',
       data 
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete user (admin only) - NEW ENDPOINT
+router.delete('/:id', checkRole('admin'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user.userId;
+
+    // Prevent self-deletion
+    if (id === currentUserId) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account',
+      });
+    }
+
+    // Check if user exists
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Delete user
+    const { error: deleteError } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) throw deleteError;
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully',
     });
   } catch (error) {
     next(error);
