@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import classService from '../../services/classService';
 import quarterService from '../../services/quarterService';
-import api from '../../services/api';
 import { 
   BookOpen, 
   Plus, 
@@ -18,7 +17,6 @@ import {
 const ClassManagement = () => {
   const [classes, setClasses] = useState([]);
   const [quarters, setQuarters] = useState([]);
-  const [secretaries, setSecretaries] = useState([]);
   const [selectedQuarter, setSelectedQuarter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -29,7 +27,6 @@ const ClassManagement = () => {
     quarter_id: '',
     class_name: '',
     teacher_name: '',
-    secretary_id: '',
     secretary_name: '',
     church_name: 'Kanyanya Seventh-day Adventist Church'
   });
@@ -44,13 +41,8 @@ const ClassManagement = () => {
 
   const loadData = async () => {
     try {
-      const [quartersRes, secretariesRes] = await Promise.all([
-        quarterService.getAll(),
-        api.get('/users/secretaries')
-      ]);
-      
+      const quartersRes = await quarterService.getAll();
       setQuarters(quartersRes.data);
-      setSecretaries(secretariesRes.data.data);
       
       // Set default quarter to active quarter
       const activeQuarter = quartersRes.data.find(q => q.is_active);
@@ -84,7 +76,6 @@ const ClassManagement = () => {
         quarter_id: classItem.quarter_id,
         class_name: classItem.class_name,
         teacher_name: classItem.teacher_name,
-        secretary_id: classItem.secretary_id,
         secretary_name: classItem.secretary_name,
         church_name: classItem.church_name
       });
@@ -95,7 +86,6 @@ const ClassManagement = () => {
         quarter_id: activeQuarter?.id || '',
         class_name: '',
         teacher_name: '',
-        secretary_id: '',
         secretary_name: '',
         church_name: 'Kanyanya Seventh-day Adventist Church'
       });
@@ -111,21 +101,10 @@ const ClassManagement = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // If secretary is selected, update secretary_name
-    if (name === 'secretary_id') {
-      const secretary = secretaries.find(s => s.id === value);
-      setFormData(prev => ({
-        ...prev,
-        secretary_id: value,
-        secretary_name: secretary ? secretary.full_name : ''
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -173,7 +152,7 @@ const ClassManagement = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
@@ -187,7 +166,7 @@ const ClassManagement = () => {
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="btn-primary flex items-center space-x-2"
+          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all"
         >
           <Plus className="h-5 w-5" />
           <span>Add Class</span>
@@ -211,13 +190,13 @@ const ClassManagement = () => {
       )}
 
       {/* Filter */}
-      <div className="card mb-6">
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex items-center space-x-4">
           <label className="text-sm font-medium text-gray-700">Filter by Quarter:</label>
           <select
             value={selectedQuarter}
             onChange={(e) => setSelectedQuarter(e.target.value)}
-            className="input max-w-xs"
+            className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white max-w-xs"
           >
             <option value="all">All Quarters</option>
             {quarters.map(quarter => (
@@ -235,11 +214,11 @@ const ClassManagement = () => {
       {/* Classes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {classes.map((classItem) => (
-          <div key={classItem.id} className="card hover:shadow-lg transition">
+          <div key={classItem.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-primary-100 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-primary-600" />
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <BookOpen className="h-6 w-6 text-indigo-600" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{classItem.class_name}</h3>
@@ -288,12 +267,6 @@ const ClassManagement = () => {
                 <span className="text-gray-600">Secretary:</span>
                 <span className="font-medium text-gray-900">{classItem.secretary_name}</span>
               </div>
-
-              {classItem.secretary?.email && (
-                <div className="text-xs text-gray-500 pl-6">
-                  {classItem.secretary.email}
-                </div>
-              )}
             </div>
           </div>
         ))}
@@ -309,7 +282,7 @@ const ClassManagement = () => {
             </p>
             <button
               onClick={() => handleOpenModal()}
-              className="btn-primary inline-flex items-center space-x-2"
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all"
             >
               <Plus className="h-5 w-5" />
               <span>Add Class</span>
@@ -347,12 +320,12 @@ const ClassManagement = () => {
               )}
 
               <div>
-                <label className="label">Quarter</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Quarter</label>
                 <select
                   name="quarter_id"
                   value={formData.quarter_id}
                   onChange={handleChange}
-                  className="input"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
                   required
                 >
                   <option value="">Select Quarter</option>
@@ -365,60 +338,55 @@ const ClassManagement = () => {
               </div>
 
               <div>
-                <label className="label">Class Name</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Class Name</label>
                 <input
                   type="text"
                   name="class_name"
                   value={formData.class_name}
                   onChange={handleChange}
-                  className="input"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
                   placeholder="e.g., Young Adults, Women's Class, Men's Class"
                   required
                 />
               </div>
 
               <div>
-                <label className="label">Teacher Name</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Teacher Name</label>
                 <input
                   type="text"
                   name="teacher_name"
                   value={formData.teacher_name}
                   onChange={handleChange}
-                  className="input"
-                  placeholder="Full name of the teacher"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                  placeholder="Enter teacher's full name"
                   required
                 />
               </div>
 
               <div>
-                <label className="label">Secretary</label>
-                <select
-                  name="secretary_id"
-                  value={formData.secretary_id}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Class Secretary Name</label>
+                <input
+                  type="text"
+                  name="secretary_name"
+                  value={formData.secretary_name}
                   onChange={handleChange}
-                  className="input"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                  placeholder="Enter class secretary's full name"
                   required
-                >
-                  <option value="">Select Secretary</option>
-                  {secretaries.map(secretary => (
-                    <option key={secretary.id} value={secretary.id}>
-                      {secretary.full_name} ({secretary.email})
-                    </option>
-                  ))}
-                </select>
+                />
                 <p className="mt-1 text-xs text-gray-500">
-                  Secretary will be able to enter weekly data for this class
+                  For record keeping only - class secretaries don't log in to the system
                 </p>
               </div>
 
               <div>
-                <label className="label">Church Name</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Church Name</label>
                 <input
                   type="text"
                   name="church_name"
                   value={formData.church_name}
                   onChange={handleChange}
-                  className="input"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
                   required
                 />
               </div>
@@ -427,13 +395,13 @@ const ClassManagement = () => {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="btn-secondary"
+                  className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary flex items-center space-x-2"
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all"
                 >
                   <Save className="h-5 w-5" />
                   <span>{editingClass ? 'Update Class' : 'Create Class'}</span>
