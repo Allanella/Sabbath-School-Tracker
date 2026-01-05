@@ -15,6 +15,15 @@ const authController = {
     try {
       const { email, password, full_name, role } = req.body;
 
+      // Validate role
+      const validRoles = ['admin', 'ss_secretary', 'viewer'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid role. Must be one of: ${validRoles.join(', ')}`,
+        });
+      }
+
       // Check if user exists
       const { data: existingUser } = await supabase
         .from('users')
@@ -39,7 +48,13 @@ const authController = {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert error:', error);
+        return res.status(400).json({
+          success: false,
+          message: error.message || 'Failed to create user',
+        });
+      }
 
       // Generate JWT token
       const token = generateToken(newUser.id, newUser.email, newUser.role);
@@ -60,6 +75,7 @@ const authController = {
         },
       });
     } catch (err) {
+      console.error('Registration error:', err);
       next(err);
     }
   },
@@ -110,6 +126,7 @@ const authController = {
         },
       });
     } catch (err) {
+      console.error('Login error:', err);
       next(err);
     }
   },
@@ -133,6 +150,7 @@ const authController = {
 
       res.json({ success: true, data: user });
     } catch (err) {
+      console.error('Get profile error:', err);
       next(err);
     }
   },
@@ -167,6 +185,7 @@ const authController = {
 
       res.json({ success: true, message: 'Password changed successfully' });
     } catch (err) {
+      console.error('Change password error:', err);
       next(err);
     }
   },
