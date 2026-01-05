@@ -31,11 +31,12 @@ const Layout = () => {
       { name: 'Users', href: '/admin/users', icon: Users },
       { name: 'Quarters', href: '/admin/quarters', icon: Calendar },
       { name: 'Classes', href: '/admin/classes', icon: BookOpen },
+      { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
     ],
-    secretary: [
+    ss_secretary: [
       { name: 'Dashboard', href: '/secretary', icon: Home },
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
@@ -102,7 +103,7 @@ const Layout = () => {
             <p className="text-sm text-indigo-200">Logged in as</p>
             <p className="font-semibold">{user?.full_name}</p>
             <p className="text-xs text-indigo-300 capitalize">
-              {user?.role}
+              {user?.role === 'ss_secretary' ? 'SS Secretary' : user?.role}
             </p>
           </div>
 
