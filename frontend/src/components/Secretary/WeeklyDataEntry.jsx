@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
-import classMemberService from '../../services/ClassMemberService';
+import classMemberService from '../../services/classMemberService';
 import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users } from 'lucide-react';
 
 const WeeklyDataEntry = () => {
