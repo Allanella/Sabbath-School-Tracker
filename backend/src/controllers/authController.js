@@ -4,20 +4,22 @@ const { generateToken } = require('../utils/jwtHelper');
 
 const cookieOptions = {
   httpOnly: true,
-  secure: true,        // Required for HTTPS (Render)
-  sameSite: 'none',    // Required for cross-domain cookies
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  secure: true,
+  sameSite: 'none',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
 const authController = {
-  // -------------------- REGISTER --------------------
   register: async (req, res, next) => {
     try {
       const { email, password, full_name, role } = req.body;
 
+      console.log('Register request:', { email, full_name, role }); // Debug log
+
       // Validate role
       const validRoles = ['admin', 'ss_secretary', 'viewer'];
       if (role && !validRoles.includes(role)) {
+        console.error('Invalid role:', role); // Debug log
         return res.status(400).json({
           success: false,
           message: `Invalid role. Must be one of: ${validRoles.join(', ')}`,
@@ -49,7 +51,7 @@ const authController = {
         .single();
 
       if (error) {
-        console.error('Supabase insert error:', error);
+        console.error('Supabase insert error:', error); // Debug log
         return res.status(400).json({
           success: false,
           message: error.message || 'Failed to create user',
@@ -80,12 +82,10 @@ const authController = {
     }
   },
 
-  // -------------------- LOGIN --------------------
   login: async (req, res, next) => {
     try {
       const { email, password } = req.body;
 
-      // Get user from Supabase
       const { data: user, error } = await supabase
         .from('users')
         .select('*')
@@ -100,7 +100,6 @@ const authController = {
         });
       }
 
-      // Verify password
       const valid = await comparePassword(password, user.password_hash);
       if (!valid) {
         return res.status(401).json({
@@ -109,7 +108,6 @@ const authController = {
         });
       }
 
-      // Generate token
       const token = generateToken(user.id, user.email, user.role);
       res.cookie('token', token, cookieOptions);
 
@@ -131,13 +129,11 @@ const authController = {
     }
   },
 
-  // -------------------- LOGOUT --------------------
   logout: (req, res) => {
     res.clearCookie('token', cookieOptions);
     res.json({ success: true, message: 'Logged out successfully' });
   },
 
-  // -------------------- GET PROFILE --------------------
   getProfile: async (req, res, next) => {
     try {
       const { data: user, error } = await supabase
@@ -155,7 +151,6 @@ const authController = {
     }
   },
 
-  // -------------------- CHANGE PASSWORD --------------------
   changePassword: async (req, res, next) => {
     try {
       const { current_password, new_password } = req.body;
