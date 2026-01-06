@@ -1,6 +1,5 @@
 require('dotenv').config();
 const path = require('path');
-const classMemberRoutes = require('./routes/classMemberRoutes');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -19,6 +18,7 @@ const classRoutes = require(path.join(ROUTES_PATH, 'class.routes'));
 const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
 const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
 const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
+const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMember.routes'));
 
 // -------------------- MIDDLEWARE --------------------
 const errorHandler = require(path.join(MIDDLEWARE_PATH, 'errorHandler'));
@@ -30,7 +30,6 @@ const PORT = process.env.PORT || 5000;
 // -------------------- SECURITY --------------------
 app.use(helmet());
 app.use(cookieParser());
-app.use('/api/class-members', classMemberRoutes);
 
 // -------------------- CORS --------------------
 const allowedOrigins = [
@@ -92,6 +91,7 @@ app.use('/api/classes', classRoutes);
 app.use('/api/quarters', quarterRoutes);
 app.use('/api/weekly-data', weeklyDataRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/class-members', classMemberRoutes);
 
 // -------------------- ROOT --------------------
 app.get('/', (req, res) => {

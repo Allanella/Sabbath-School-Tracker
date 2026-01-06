@@ -22,6 +22,7 @@ router.get('/class/:class_id', async (req, res, next) => {
 
     res.json({ success: true, data });
   } catch (error) {
+    console.error('Get members error:', error);
     next(error);
   }
 });
@@ -31,13 +32,18 @@ router.post('/', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
   try {
     const { class_id, member_name } = req.body;
 
+    console.log('Creating member:', { class_id, member_name }); // Debug
+
     const { data, error } = await supabase
       .from('class_members')
       .insert([{ class_id, member_name }])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert member error:', error);
+      throw error;
+    }
 
     res.status(201).json({
       success: true,
@@ -45,6 +51,7 @@ router.post('/', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
       data,
     });
   } catch (error) {
+    console.error('Create member error:', error);
     next(error);
   }
 });
@@ -70,6 +77,7 @@ router.put('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next) =>
       data,
     });
   } catch (error) {
+    console.error('Update member error:', error);
     next(error);
   }
 });
@@ -91,6 +99,7 @@ router.delete('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next)
       message: 'Member removed successfully',
     });
   } catch (error) {
+    console.error('Delete member error:', error);
     next(error);
   }
 });
