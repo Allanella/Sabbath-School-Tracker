@@ -33,10 +33,7 @@ const WeeklyDataEntry = () => {
     members_paid_lesson_luganda: 0,
     members_paid_morning_watch_english: 0,
     members_paid_morning_watch_luganda: 0,
-    members_summary: '',
-    objectives_next_week: '',
-    challenges_faced: '',
-    way_forward: '',
+    members_summary: '', // Only keeping this one note field
   });
 
   useEffect(() => {
@@ -155,9 +152,6 @@ const WeeklyDataEntry = () => {
           members_paid_morning_watch_english: 0,
           members_paid_morning_watch_luganda: 0,
           members_summary: '',
-          objectives_next_week: '',
-          challenges_faced: '',
-          way_forward: '',
         });
         setMessage({ type: '', text: '' });
       }
@@ -514,57 +508,19 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Secretary Notes */}
+        {/* Additional Notes - SIMPLIFIED */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Secretary Notes</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Sabbath School Members Summary</label>
-              <textarea
-                name="members_summary"
-                value={formData.members_summary}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                rows="3"
-                placeholder="Brief summary of class members and attendance patterns..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Objectives for Next Week</label>
-              <textarea
-                name="objectives_next_week"
-                value={formData.objectives_next_week}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                rows="3"
-                placeholder="Goals and plans for the upcoming week..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Challenges Faced</label>
-              <textarea
-                name="challenges_faced"
-                value={formData.challenges_faced}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                rows="3"
-                placeholder="Any difficulties or issues encountered..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Way Forward</label>
-              <textarea
-                name="way_forward"
-                value={formData.way_forward}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                rows="3"
-                placeholder="Action plans and solutions..."
-              />
-            </div>
+          <h2 className="text-xl font-semibold mb-4">Additional Notes (Optional)</h2>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Notes/Comments</label>
+            <textarea
+              name="members_summary"
+              value={formData.members_summary}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+              rows="4"
+              placeholder="Any additional notes, comments, or observations..."
+            />
           </div>
         </div>
 
