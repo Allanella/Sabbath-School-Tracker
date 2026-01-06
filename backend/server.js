@@ -18,7 +18,7 @@ const classRoutes = require(path.join(ROUTES_PATH, 'class.routes'));
 const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
 const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
 const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
-const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMember.routes'));
+const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMemberRoutes'));
 
 // -------------------- MIDDLEWARE --------------------
 const errorHandler = require(path.join(MIDDLEWARE_PATH, 'errorHandler'));
