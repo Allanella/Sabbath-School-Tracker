@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+const classMemberRoutes = require('./routes/classMemberRoutes');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -29,6 +30,7 @@ const PORT = process.env.PORT || 5000;
 // -------------------- SECURITY --------------------
 app.use(helmet());
 app.use(cookieParser());
+app.use('/api/class-members', classMemberRoutes);
 
 // -------------------- CORS --------------------
 const allowedOrigins = [
