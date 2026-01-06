@@ -1,3 +1,4 @@
+const supabase = require('../config/database');
 const weeklyDataController = {
   // Submit weekly data
   create: async (req, res, next) => {

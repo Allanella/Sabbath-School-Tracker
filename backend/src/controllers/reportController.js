@@ -1,3 +1,4 @@
+
 const supabase = require('../config/database');
 
 const reportController = {
