@@ -19,6 +19,12 @@ const WeeklyDataEntry = () => {
   const [newMemberName, setNewMemberName] = useState('');
   const [editingMember, setEditingMember] = useState(null);
 
+  // Member selection states for payments
+  const [selectedLessonEnglish, setSelectedLessonEnglish] = useState([]);
+  const [selectedLessonLuganda, setSelectedLessonLuganda] = useState([]);
+  const [selectedMorningWatchEnglish, setSelectedMorningWatchEnglish] = useState([]);
+  const [selectedMorningWatchLuganda, setSelectedMorningWatchLuganda] = useState([]);
+
   const [formData, setFormData] = useState({
     sabbath_date: '',
     total_attendance: 0,
@@ -29,11 +35,7 @@ const WeeklyDataEntry = () => {
     number_of_visitors: 0,
     bible_study_guides_distributed: 0,
     offering_global_mission: 0,
-    members_paid_lesson_english: 0,
-    members_paid_lesson_luganda: 0,
-    members_paid_morning_watch_english: 0,
-    members_paid_morning_watch_luganda: 0,
-    members_summary: '', // Only keeping this one note field
+    members_summary: '',
   });
 
   useEffect(() => {
@@ -127,11 +129,27 @@ const WeeklyDataEntry = () => {
     }
   };
 
+  const toggleMemberSelection = (memberName, list, setList) => {
+    if (list.includes(memberName)) {
+      setList(list.filter(name => name !== memberName));
+    } else {
+      setList([...list, memberName]);
+    }
+  };
+
   const checkExistingData = async () => {
     try {
       const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
       if (response.data) {
-        setFormData(response.data);
+        const data = response.data;
+        setFormData(data);
+        
+        // Parse saved member names back into arrays
+        setSelectedLessonEnglish(data.members_paid_lesson_english ? data.members_paid_lesson_english.split(',').map(n => n.trim()) : []);
+        setSelectedLessonLuganda(data.members_paid_lesson_luganda ? data.members_paid_lesson_luganda.split(',').map(n => n.trim()) : []);
+        setSelectedMorningWatchEnglish(data.members_paid_morning_watch_english ? data.members_paid_morning_watch_english.split(',').map(n => n.trim()) : []);
+        setSelectedMorningWatchLuganda(data.members_paid_morning_watch_luganda ? data.members_paid_morning_watch_luganda.split(',').map(n => n.trim()) : []);
+        
         setMessage({
           type: 'info',
           text: 'Editing existing data for this week. Click Update to save changes.',
@@ -147,12 +165,12 @@ const WeeklyDataEntry = () => {
           number_of_visitors: 0,
           bible_study_guides_distributed: 0,
           offering_global_mission: 0,
-          members_paid_lesson_english: 0,
-          members_paid_lesson_luganda: 0,
-          members_paid_morning_watch_english: 0,
-          members_paid_morning_watch_luganda: 0,
           members_summary: '',
         });
+        setSelectedLessonEnglish([]);
+        setSelectedLessonLuganda([]);
+        setSelectedMorningWatchEnglish([]);
+        setSelectedMorningWatchLuganda([]);
         setMessage({ type: '', text: '' });
       }
     } catch (error) {
@@ -178,6 +196,11 @@ const WeeklyDataEntry = () => {
         class_id: selectedClass,
         week_number: parseInt(weekNumber),
         ...formData,
+        // Save as comma-separated names
+        members_paid_lesson_english: selectedLessonEnglish.join(', '),
+        members_paid_lesson_luganda: selectedLessonLuganda.join(', '),
+        members_paid_morning_watch_english: selectedMorningWatchEnglish.join(', '),
+        members_paid_morning_watch_luganda: selectedMorningWatchLuganda.join(', '),
       };
 
       if (formData.id) {
@@ -202,7 +225,7 @@ const WeeklyDataEntry = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Weekly Data Entry</h1>
 
       {message.text && (
@@ -441,74 +464,144 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Financial Data */}
+        {/* Financial Data - NEW CHECKBOX APPROACH */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Financial Data</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Offering Given for Global Mission (UGX)</label>
-              <input
-                type="number"
-                name="offering_global_mission"
-                value={formData.offering_global_mission}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                min="0"
-                step="0.01"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Paid for Lesson (English)</label>
-              <input
-                type="number"
-                name="members_paid_lesson_english"
-                value={formData.members_paid_lesson_english}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                min="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Paid for Lesson (Luganda)</label>
-              <input
-                type="number"
-                name="members_paid_lesson_luganda"
-                value={formData.members_paid_lesson_luganda}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                min="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Paid for Morning Watch (English)</label>
-              <input
-                type="number"
-                name="members_paid_morning_watch_english"
-                value={formData.members_paid_morning_watch_english}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                min="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Paid for Morning Watch (Luganda)</label>
-              <input
-                type="number"
-                name="members_paid_morning_watch_luganda"
-                value={formData.members_paid_morning_watch_luganda}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                min="0"
-              />
-            </div>
+          <h2 className="text-xl font-semibold mb-4">Financial Data - Lesson & Morning Watch Payments</h2>
+          
+          <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+            <p className="text-sm text-blue-800">
+              <strong>Instructions:</strong> Check the boxes next to members who paid for lessons and morning watch materials.
+            </p>
           </div>
+
+          {members.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">
+              Please add class members first to track payments.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {/* Lesson English */}
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm mr-2">
+                    {selectedLessonEnglish.length} paid
+                  </span>
+                  Lesson (English)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {members.map((member) => (
+                    <label
+                      key={`lesson-eng-${member.id}`}
+                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedLessonEnglish.includes(member.member_name)}
+                        onChange={() => toggleMemberSelection(member.member_name, selectedLessonEnglish, setSelectedLessonEnglish)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lesson Luganda */}
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm mr-2">
+                    {selectedLessonLuganda.length} paid
+                  </span>
+                  Lesson (Luganda)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {members.map((member) => (
+                    <label
+                      key={`lesson-lug-${member.id}`}
+                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedLessonLuganda.includes(member.member_name)}
+                        onChange={() => toggleMemberSelection(member.member_name, selectedLessonLuganda, setSelectedLessonLuganda)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Morning Watch English */}
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm mr-2">
+                    {selectedMorningWatchEnglish.length} paid
+                  </span>
+                  Morning Watch (English)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {members.map((member) => (
+                    <label
+                      key={`mw-eng-${member.id}`}
+                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMorningWatchEnglish.includes(member.member_name)}
+                        onChange={() => toggleMemberSelection(member.member_name, selectedMorningWatchEnglish, setSelectedMorningWatchEnglish)}
+                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Morning Watch Luganda */}
+              <div>
+                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm mr-2">
+                    {selectedMorningWatchLuganda.length} paid
+                  </span>
+                  Morning Watch (Luganda)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {members.map((member) => (
+                    <label
+                      key={`mw-lug-${member.id}`}
+                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMorningWatchLuganda.includes(member.member_name)}
+                        onChange={() => toggleMemberSelection(member.member_name, selectedMorningWatchLuganda, setSelectedMorningWatchLuganda)}
+                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Offering */}
+              <div className="pt-4 border-t">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Offering Given for Global Mission (UGX)</label>
+                <input
+                  type="number"
+                  name="offering_global_mission"
+                  value={formData.offering_global_mission}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Additional Notes - SIMPLIFIED */}
+        {/* Additional Notes */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Additional Notes (Optional)</h2>
           <div>
