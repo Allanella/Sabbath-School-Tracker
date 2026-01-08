@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import classMemberService from '../../services/classMemberService';
-import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign } from 'lucide-react';
 
 const WeeklyDataEntry = () => {
   const navigate = useNavigate();
@@ -19,11 +19,11 @@ const WeeklyDataEntry = () => {
   const [newMemberName, setNewMemberName] = useState('');
   const [editingMember, setEditingMember] = useState(null);
 
-  // Member selection states for payments
-  const [selectedLessonEnglish, setSelectedLessonEnglish] = useState([]);
-  const [selectedLessonLuganda, setSelectedLessonLuganda] = useState([]);
-  const [selectedMorningWatchEnglish, setSelectedMorningWatchEnglish] = useState([]);
-  const [selectedMorningWatchLuganda, setSelectedMorningWatchLuganda] = useState([]);
+  // Payment tracking - stores {memberId: amount}
+  const [paymentsLessonEnglish, setPaymentsLessonEnglish] = useState({});
+  const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
+  const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
+  const [paymentsMorningWatchLuganda, setPaymentsMorningWatchLuganda] = useState({});
 
   const [formData, setFormData] = useState({
     sabbath_date: '',
@@ -129,12 +129,44 @@ const WeeklyDataEntry = () => {
     }
   };
 
-  const toggleMemberSelection = (memberName, list, setList) => {
-    if (list.includes(memberName)) {
-      setList(list.filter(name => name !== memberName));
-    } else {
-      setList([...list, memberName]);
-    }
+  const handlePaymentChange = (memberId, amount, setPayments) => {
+    setPayments(prev => ({
+      ...prev,
+      [memberId]: parseFloat(amount) || 0
+    }));
+  };
+
+  const calculateTotal = (payments) => {
+    return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
+  };
+
+  const formatPaymentsForSave = (payments) => {
+    // Convert {memberId: amount} to "Name: amount, Name: amount"
+    return Object.entries(payments)
+      .filter(([id, amount]) => amount > 0)
+      .map(([id, amount]) => {
+        const member = members.find(m => m.id === id);
+        return `${member?.member_name}: ${amount}`;
+      })
+      .join(', ');
+  };
+
+  const parsePaymentsFromSaved = (paymentString) => {
+    // Convert "Name: amount, Name: amount" back to {memberId: amount}
+    if (!paymentString) return {};
+    
+    const payments = {};
+    const entries = paymentString.split(',').map(s => s.trim());
+    
+    entries.forEach(entry => {
+      const [name, amount] = entry.split(':').map(s => s.trim());
+      const member = members.find(m => m.member_name === name);
+      if (member && amount) {
+        payments[member.id] = parseFloat(amount);
+      }
+    });
+    
+    return payments;
   };
 
   const checkExistingData = async () => {
@@ -144,11 +176,11 @@ const WeeklyDataEntry = () => {
         const data = response.data;
         setFormData(data);
         
-        // Parse saved member names back into arrays
-        setSelectedLessonEnglish(data.members_paid_lesson_english ? data.members_paid_lesson_english.split(',').map(n => n.trim()) : []);
-        setSelectedLessonLuganda(data.members_paid_lesson_luganda ? data.members_paid_lesson_luganda.split(',').map(n => n.trim()) : []);
-        setSelectedMorningWatchEnglish(data.members_paid_morning_watch_english ? data.members_paid_morning_watch_english.split(',').map(n => n.trim()) : []);
-        setSelectedMorningWatchLuganda(data.members_paid_morning_watch_luganda ? data.members_paid_morning_watch_luganda.split(',').map(n => n.trim()) : []);
+        // Parse saved payment data
+        setPaymentsLessonEnglish(parsePaymentsFromSaved(data.members_paid_lesson_english));
+        setPaymentsLessonLuganda(parsePaymentsFromSaved(data.members_paid_lesson_luganda));
+        setPaymentsMorningWatchEnglish(parsePaymentsFromSaved(data.members_paid_morning_watch_english));
+        setPaymentsMorningWatchLuganda(parsePaymentsFromSaved(data.members_paid_morning_watch_luganda));
         
         setMessage({
           type: 'info',
@@ -167,10 +199,10 @@ const WeeklyDataEntry = () => {
           offering_global_mission: 0,
           members_summary: '',
         });
-        setSelectedLessonEnglish([]);
-        setSelectedLessonLuganda([]);
-        setSelectedMorningWatchEnglish([]);
-        setSelectedMorningWatchLuganda([]);
+        setPaymentsLessonEnglish({});
+        setPaymentsLessonLuganda({});
+        setPaymentsMorningWatchEnglish({});
+        setPaymentsMorningWatchLuganda({});
         setMessage({ type: '', text: '' });
       }
     } catch (error) {
@@ -196,11 +228,11 @@ const WeeklyDataEntry = () => {
         class_id: selectedClass,
         week_number: parseInt(weekNumber),
         ...formData,
-        // Save as comma-separated names
-        members_paid_lesson_english: selectedLessonEnglish.join(', '),
-        members_paid_lesson_luganda: selectedLessonLuganda.join(', '),
-        members_paid_morning_watch_english: selectedMorningWatchEnglish.join(', '),
-        members_paid_morning_watch_luganda: selectedMorningWatchLuganda.join(', '),
+        // Save as "Name: amount, Name: amount"
+        members_paid_lesson_english: formatPaymentsForSave(paymentsLessonEnglish),
+        members_paid_lesson_luganda: formatPaymentsForSave(paymentsLessonLuganda),
+        members_paid_morning_watch_english: formatPaymentsForSave(paymentsMorningWatchEnglish),
+        members_paid_morning_watch_luganda: formatPaymentsForSave(paymentsMorningWatchLuganda),
       };
 
       if (formData.id) {
@@ -464,13 +496,16 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Financial Data - NEW CHECKBOX APPROACH */}
+        {/* Payment Tracking - Individual Amounts */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Financial Data - Lesson & Morning Watch Payments</h2>
+          <div className="flex items-center space-x-2 mb-4">
+            <DollarSign className="h-6 w-6 text-green-600" />
+            <h2 className="text-xl font-semibold">Lesson & Morning Watch Payments (Individual Amounts)</h2>
+          </div>
           
           <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
             <p className="text-sm text-blue-800">
-              <strong>Instructions:</strong> Check the boxes next to members who paid for lessons and morning watch materials.
+              <strong>Instructions:</strong> Enter the amount each member paid this week. Leave blank (0) for members who didn't pay.
             </p>
           </div>
 
@@ -479,113 +514,171 @@ const WeeklyDataEntry = () => {
               Please add class members first to track payments.
             </p>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* Lesson English */}
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm mr-2">
-                    {selectedLessonEnglish.length} paid
+              <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    📚 Lesson (English)
                   </span>
-                  Lesson (English)
+                  <span className="bg-green-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsLessonEnglish).toLocaleString()} UGX
+                  </span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {members.map((member) => (
-                    <label
-                      key={`lesson-eng-${member.id}`}
-                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedLessonEnglish.includes(member.member_name)}
-                        onChange={() => toggleMemberSelection(member.member_name, selectedLessonEnglish, setSelectedLessonEnglish)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
-                    </label>
+                    <div key={`le-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsLessonEnglish[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonEnglish)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
               {/* Lesson Luganda */}
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm mr-2">
-                    {selectedLessonLuganda.length} paid
+              <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    📚 Lesson (Luganda)
                   </span>
-                  Lesson (Luganda)
+                  <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsLessonLuganda).toLocaleString()} UGX
+                  </span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {members.map((member) => (
-                    <label
-                      key={`lesson-lug-${member.id}`}
-                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedLessonLuganda.includes(member.member_name)}
-                        onChange={() => toggleMemberSelection(member.member_name, selectedLessonLuganda, setSelectedLessonLuganda)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
-                    </label>
+                    <div key={`ll-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsLessonLuganda[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonLuganda)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
               {/* Morning Watch English */}
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
-                  <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm mr-2">
-                    {selectedMorningWatchEnglish.length} paid
+              <div className="border-2 border-purple-200 rounded-lg p-4 bg-purple-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    🌅 Morning Watch (English)
                   </span>
-                  Morning Watch (English)
+                  <span className="bg-purple-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsMorningWatchEnglish).toLocaleString()} UGX
+                  </span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {members.map((member) => (
-                    <label
-                      key={`mw-eng-${member.id}`}
-                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMorningWatchEnglish.includes(member.member_name)}
-                        onChange={() => toggleMemberSelection(member.member_name, selectedMorningWatchEnglish, setSelectedMorningWatchEnglish)}
-                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
-                    </label>
+                    <div key={`mwe-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsMorningWatchEnglish[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchEnglish)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
               {/* Morning Watch Luganda */}
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
-                  <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm mr-2">
-                    {selectedMorningWatchLuganda.length} paid
+              <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    🌅 Morning Watch (Luganda)
                   </span>
-                  Morning Watch (Luganda)
+                  <span className="bg-orange-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsMorningWatchLuganda).toLocaleString()} UGX
+                  </span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {members.map((member) => (
-                    <label
-                      key={`mw-lug-${member.id}`}
-                      className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMorningWatchLuganda.includes(member.member_name)}
-                        onChange={() => toggleMemberSelection(member.member_name, selectedMorningWatchLuganda, setSelectedMorningWatchLuganda)}
-                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
-                    </label>
+                    <div key={`mwl-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsMorningWatchLuganda[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchLuganda)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
+              {/* Grand Total Summary */}
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg p-6">
+                <h3 className="text-xl font-bold mb-4">📊 Week {weekNumber} Payment Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm opacity-90">Lesson (English)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsLessonEnglish).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">Lesson (Luganda)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsLessonLuganda).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">MW (English)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsMorningWatchEnglish).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">MW (Luganda)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsMorningWatchLuganda).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-white/30">
+                  <p className="text-sm opacity-90">Total Collections This Week</p>
+                  <p className="text-3xl font-bold">
+                    {(
+                      calculateTotal(paymentsLessonEnglish) +
+                      calculateTotal(paymentsLessonLuganda) +
+                      calculateTotal(paymentsMorningWatchEnglish) +
+                      calculateTotal(paymentsMorningWatchLuganda)
+                    ).toLocaleString()} UGX
+                  </p>
+                </div>
+              </div>
+
               {/* Offering */}
-              <div className="pt-4 border-t">
+              <div className="pt-4">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Offering Given for Global Mission (UGX)</label>
                 <input
                   type="number"
