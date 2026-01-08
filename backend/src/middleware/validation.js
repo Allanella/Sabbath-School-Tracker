@@ -17,7 +17,7 @@ const validationRules = {
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 6 }),
     body('full_name').trim().notEmpty(),
-    body('role').isIn(['admin', 'secretary', 'viewer'])
+    body('role').isIn(['admin', 'ss_secretary', 'viewer'])
   ],
   
   login: [
@@ -30,7 +30,7 @@ const validationRules = {
     body('class_name').trim().notEmpty(),
     body('teacher_name').trim().notEmpty(),
     body('secretary_name').trim().notEmpty(),
-    body('secretary_id').isUUID()
+    body('secretary_id').optional().isUUID()
   ],
   
   createQuarter: [
