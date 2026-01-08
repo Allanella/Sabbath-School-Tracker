@@ -21,10 +21,15 @@ const Login = () => {
       const response = await login(email, password);
       const role = response.data.user.role;
       
+      // Clear form fields for security
+      setEmail('');
+      setPassword('');
+      setShowPassword(false);
+      
       // Redirect based on role
       if (role === 'admin') {
         navigate('/admin');
-      } else if (role === 'secretary') {
+      } else if (role === 'ss_secretary') {
         navigate('/secretary');
       } else {
         navigate('/reports/weekly');
@@ -99,6 +104,7 @@ const Login = () => {
                   className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-200 text-gray-800 placeholder-gray-400 shadow-sm"
                   placeholder="your.email@example.com"
                   required
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -116,6 +122,7 @@ const Login = () => {
                   className="w-full px-4 py-3 pr-12 bg-white border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all duration-200 text-gray-800 placeholder-gray-400 shadow-sm"
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
