@@ -12,7 +12,8 @@ import {
   DollarSign,
   LogOut,
   BarChart3,
-  Heart
+  Heart,
+  Search
 } from 'lucide-react';
 
 const Layout = () => {
@@ -32,6 +33,7 @@ const Layout = () => {
       { name: 'Quarters', href: '/admin/quarters', icon: Calendar },
       { name: 'Classes', href: '/admin/classes', icon: BookOpen },
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
+      { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
@@ -39,10 +41,12 @@ const Layout = () => {
     ss_secretary: [
       { name: 'Dashboard', href: '/secretary', icon: Home },
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
+      { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
     ],
     viewer: [
+      { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },

@@ -7,8 +7,9 @@ import AdminDashboard from './components/Admin/Dashboard';
 import UserManagement from './components/Admin/UserManagement';
 import QuarterSetup from './components/Admin/QuarterSetup';
 import ClassManagement from './components/Admin/ClassManagement';
-import SecretaryDashboard from './components/Secretary/Dashboard';
+import SecretaryDashboard from './components/Secretary/SecretaryDashboard';
 import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry';
+import MemberSearch from './components/Reports/MemberSearch';
 import WeeklyReport from './components/Reports/WeeklyReport';
 import QuarterlyReport from './components/Reports/QuarterlyReport';
 import FinancialReport from './components/Reports/FinancialReport';
@@ -125,6 +126,7 @@ function App() {
             <Route path="secretary/entry" element={<WeeklyDataEntry />} />
             
             {/* Report Routes */}
+            <Route path="reports/member-search" element={<MemberSearch />} />
             <Route path="reports/weekly" element={<WeeklyReport />} />
             <Route path="reports/quarterly" element={<QuarterlyReport />} />
             <Route path="reports/financial" element={<FinancialReport />} />
