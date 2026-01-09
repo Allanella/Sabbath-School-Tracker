@@ -245,11 +245,14 @@ const WeeklyDataEntry = () => {
 
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
-        setMessage({ type: 'success', text: 'Data updated successfully!' });
+        setMessage({ type: 'success', text: '✅ Data updated successfully! Redirecting to dashboard...' });
       } else {
         await weeklyDataService.submit(dataToSubmit);
-        setMessage({ type: 'success', text: 'Data submitted successfully!' });
+        setMessage({ type: 'success', text: '🎉 Data submitted successfully! Redirecting to dashboard...' });
       }
+
+      // Scroll to top to see success message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       setTimeout(() => {
         navigate('/secretary');
@@ -259,6 +262,8 @@ const WeeklyDataEntry = () => {
         type: 'error',
         text: error.response?.data?.message || 'Failed to save data. Please try again.',
       });
+      // Scroll to top to see error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
     }
@@ -270,7 +275,7 @@ const WeeklyDataEntry = () => {
 
       {message.text && (
         <div
-          className={`mb-6 p-4 rounded-lg flex items-start ${
+          className={`mb-6 p-4 rounded-lg flex items-start animate-fade-in ${
             message.type === 'success'
               ? 'bg-green-50 border border-green-200'
               : message.type === 'error'
@@ -288,7 +293,7 @@ const WeeklyDataEntry = () => {
             />
           )}
           <p
-            className={`text-sm ${
+            className={`text-sm font-medium ${
               message.type === 'success'
                 ? 'text-green-800'
                 : message.type === 'error'
@@ -800,6 +805,24 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
       )}
+
+      {/* Add CSS for fade-in animation */}
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
