@@ -68,10 +68,11 @@ const Layout = () => {
           bg-indigo-800 text-white
           transform transition-transform duration-300
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          flex flex-col
         `}
       >
         {/* Sidebar header */}
-        <div className="flex items-center justify-between p-4 border-b border-indigo-700">
+        <div className="flex items-center justify-between p-4 border-b border-indigo-700 flex-shrink-0">
           <h1 className="text-xl font-bold">SS Tracker</h1>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -81,8 +82,8 @@ const Layout = () => {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-2">
+        {/* Navigation - scrollable if too many items */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
           {currentNav.map((item) => (
             <Link
               key={item.name}
@@ -91,29 +92,31 @@ const Layout = () => {
               className="flex items-center space-x-3 px-4 py-3 rounded-lg
                          hover:bg-indigo-700 transition"
             >
-              <item.icon className="h-5 w-5" />
-              <span>{item.name}</span>
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm font-medium">{item.name}</span>
             </Link>
           ))}
         </nav>
 
-        {/* User info + logout */}
-        <div className="absolute bottom-0 w-full p-4 border-t border-indigo-700">
-          <div className="mb-4">
-            <p className="text-sm text-indigo-200">Logged in as</p>
-            <p className="font-semibold">{user?.full_name}</p>
-            <p className="text-xs text-indigo-300 capitalize">
+        {/* User info + logout - fixed at bottom */}
+        <div className="flex-shrink-0 p-4 border-t border-indigo-700 bg-indigo-900">
+          <div className="mb-3">
+            <p className="text-xs text-indigo-300 mb-1">Logged in as</p>
+            <p className="font-semibold text-sm truncate" title={user?.full_name}>
+              {user?.full_name}
+            </p>
+            <p className="text-xs text-indigo-300 capitalize mt-0.5">
               {user?.role === 'ss_secretary' ? 'SS Secretary' : user?.role}
             </p>
           </div>
 
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-2 w-full
-                       px-4 py-2 bg-indigo-700 rounded-lg
-                       hover:bg-indigo-600 transition"
+            className="flex items-center justify-center space-x-2 w-full
+                       px-4 py-2.5 bg-indigo-700 rounded-lg
+                       hover:bg-indigo-600 transition text-sm font-medium"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-4 w-4" />
             <span>Logout</span>
           </button>
         </div>
