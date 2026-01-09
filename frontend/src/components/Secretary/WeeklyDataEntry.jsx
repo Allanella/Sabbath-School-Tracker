@@ -141,22 +141,30 @@ const WeeklyDataEntry = () => {
   };
 
   const formatPaymentsForSave = (payments) => {
+    // Return empty string if no payments or all are zero
+    if (!payments || Object.keys(payments).length === 0) {
+      return '';
+    }
+    
     // Convert {memberId: amount} to "Name: amount, Name: amount"
-    return Object.entries(payments)
-      .filter(([id, amount]) => amount > 0)
+    const entries = Object.entries(payments)
+      .filter(([id, amount]) => amount && amount > 0)
       .map(([id, amount]) => {
         const member = members.find(m => m.id === id);
-        return `${member?.member_name}: ${amount}`;
+        return member ? `${member.member_name}: ${amount}` : null;
       })
-      .join(', ');
+      .filter(Boolean); // Remove null entries
+    
+    // Return empty string if no valid entries
+    return entries.length > 0 ? entries.join(', ') : '';
   };
 
   const parsePaymentsFromSaved = (paymentString) => {
     // Convert "Name: amount, Name: amount" back to {memberId: amount}
-    if (!paymentString) return {};
+    if (!paymentString || paymentString.trim() === '') return {};
     
     const payments = {};
-    const entries = paymentString.split(',').map(s => s.trim());
+    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
     
     entries.forEach(entry => {
       const [name, amount] = entry.split(':').map(s => s.trim());
@@ -228,7 +236,7 @@ const WeeklyDataEntry = () => {
         class_id: selectedClass,
         week_number: parseInt(weekNumber),
         ...formData,
-        // Save as "Name: amount, Name: amount"
+        // Save as "Name: amount, Name: amount" or empty string
         members_paid_lesson_english: formatPaymentsForSave(paymentsLessonEnglish),
         members_paid_lesson_luganda: formatPaymentsForSave(paymentsLessonLuganda),
         members_paid_morning_watch_english: formatPaymentsForSave(paymentsMorningWatchEnglish),
