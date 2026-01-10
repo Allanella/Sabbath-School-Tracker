@@ -6,6 +6,35 @@ const reportController = {
     try {
       const { quarter_id, week_number } = req.query;
 
+      // First, get all classes for this quarter
+      const { data: classes, error: classError } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('quarter_id', quarter_id);
+
+      if (classError) throw classError;
+
+      const classIds = classes.map(c => c.id);
+
+      if (classIds.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            week_number,
+            classes: [],
+            summary: {
+              total_attendance: 0,
+              total_visits: 0,
+              total_bible_studies: 0,
+              total_offerings: 0,
+              total_visitors: 0,
+              classes_count: 0
+            }
+          }
+        });
+      }
+
+      // Then get weekly data for those classes
       const { data, error } = await supabase
         .from('weekly_data')
         .select(`
@@ -18,17 +47,17 @@ const reportController = {
           )
         `)
         .eq('week_number', week_number)
-        .eq('class.quarter_id', quarter_id);
+        .in('class_id', classIds);
 
       if (error) throw error;
 
       // Calculate totals
       const totals = data.reduce((acc, record) => ({
-        total_attendance: acc.total_attendance + (record.total_attendance || 0),
-        total_visits: acc.total_visits + (record.member_visits || 0),
-        total_bible_studies: acc.total_bible_studies + (record.members_conducted_bible_studies || 0),
-        total_offerings: acc.total_offerings + parseFloat(record.offering_global_mission || 0),
-        total_visitors: acc.total_visitors + (record.number_of_visitors || 0),
+        total_attendance: acc.total_attendance + (parseInt(record.total_attendance) || 0),
+        total_visits: acc.total_visits + (parseInt(record.member_visits) || 0),
+        total_bible_studies: acc.total_bible_studies + (parseInt(record.members_conducted_bible_studies) || 0),
+        total_offerings: acc.total_offerings + (parseFloat(record.offering_global_mission) || 0),
+        total_visitors: acc.total_visitors + (parseInt(record.number_of_visitors) || 0),
         classes_count: acc.classes_count + 1
       }), {
         total_attendance: 0,
@@ -39,6 +68,8 @@ const reportController = {
         classes_count: 0
       });
 
+      console.log('Weekly Report Totals:', totals); // Debug log
+
       res.json({
         success: true,
         data: {
@@ -48,6 +79,7 @@ const reportController = {
         }
       });
     } catch (error) {
+      console.error('Weekly Report Error:', error);
       next(error);
     }
   },
