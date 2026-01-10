@@ -1,4 +1,3 @@
-
 const supabase = require('../config/database');
 
 const reportController = {
@@ -27,12 +26,14 @@ const reportController = {
       const totals = data.reduce((acc, record) => ({
         total_attendance: acc.total_attendance + (record.total_attendance || 0),
         total_visits: acc.total_visits + (record.member_visits || 0),
+        total_bible_studies: acc.total_bible_studies + (record.members_conducted_bible_studies || 0),
         total_offerings: acc.total_offerings + parseFloat(record.offering_global_mission || 0),
         total_visitors: acc.total_visitors + (record.number_of_visitors || 0),
         classes_count: acc.classes_count + 1
       }), {
         total_attendance: 0,
         total_visits: 0,
+        total_bible_studies: 0,
         total_offerings: 0,
         total_visitors: 0,
         classes_count: 0
