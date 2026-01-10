@@ -418,10 +418,27 @@ const WeeklyDataEntry = () => {
           </div>
         )}
 
-        {/* Attendance & Participation */}
+        {/* Attendance & Participation - OFFERING FIRST */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Attendance & Participation</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* OFFERING FIRST - Full Width */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Offering Given for Global Mission (UGX)
+              </label>
+              <input
+                type="number"
+                name="offering_global_mission"
+                value={formData.offering_global_mission}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+                step="0.01"
+                placeholder="Enter offering amount"
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Total Attendance</label>
               <input
@@ -688,20 +705,6 @@ const WeeklyDataEntry = () => {
                     ).toLocaleString()} UGX
                   </p>
                 </div>
-              </div>
-
-              {/* Offering */}
-              <div className="pt-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Offering Given for Global Mission (UGX)</label>
-                <input
-                  type="number"
-                  name="offering_global_mission"
-                  value={formData.offering_global_mission}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                  min="0"
-                  step="0.01"
-                />
               </div>
             </div>
           )}
