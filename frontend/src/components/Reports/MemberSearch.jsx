@@ -8,6 +8,7 @@ const MemberSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState(null);
+  const [allMatchingMembers, setAllMatchingMembers] = useState([]);
   const [error, setError] = useState('');
 
   const handleSearch = async () => {
@@ -19,38 +20,61 @@ const MemberSearch = () => {
     setSearching(true);
     setError('');
     setSearchResults(null);
+    setAllMatchingMembers([]);
 
     try {
       // Get all classes
       const classesResponse = await classService.getAll();
       const classes = classesResponse.data || [];
 
-      // Search for member across all classes
-      let foundMember = null;
-      let memberClass = null;
+      // Search for ALL members that match the search query across all classes
+      const matchingMembers = [];
 
       for (const cls of classes) {
         const membersResponse = await classMemberService.getByClass(cls.id);
         const members = membersResponse.data || [];
         
-        const member = members.find(m => 
+        // Find all members whose name contains the search query (case-insensitive)
+        const classMatches = members.filter(m => 
           m.member_name.toLowerCase().includes(searchQuery.toLowerCase())
         );
 
-        if (member) {
-          foundMember = member;
-          memberClass = cls;
-          break;
-        }
+        // Add class info to each matching member
+        classMatches.forEach(member => {
+          matchingMembers.push({
+            ...member,
+            class: cls
+          });
+        });
       }
 
-      if (!foundMember) {
-        setError('No member found with that name');
+      if (matchingMembers.length === 0) {
+        setError('No members found matching that name');
         return;
       }
 
-      // Get all weekly data for this class
-      const weeklyDataResponse = await weeklyDataService.getByClass(memberClass.id);
+      // If multiple matches, show them all
+      setAllMatchingMembers(matchingMembers);
+
+      // If only one match, load their data automatically
+      if (matchingMembers.length === 1) {
+        await loadMemberData(matchingMembers[0]);
+      }
+
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Failed to search. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const loadMemberData = async (memberWithClass) => {
+    try {
+      setSearching(true);
+      
+      // Get all weekly data for this member's class
+      const weeklyDataResponse = await weeklyDataService.getByClass(memberWithClass.class.id);
       const allWeeklyData = weeklyDataResponse.data || [];
 
       // Filter and parse payment history for this member
@@ -78,7 +102,7 @@ const MemberSearch = () => {
           const entries = weekData.members_paid_lesson_english.split(',').map(s => s.trim());
           entries.forEach(entry => {
             const [name, amount] = entry.split(':').map(s => s.trim());
-            if (name === foundMember.member_name && amount) {
+            if (name === memberWithClass.member_name && amount) {
               weekPayments.lesson_english = parseFloat(amount);
               totalLessonEnglish += parseFloat(amount);
               hasPayment = true;
@@ -91,7 +115,7 @@ const MemberSearch = () => {
           const entries = weekData.members_paid_lesson_luganda.split(',').map(s => s.trim());
           entries.forEach(entry => {
             const [name, amount] = entry.split(':').map(s => s.trim());
-            if (name === foundMember.member_name && amount) {
+            if (name === memberWithClass.member_name && amount) {
               weekPayments.lesson_luganda = parseFloat(amount);
               totalLessonLuganda += parseFloat(amount);
               hasPayment = true;
@@ -104,7 +128,7 @@ const MemberSearch = () => {
           const entries = weekData.members_paid_morning_watch_english.split(',').map(s => s.trim());
           entries.forEach(entry => {
             const [name, amount] = entry.split(':').map(s => s.trim());
-            if (name === foundMember.member_name && amount) {
+            if (name === memberWithClass.member_name && amount) {
               weekPayments.morning_watch_english = parseFloat(amount);
               totalMorningWatchEnglish += parseFloat(amount);
               hasPayment = true;
@@ -117,7 +141,7 @@ const MemberSearch = () => {
           const entries = weekData.members_paid_morning_watch_luganda.split(',').map(s => s.trim());
           entries.forEach(entry => {
             const [name, amount] = entry.split(':').map(s => s.trim());
-            if (name === foundMember.member_name && amount) {
+            if (name === memberWithClass.member_name && amount) {
               weekPayments.morning_watch_luganda = parseFloat(amount);
               totalMorningWatchLuganda += parseFloat(amount);
               hasPayment = true;
@@ -135,8 +159,8 @@ const MemberSearch = () => {
       paymentHistory.sort((a, b) => a.week_number - b.week_number);
 
       setSearchResults({
-        member: foundMember,
-        class: memberClass,
+        member: memberWithClass,
+        class: memberWithClass.class,
         paymentHistory,
         totals: {
           lesson_english: totalLessonEnglish,
@@ -148,9 +172,12 @@ const MemberSearch = () => {
         }
       });
 
+      // Clear the multiple results list
+      setAllMatchingMembers([]);
+
     } catch (err) {
-      console.error('Search error:', err);
-      setError('Failed to search. Please try again.');
+      console.error('Error loading member data:', err);
+      setError('Failed to load member data. Please try again.');
     } finally {
       setSearching(false);
     }
@@ -165,6 +192,7 @@ const MemberSearch = () => {
   const clearSearch = () => {
     setSearchQuery('');
     setSearchResults(null);
+    setAllMatchingMembers([]);
     setError('');
   };
 
@@ -194,7 +222,7 @@ const MemberSearch = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Enter member name (e.g., John Doe)"
+              placeholder="Enter member name (e.g., John, Mary, etc.)"
               className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
             />
             {searchQuery && (
@@ -231,6 +259,44 @@ const MemberSearch = () => {
           </div>
         )}
       </div>
+
+      {/* Multiple Matches - Show List */}
+      {allMatchingMembers.length > 1 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Found {allMatchingMembers.length} members matching "{searchQuery}"
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">Click on a member to view their payment history:</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {allMatchingMembers.map((member, index) => (
+              <button
+                key={index}
+                onClick={() => loadMemberData(member)}
+                className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-left"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-blue-100 rounded-full">
+                    <User className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{member.member_name}</p>
+                    <p className="text-sm text-gray-600">
+                      {member.class.class_name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {member.class.quarter?.name} {member.class.quarter?.year}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-blue-600">
+                  <span className="text-sm font-medium">View →</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search Results */}
       {searchResults && (
