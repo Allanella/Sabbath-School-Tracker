@@ -214,11 +214,11 @@ const WeeklyReport = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Name</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offering (UGX)</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Attendance</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Visits</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Bible Studies</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Visitors</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offering (UGX)</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -234,6 +234,9 @@ const WeeklyReport = () => {
                             </div>
                           </div>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-green-600">
+                          {parseFloat(classData.offering_global_mission || 0).toLocaleString()}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900">
                           {classData.total_attendance}
                         </td>
@@ -246,15 +249,15 @@ const WeeklyReport = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
                           {classData.number_of_visitors}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                          {parseFloat(classData.offering_global_mission || 0).toLocaleString()}
-                        </td>
                       </tr>
                     ))}
                     {/* Totals Row */}
                     <tr className="bg-gray-50 font-semibold">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         TOTALS
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-700">
+                        {reportData.summary.total_offerings.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
                         {reportData.summary.total_attendance}
@@ -263,13 +266,10 @@ const WeeklyReport = () => {
                         {reportData.summary.total_visits}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        -
+                        {reportData.summary.total_bible_studies || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
                         {reportData.summary.total_visitors}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                        {reportData.summary.total_offerings.toLocaleString()}
                       </td>
                     </tr>
                   </tbody>
@@ -279,41 +279,20 @@ const WeeklyReport = () => {
           </div>
 
           {/* Secretary Notes */}
-          {reportData.classes.some(c => c.members_summary || c.challenges_faced) && (
+          {reportData.classes.some(c => c.members_summary) && (
             <div className="card mt-6">
               <h2 className="text-xl font-semibold mb-4">Secretary Notes</h2>
               <div className="space-y-4">
                 {reportData.classes.map((classData, index) => (
-                  (classData.members_summary || classData.objectives_next_week || 
-                   classData.challenges_faced || classData.way_forward) && (
+                  classData.members_summary && (
                     <div key={index} className="border-b border-gray-200 pb-4 last:border-0">
                       <h3 className="font-medium text-gray-900 mb-2">
                         {classData.class.class_name}
                       </h3>
-                      {classData.members_summary && (
-                        <div className="mb-2">
-                          <p className="text-sm font-medium text-gray-700">Summary:</p>
-                          <p className="text-sm text-gray-600">{classData.members_summary}</p>
-                        </div>
-                      )}
-                      {classData.objectives_next_week && (
-                        <div className="mb-2">
-                          <p className="text-sm font-medium text-gray-700">Next Week Objectives:</p>
-                          <p className="text-sm text-gray-600">{classData.objectives_next_week}</p>
-                        </div>
-                      )}
-                      {classData.challenges_faced && (
-                        <div className="mb-2">
-                          <p className="text-sm font-medium text-gray-700">Challenges:</p>
-                          <p className="text-sm text-gray-600">{classData.challenges_faced}</p>
-                        </div>
-                      )}
-                      {classData.way_forward && (
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Way Forward:</p>
-                          <p className="text-sm text-gray-600">{classData.way_forward}</p>
-                        </div>
-                      )}
+                      <div className="mb-2">
+                        <p className="text-sm font-medium text-gray-700">Notes:</p>
+                        <p className="text-sm text-gray-600">{classData.members_summary}</p>
+                      </div>
                     </div>
                   )
                 ))}
