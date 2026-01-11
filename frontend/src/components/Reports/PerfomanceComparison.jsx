@@ -68,7 +68,6 @@ const PerformanceComparison = () => {
       const response = await weeklyDataService.getByClass(selectedClass);
       const weeklyData = (response.data || []).sort((a, b) => a.week_number - b.week_number);
 
-      // Calculate week-over-week changes
       const performance = weeklyData.map((week, index) => {
         const previousWeek = index > 0 ? weeklyData[index - 1] : null;
 
@@ -125,14 +124,12 @@ const PerformanceComparison = () => {
         };
       });
 
-      // Calculate overall statistics
       const totalWeeks = performance.length;
       const avgAttendance = performance.reduce((sum, p) => sum + p.attendance, 0) / totalWeeks;
       const avgOffering = performance.reduce((sum, p) => sum + p.offering, 0) / totalWeeks;
       const totalOffering = performance.reduce((sum, p) => sum + p.offering, 0);
       const totalPayments = performance.reduce((sum, p) => sum + p.totalPayments, 0);
 
-      // Find best and worst weeks
       const bestAttendance = performance.reduce((max, p) => p.attendance > max.attendance ? p : max, performance[0]);
       const worstAttendance = performance.reduce((min, p) => p.attendance < min.attendance ? p : min, performance[0]);
       const bestOffering = performance.reduce((max, p) => p.offering > max.offering ? p : max, performance[0]);
