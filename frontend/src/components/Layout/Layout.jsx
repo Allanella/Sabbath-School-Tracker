@@ -13,7 +13,8 @@ import {
   LogOut,
   BarChart3,
   Heart,
-  Search
+  Search,
+  TrendingUp
 } from 'lucide-react';
 
 const Layout = () => {
@@ -35,6 +36,7 @@ const Layout = () => {
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
+      { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
@@ -44,12 +46,14 @@ const Layout = () => {
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
+      { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
     ],
     viewer: [
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
+      { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },

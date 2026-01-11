@@ -11,6 +11,7 @@ import SecretaryDashboard from './components/Secretary/SecretaryDashboard';
 import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry';
 import MemberSearch from './components/Reports/MemberSearch';
 import ClassSearch from './components/Reports/ClassSearch';
+import PerformanceComparison from './components/Reports/PerformanceComparison';
 import WeeklyReport from './components/Reports/WeeklyReport';
 import QuarterlyReport from './components/Reports/QuarterlyReport';
 import FinancialReport from './components/Reports/FinancialReport';
@@ -129,6 +130,7 @@ function App() {
             {/* Report Routes */}
             <Route path="reports/member-search" element={<MemberSearch />} />
             <Route path="reports/class-search" element={<ClassSearch />} />
+            <Route path="reports/performance" element={<PerformanceComparison />} />
             <Route path="reports/weekly" element={<WeeklyReport />} />
             <Route path="reports/quarterly" element={<QuarterlyReport />} />
             <Route path="reports/financial" element={<FinancialReport />} />
