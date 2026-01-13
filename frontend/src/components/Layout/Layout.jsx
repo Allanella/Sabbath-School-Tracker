@@ -14,7 +14,9 @@ import {
   BarChart3,
   Heart,
   Search,
-  TrendingUp
+  TrendingUp,
+  Trophy,
+  Crown
 } from 'lucide-react';
 
 const Layout = () => {
@@ -37,6 +39,8 @@ const Layout = () => {
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
+      { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
+      { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
@@ -47,6 +51,8 @@ const Layout = () => {
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
+      { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
+      { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
     ],
@@ -54,6 +60,8 @@ const Layout = () => {
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
+      { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
+      { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
