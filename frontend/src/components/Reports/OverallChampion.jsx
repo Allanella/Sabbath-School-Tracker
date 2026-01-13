@@ -92,17 +92,17 @@ const OverallChampion = () => {
         const avgAttendance = weeksReported > 0 ? totalAttendance / weeksReported : 0;
         const avgOffering = weeksReported > 0 ? totalOfferings / weeksReported : 0;
 
-        // Comprehensive scoring system
-        const attendanceScore = avgAttendance * 10;
-        const offeringScore = avgOffering / 1000;
-        const visitsScore = totalVisits * 2;
-        const bibleStudiesScore = totalBibleStudies * 3;
-        const visitorsScore = totalVisitors * 2;
-        const helpedOthersScore = totalHelpedOthers * 1.5;
-        const studiedLessonScore = totalStudiedLesson * 1;
-        const guidesScore = totalGuidesDistributed * 1;
-        const paymentsScore = totalPayments / 10000;
-        const consistencyScore = (weeksReported / 13) * 20;
+        // Improved comprehensive scoring system
+        const attendanceScore = avgAttendance * 5;           // Weight: 5 per person
+        const offeringScore = (totalOfferings / 1000) * 2;   // Weight: 2 per 1000 UGX
+        const visitsScore = totalVisits * 3;                 // Weight: 3 per visit
+        const bibleStudiesScore = totalBibleStudies * 4;     // Weight: 4 per study
+        const visitorsScore = totalVisitors * 3;             // Weight: 3 per visitor
+        const helpedOthersScore = totalHelpedOthers * 2;     // Weight: 2 per person
+        const studiedLessonScore = totalStudiedLesson * 1;   // Weight: 1 per person
+        const guidesScore = totalGuidesDistributed * 2;      // Weight: 2 per guide
+        const paymentsScore = (totalPayments / 5000) * 1;    // Weight: 1 per 5000 UGX
+        const consistencyScore = (weeksReported / 13) * 30;  // Max 30 points
 
         const overallScore = 
           attendanceScore + 

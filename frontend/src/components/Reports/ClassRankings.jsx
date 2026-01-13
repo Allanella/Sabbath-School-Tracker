@@ -67,6 +67,9 @@ const ClassRankings = () => {
         let totalVisits = 0;
         let totalBibleStudies = 0;
         let totalVisitors = 0;
+        let totalHelpedOthers = 0;
+        let totalStudiedLesson = 0;
+        let totalGuidesDistributed = 0;
         let totalPayments = 0;
         let weeksReported = weeklyData.length;
 
@@ -76,6 +79,9 @@ const ClassRankings = () => {
           totalVisits += parseInt(week.member_visits) || 0;
           totalBibleStudies += parseInt(week.members_conducted_bible_studies) || 0;
           totalVisitors += parseInt(week.number_of_visitors) || 0;
+          totalHelpedOthers += parseInt(week.members_helped_others) || 0;
+          totalStudiedLesson += parseInt(week.members_studied_lesson) || 0;
+          totalGuidesDistributed += parseInt(week.bible_study_guides_distributed) || 0;
 
           totalPayments += parsePaymentAmount(week.members_paid_lesson_english);
           totalPayments += parsePaymentAmount(week.members_paid_lesson_luganda);
@@ -86,15 +92,29 @@ const ClassRankings = () => {
         const avgAttendance = weeksReported > 0 ? totalAttendance / weeksReported : 0;
         const avgOffering = weeksReported > 0 ? totalOfferings / weeksReported : 0;
 
-        // Calculate performance score (weighted)
-        const attendanceScore = avgAttendance * 10;
-        const offeringScore = avgOffering / 1000;
-        const visitsScore = totalVisits * 2;
-        const bibleStudiesScore = totalBibleStudies * 3;
-        const visitorsScore = totalVisitors * 2;
-        const paymentsScore = totalPayments / 10000;
+        // Improved scoring system with balanced weights
+        const attendanceScore = avgAttendance * 5;           // Weight: 5 per person
+        const offeringScore = (totalOfferings / 1000) * 2;   // Weight: 2 per 1000 UGX
+        const visitsScore = totalVisits * 3;                 // Weight: 3 per visit
+        const bibleStudiesScore = totalBibleStudies * 4;     // Weight: 4 per study
+        const visitorsScore = totalVisitors * 3;             // Weight: 3 per visitor
+        const helpedOthersScore = totalHelpedOthers * 2;     // Weight: 2 per person helped
+        const studiedLessonScore = totalStudiedLesson * 1;   // Weight: 1 per person
+        const guidesScore = totalGuidesDistributed * 2;      // Weight: 2 per guide
+        const paymentsScore = (totalPayments / 5000) * 1;    // Weight: 1 per 5000 UGX
+        const consistencyScore = (weeksReported / 13) * 30;  // Max 30 points for full reporting
 
-        const overallScore = attendanceScore + offeringScore + visitsScore + bibleStudiesScore + visitorsScore + paymentsScore;
+        const overallScore = 
+          attendanceScore + 
+          offeringScore + 
+          visitsScore + 
+          bibleStudiesScore + 
+          visitorsScore + 
+          helpedOthersScore + 
+          studiedLessonScore + 
+          guidesScore + 
+          paymentsScore + 
+          consistencyScore;
 
         classPerformance.push({
           class: cls,
@@ -139,13 +159,13 @@ const ClassRankings = () => {
   };
 
   const getGrade = (score) => {
-    if (score >= 100) return { letter: 'A+', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
-    if (score >= 80) return { letter: 'A', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
-    if (score >= 70) return { letter: 'B+', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
-    if (score >= 60) return { letter: 'B', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
-    if (score >= 50) return { letter: 'C+', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
-    if (score >= 40) return { letter: 'C', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
-    if (score >= 30) return { letter: 'D', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
+    if (score >= 200) return { letter: 'A+', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
+    if (score >= 150) return { letter: 'A', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
+    if (score >= 120) return { letter: 'B+', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
+    if (score >= 100) return { letter: 'B', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
+    if (score >= 80) return { letter: 'C+', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
+    if (score >= 60) return { letter: 'C', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' };
+    if (score >= 40) return { letter: 'D', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
     return { letter: 'F', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
   };
 
@@ -419,14 +439,14 @@ const ClassRankings = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Grading Scale</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
               {[
-                { letter: 'A+', range: '100+', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
-                { letter: 'A', range: '80-99', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
-                { letter: 'B+', range: '70-79', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-                { letter: 'B', range: '60-69', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
-                { letter: 'C+', range: '50-59', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-                { letter: 'C', range: '40-49', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-                { letter: 'D', range: '30-39', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
-                { letter: 'F', range: '<30', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+                { letter: 'A+', range: '200+', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
+                { letter: 'A', range: '150-199', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
+                { letter: 'B+', range: '120-149', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+                { letter: 'B', range: '100-119', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+                { letter: 'C+', range: '80-99', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+                { letter: 'C', range: '60-79', color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
+                { letter: 'D', range: '40-59', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+                { letter: 'F', range: '<40', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
               ].map((grade, idx) => (
                 <div key={idx} className={`p-3 rounded-lg ${grade.bg} border-2 ${grade.border} text-center`}>
                   <div className={`text-2xl font-bold ${grade.color}`}>{grade.letter}</div>
