@@ -1,15 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import reportService from '../../services/reportService';
 import quarterService from '../../services/quarterService';
 import classService from '../../services/classService';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { 
   FileText, 
+  Calendar, 
+  Users, 
+  TrendingUp, 
+  DollarSign,
   Download,
-  TrendingUp,
-  Users,
-  BookOpen,
   AlertCircle
 } from 'lucide-react';
 
@@ -17,25 +16,26 @@ const QuarterlyReport = () => {
   const [quarters, setQuarters] = useState([]);
   const [classes, setClasses] = useState([]);
   const [selectedQuarter, setSelectedQuarter] = useState('');
-  const [selectedClass, setSelectedClass] = useState('all');
+  const [selectedClass, setSelectedClass] = useState('');
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('class'); // 'class' or 'church'
 
   useEffect(() => {
     loadQuarters();
+    loadClasses();
   }, []);
 
   useEffect(() => {
     if (selectedQuarter) {
-      loadClasses();
-      if (selectedClass !== 'all') {
+      if (viewMode === 'class' && selectedClass) {
         loadClassReport();
-      } else {
+      } else if (viewMode === 'church') {
         loadChurchReport();
       }
     }
-  }, [selectedQuarter, selectedClass]);
+  }, [selectedQuarter, selectedClass, viewMode]);
 
   const loadQuarters = async () => {
     try {
@@ -55,10 +55,10 @@ const QuarterlyReport = () => {
 
   const loadClasses = async () => {
     try {
-      const response = await classService.getAll(selectedQuarter);
+      const response = await classService.getAll();
       setClasses(response.data);
     } catch (error) {
-      console.error('Failed to load classes');
+      setError('Failed to load classes');
     }
   };
 
@@ -70,7 +70,7 @@ const QuarterlyReport = () => {
       const response = await reportService.getClassQuarterlyReport(selectedClass);
       setReportData(response.data);
     } catch (error) {
-      setError('Failed to load class report');
+      setError('Failed to load quarterly report');
       setReportData(null);
     } finally {
       setLoading(false);
@@ -85,7 +85,7 @@ const QuarterlyReport = () => {
       const response = await reportService.getChurchQuarterlyReport(selectedQuarter);
       setReportData(response.data);
     } catch (error) {
-      setError('Failed to load church report');
+      setError('Failed to load church quarterly report');
       setReportData(null);
     } finally {
       setLoading(false);
@@ -97,6 +97,7 @@ const QuarterlyReport = () => {
   };
 
   const selectedQuarterObj = quarters.find(q => q.id === selectedQuarter);
+  const selectedClassObj = classes.find(c => c.id === selectedClass);
 
   if (loading && !reportData) {
     return (
@@ -111,7 +112,7 @@ const QuarterlyReport = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Quarterly Report</h1>
-          <p className="text-gray-600 mt-1">Complete quarterly summary and analysis</p>
+          <p className="text-gray-600 mt-1">View complete quarter statistics</p>
         </div>
         <button
           onClick={handlePrint}
@@ -124,15 +125,24 @@ const QuarterlyReport = () => {
 
       {/* Filters */}
       <div className="card mb-6 print:hidden">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="label">View Mode</label>
+            <select
+              value={viewMode}
+              onChange={(e) => setViewMode(e.target.value)}
+              className="input"
+            >
+              <option value="class">Single Class Report</option>
+              <option value="church">Entire Church Report</option>
+            </select>
+          </div>
+
           <div>
             <label className="label">Select Quarter</label>
             <select
               value={selectedQuarter}
-              onChange={(e) => {
-                setSelectedQuarter(e.target.value);
-                setSelectedClass('all');
-              }}
+              onChange={(e) => setSelectedQuarter(e.target.value)}
               className="input"
             >
               <option value="">Choose Quarter</option>
@@ -144,21 +154,25 @@ const QuarterlyReport = () => {
             </select>
           </div>
 
-          <div>
-            <label className="label">Select Class</label>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="input"
-            >
-              <option value="all">All Classes (Church Summary)</option>
-              {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.class_name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {viewMode === 'class' && (
+            <div>
+              <label className="label">Select Class</label>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="input"
+              >
+                <option value="">Choose Class</option>
+                {classes
+                  .filter(cls => cls.quarter_id === selectedQuarter)
+                  .map(cls => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.class_name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -169,210 +183,256 @@ const QuarterlyReport = () => {
         </div>
       )}
 
-      {reportData && (
+      {reportData && viewMode === 'class' && (
         <>
-          {/* Print Header */}
+          {/* Class Report Header for Print */}
           <div className="hidden print:block mb-8 text-center">
             <h1 className="text-2xl font-bold">Kanyanya Seventh-day Adventist Church</h1>
             <h2 className="text-xl mt-2">Sabbath School Quarterly Report</h2>
             <p className="text-gray-600 mt-1">
               {selectedQuarterObj?.name} {selectedQuarterObj?.year}
             </p>
+            <p className="text-gray-600">
+              Class: {reportData.class.class_name} - Teacher: {reportData.class.teacher_name}
+            </p>
           </div>
 
-          {/* Church-Wide Summary */}
-          {selectedClass === 'all' && reportData.church_totals && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Classes</p>
-                      <p className="text-3xl font-bold text-gray-900">
-                        {reportData.total_classes}
-                      </p>
-                    </div>
-                    <BookOpen className="h-8 w-8 text-blue-600" />
-                  </div>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Attendance</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.totals.total_attendance}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Avg: {reportData.averages.avg_attendance}
+                  </p>
                 </div>
-
-                <div className="card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Attendance</p>
-                      <p className="text-3xl font-bold text-gray-900">
-                        {reportData.church_totals.total_attendance}
-                      </p>
-                    </div>
-                    <Users className="h-8 w-8 text-green-600" />
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Bible Studies</p>
-                      <p className="text-3xl font-bold text-gray-900">
-                        {reportData.church_totals.total_bible_studies}
-                      </p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-purple-600" />
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Offerings</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {reportData.church_totals.total_offerings.toLocaleString()} UGX
-                      </p>
-                    </div>
-                    <FileText className="h-8 w-8 text-orange-600" />
-                  </div>
-                </div>
+                <Users className="h-8 w-8 text-blue-600" />
               </div>
+            </div>
 
-              {/* Class Comparison Table */}
-              <div className="card mb-8">
-                <h2 className="text-xl font-semibold mb-6">Class Performance Summary</h2>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total Att.</th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Avg Att.</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Offerings (UGX)</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.totals.total_offerings.toLocaleString()}
+                  </p>
+                </div>
+                <DollarSign className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Bible Studies</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.totals.total_bible_studies}
+                  </p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-600" />
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Weeks Reported</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.totals.weeks_reported}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">out of 13</p>
+                </div>
+                <Calendar className="h-8 w-8 text-orange-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Weekly Data Table */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-6">Week by Week Data</h2>
+            
+            {reportData.weekly_data.length === 0 ? (
+              <div className="text-center py-12">
+                <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600">No data available for this quarter</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offering (UGX)</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Attendance</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Visits</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Bible Studies</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Visitors</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {reportData.weekly_data.map((week, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm font-medium rounded-full">
+                            Week {week.week_number}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(week.sabbath_date).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-green-600">
+                          {parseFloat(week.offering_global_mission || 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900">
+                          {week.total_attendance}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                          {week.member_visits}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                          {week.members_conducted_bible_studies}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                          {week.number_of_visitors}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {reportData.classes.map((cls, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {cls.class_name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
-                            {cls.weeks_reported}/13
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                            {cls.total_attendance}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                            {cls.avg_attendance}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {cls.teacher_name}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                    {/* Totals Row */}
+                    <tr className="bg-gray-50 font-semibold">
+                      <td colSpan="2" className="px-6 py-4 text-left text-sm text-gray-900 uppercase">
+                        Total
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-700">
+                        {reportData.totals.total_offerings.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.totals.total_attendance}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.totals.total_visits}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.totals.total_bible_studies}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.totals.total_visitors}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+            )}
+          </div>
+        </>
+      )}
 
-              {/* Attendance Chart */}
-              <div className="card print:hidden">
-                <h2 className="text-xl font-semibold mb-6">Attendance Comparison</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={reportData.classes}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="class_name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="total_attendance" fill="#3b82f6" name="Total Attendance" />
-                    <Bar dataKey="avg_attendance" fill="#10b981" name="Average Attendance" />
-                  </BarChart>
-                </ResponsiveContainer>
+      {reportData && viewMode === 'church' && (
+        <>
+          {/* Church Report Header for Print */}
+          <div className="hidden print:block mb-8 text-center">
+            <h1 className="text-2xl font-bold">Kanyanya Seventh-day Adventist Church</h1>
+            <h2 className="text-xl mt-2">Church-Wide Quarterly Report</h2>
+            <p className="text-gray-600 mt-1">
+              {selectedQuarterObj?.name} {selectedQuarterObj?.year}
+            </p>
+          </div>
+
+          {/* Church Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Classes</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.total_classes}
+                  </p>
+                </div>
+                <FileText className="h-8 w-8 text-blue-600" />
               </div>
-            </>
-          )}
+            </div>
 
-          {/* Individual Class Report */}
-          {selectedClass !== 'all' && reportData.class && (
-            <>
-              <div className="card mb-8">
-                <div className="border-b pb-4 mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">{reportData.class.class_name}</h2>
-                  <div className="mt-2 space-y-1 text-sm text-gray-600">
-                    <p>Teacher: {reportData.class.teacher_name}</p>
-                    <p>Secretary: {reportData.class.secretary_name}</p>
-                    <p>Quarter: {reportData.class.quarter.name} {reportData.class.quarter.year}</p>
-                  </div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Attendance</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.church_totals.total_attendance}
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Weeks Reported</p>
-                    <p className="text-3xl font-bold text-gray-900">{reportData.totals.weeks_reported}/13</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Attendance</p>
-                    <p className="text-3xl font-bold text-gray-900">{reportData.totals.total_attendance}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Avg Attendance</p>
-                    <p className="text-3xl font-bold text-gray-900">{reportData.averages.avg_attendance}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Offerings</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {reportData.totals.total_offerings.toLocaleString()} UGX
-                    </p>
-                  </div>
-                </div>
+                <Users className="h-8 w-8 text-green-600" />
               </div>
+            </div>
 
-              {/* Detailed Metrics */}
-              <div className="card mb-8">
-                <h3 className="text-lg font-semibold mb-4">Activity Metrics</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Member Visits</p>
-                    <p className="text-2xl font-bold text-gray-900">{reportData.totals.total_visits}</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Bible Studies</p>
-                    <p className="text-2xl font-bold text-gray-900">{reportData.totals.total_bible_studies}</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Helped Others</p>
-                    <p className="text-2xl font-bold text-gray-900">{reportData.totals.total_helped_others}</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Studied Lesson</p>
-                    <p className="text-2xl font-bold text-gray-900">{reportData.totals.total_studied_lesson}</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Visitors</p>
-                    <p className="text-2xl font-bold text-gray-900">{reportData.totals.total_visitors}</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Guides Distributed</p>
-                    <p className="text-2xl font-bold text-gray-900">{reportData.totals.total_guides_distributed}</p>
-                  </div>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Offerings (UGX)</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.church_totals.total_offerings.toLocaleString()}
+                  </p>
                 </div>
+                <DollarSign className="h-8 w-8 text-purple-600" />
               </div>
+            </div>
 
-              {/* Weekly Breakdown */}
-              {reportData.weekly_data && reportData.weekly_data.length > 0 && (
-                <div className="card print:hidden">
-                  <h3 className="text-lg font-semibold mb-4">Weekly Attendance Trend</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={reportData.weekly_data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week_number" label={{ value: 'Week', position: 'insideBottom', offset: -5 }} />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="total_attendance" fill="#3b82f6" name="Attendance" />
-                    </BarChart>
-                  </ResponsiveContainer>
+            <div className="card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Bible Studies</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {reportData.church_totals.total_bible_studies}
+                  </p>
                 </div>
-              )}
-            </>
-          )}
+                <TrendingUp className="h-8 w-8 text-orange-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Class Summaries Table */}
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-6">Class Summaries</h2>
+            
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Reported</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Attendance</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Avg Attendance</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {reportData.classes.map((classData, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {classData.class_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {classData.teacher_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {classData.weeks_reported}/13
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                        {classData.total_attendance}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-600">
+                        {classData.avg_attendance}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
       )}
     </div>
