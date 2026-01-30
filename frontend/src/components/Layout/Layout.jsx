@@ -16,7 +16,8 @@ import {
   Search,
   TrendingUp,
   Trophy,
-  Crown
+  Crown,
+  Receipt
 } from 'lucide-react';
 
 const Layout = () => {
@@ -41,6 +42,7 @@ const Layout = () => {
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
       { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
+      { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
@@ -53,6 +55,7 @@ const Layout = () => {
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
       { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
+      { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
     ],
@@ -62,6 +65,7 @@ const Layout = () => {
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
       { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
+      { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },

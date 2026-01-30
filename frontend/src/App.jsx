@@ -14,6 +14,7 @@ import ClassSearch from './components/Reports/ClassSearch';
 import PerformanceComparison from './components/Reports/PerformanceComparison';
 import ClassRankings from './components/Reports/ClassRankings';
 import OverallChampion from './components/Reports/OverallChampion';
+import PaymentReport from './components/Reports/PaymentReport';
 import WeeklyReport from './components/Reports/WeeklyReport';
 import QuarterlyReport from './components/Reports/QuarterlyReport';
 import FinancialReport from './components/Reports/FinancialReport';
@@ -135,6 +136,7 @@ function App() {
             <Route path="reports/performance" element={<PerformanceComparison />} />
             <Route path="reports/rankings" element={<ClassRankings />} />
             <Route path="reports/champion" element={<OverallChampion />} />
+            <Route path="reports/payments" element={<PaymentReport />} />
             <Route path="reports/weekly" element={<WeeklyReport />} />
             <Route path="reports/quarterly" element={<QuarterlyReport />} />
             <Route path="reports/financial" element={<FinancialReport />} />
