@@ -31,15 +31,29 @@ const classMemberController = {
       // Check if member already exists in ANY class (case-insensitive)
       const { data: existing, error: checkError } = await supabase
         .from('class_members')
-        .select('id, class_id, class:classes(class_name)')
+        .select(`
+          id,
+          class_id,
+          member_name,
+          class:classes (
+            class_name,
+            teacher_name
+          )
+        `)
         .ilike('member_name', member_name)
         .maybeSingle();
 
       if (existing) {
-        const existingClassName = existing.class?.class_name || 'another class';
+        const className = existing.class?.class_name || 'Unknown Class';
+        const teacherName = existing.class?.teacher_name || '';
+        
+        const errorMsg = teacherName 
+          ? `"${member_name}" is already a member of ${className} (Teacher: ${teacherName})`
+          : `"${member_name}" is already a member of ${className}`;
+        
         return res.status(400).json({
           success: false,
-          message: `"${member_name}" is already a member of ${existingClassName}`
+          message: errorMsg
         });
       }
 
@@ -53,9 +67,28 @@ const classMemberController = {
       if (error) {
         // Handle unique constraint violation
         if (error.code === '23505') {
+          // Fetch the class info for the duplicate
+          const { data: duplicateInfo } = await supabase
+            .from('class_members')
+            .select(`
+              class:classes (
+                class_name,
+                teacher_name
+              )
+            `)
+            .ilike('member_name', member_name)
+            .single();
+
+          const className = duplicateInfo?.class?.class_name || 'another class';
+          const teacherName = duplicateInfo?.class?.teacher_name || '';
+          
+          const errorMsg = teacherName
+            ? `"${member_name}" already exists in ${className} (Teacher: ${teacherName})`
+            : `"${member_name}" already exists in ${className}`;
+
           return res.status(400).json({
             success: false,
-            message: `"${member_name}" already exists in the system`
+            message: errorMsg
           });
         }
         throw error;
@@ -79,16 +112,29 @@ const classMemberController = {
       // Check if new name already exists for a different member
       const { data: existing, error: checkError } = await supabase
         .from('class_members')
-        .select('id, class:classes(class_name)')
+        .select(`
+          id,
+          member_name,
+          class:classes (
+            class_name,
+            teacher_name
+          )
+        `)
         .ilike('member_name', member_name)
         .neq('id', id)
         .maybeSingle();
 
       if (existing) {
-        const existingClassName = existing.class?.class_name || 'another class';
+        const className = existing.class?.class_name || 'another class';
+        const teacherName = existing.class?.teacher_name || '';
+        
+        const errorMsg = teacherName
+          ? `"${member_name}" is already a member of ${className} (Teacher: ${teacherName})`
+          : `"${member_name}" is already a member of ${className}`;
+
         return res.status(400).json({
           success: false,
-          message: `"${member_name}" is already a member of ${existingClassName}`
+          message: errorMsg
         });
       }
 
@@ -102,9 +148,29 @@ const classMemberController = {
       if (error) {
         // Handle unique constraint violation
         if (error.code === '23505') {
+          // Fetch the class info for the duplicate
+          const { data: duplicateInfo } = await supabase
+            .from('class_members')
+            .select(`
+              class:classes (
+                class_name,
+                teacher_name
+              )
+            `)
+            .ilike('member_name', member_name)
+            .neq('id', id)
+            .single();
+
+          const className = duplicateInfo?.class?.class_name || 'another class';
+          const teacherName = duplicateInfo?.class?.teacher_name || '';
+          
+          const errorMsg = teacherName
+            ? `"${member_name}" already exists in ${className} (Teacher: ${teacherName})`
+            : `"${member_name}" already exists in ${className}`;
+
           return res.status(400).json({
             success: false,
-            message: `"${member_name}" already exists in the system`
+            message: errorMsg
           });
         }
         throw error;
