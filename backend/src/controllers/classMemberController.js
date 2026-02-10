@@ -28,18 +28,18 @@ const classMemberController = {
     try {
       const { class_id, member_name } = req.body;
 
-      // Check if member already exists in this class (case-insensitive)
+      // Check if member already exists in ANY class (case-insensitive)
       const { data: existing, error: checkError } = await supabase
         .from('class_members')
-        .select('id')
-        .eq('class_id', class_id)
+        .select('id, class_id, class:classes(class_name)')
         .ilike('member_name', member_name)
         .maybeSingle();
 
       if (existing) {
+        const existingClassName = existing.class?.class_name || 'another class';
         return res.status(400).json({
           success: false,
-          message: `"${member_name}" is already a member of this class`
+          message: `"${member_name}" is already a member of ${existingClassName}`
         });
       }
 
@@ -55,7 +55,7 @@ const classMemberController = {
         if (error.code === '23505') {
           return res.status(400).json({
             success: false,
-            message: `"${member_name}" is already a member of this class`
+            message: `"${member_name}" already exists in the system`
           });
         }
         throw error;
@@ -76,6 +76,22 @@ const classMemberController = {
       const { id } = req.params;
       const { member_name } = req.body;
 
+      // Check if new name already exists for a different member
+      const { data: existing, error: checkError } = await supabase
+        .from('class_members')
+        .select('id, class:classes(class_name)')
+        .ilike('member_name', member_name)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (existing) {
+        const existingClassName = existing.class?.class_name || 'another class';
+        return res.status(400).json({
+          success: false,
+          message: `"${member_name}" is already a member of ${existingClassName}`
+        });
+      }
+
       const { data, error } = await supabase
         .from('class_members')
         .update({ member_name })
@@ -88,7 +104,7 @@ const classMemberController = {
         if (error.code === '23505') {
           return res.status(400).json({
             success: false,
-            message: `"${member_name}" is already a member of this class`
+            message: `"${member_name}" already exists in the system`
           });
         }
         throw error;
