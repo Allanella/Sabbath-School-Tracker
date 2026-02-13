@@ -1,335 +1,298 @@
 import React, { useState, useEffect } from 'react';
 import classService from '../../services/classService';
+import classMemberService from '../../services/classMemberService';
 import quarterService from '../../services/quarterService';
-import { 
-  BookOpen, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  X, 
-  Save, 
-  AlertCircle,
-  CheckCircle,
-  User,
-  Calendar
-} from 'lucide-react';
+import { Plus, Trash2, Edit2, Users, Save, X, AlertCircle, CheckCircle } from 'lucide-react';
 
 const ClassManagement = () => {
-  const [classes, setClasses] = useState([]);
   const [quarters, setQuarters] = useState([]);
-  const [selectedQuarter, setSelectedQuarter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingClass, setEditingClass] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [classes, setClasses] = useState([]);
+  const [classMembers, setClassMembers] = useState([]);
+  const [selectedClassForMembers, setSelectedClassForMembers] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
+  // Form states
+  const [showForm, setShowForm] = useState(false);
+  const [editingClass, setEditingClass] = useState(null);
   const [formData, setFormData] = useState({
-    quarter_id: '',
     class_name: '',
     teacher_name: '',
     secretary_name: '',
-    church_name: 'Kanyanya Seventh-day Adventist Church'
+    quarter_id: ''
   });
 
   useEffect(() => {
-    loadData();
+    loadQuarters();
+    loadClasses();
   }, []);
 
-  useEffect(() => {
-    loadClasses();
-  }, [selectedQuarter]);
-
-  const loadData = async () => {
+  const loadQuarters = async () => {
     try {
-      const quartersRes = await quarterService.getAll();
-      setQuarters(quartersRes.data);
-      
-      // Set default quarter to active quarter
-      const activeQuarter = quartersRes.data.find(q => q.is_active);
-      if (activeQuarter) {
-        setSelectedQuarter(activeQuarter.id);
-        setFormData(prev => ({ ...prev, quarter_id: activeQuarter.id }));
-      }
-      
-      await loadClasses();
+      const response = await quarterService.getAll();
+      setQuarters(response.data);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to load data' });
+      console.error('Failed to load quarters:', error);
+      setError('Failed to load quarters');
+    }
+  };
+
+  const loadClasses = async () => {
+    setLoading(true);
+    try {
+      const response = await classService.getAll();
+      setClasses(response.data);
+      setError('');
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      setError('Failed to load classes');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadClasses = async () => {
+  const loadClassMembers = async (classId) => {
+    setLoading(true);
     try {
-      const quarterId = selectedQuarter === 'all' ? undefined : selectedQuarter;
-      const response = await classService.getAll(quarterId);
-      setClasses(response.data);
+      const response = await classMemberService.getByClass(classId);
+      setClassMembers(response.data || []);
+      setError('');
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to load classes' });
+      console.error('Failed to load class members:', error);
+      setError('Failed to load class members');
+      setClassMembers([]);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleOpenModal = (classItem = null) => {
-    if (classItem) {
-      setEditingClass(classItem);
-      setFormData({
-        quarter_id: classItem.quarter_id,
-        class_name: classItem.class_name,
-        teacher_name: classItem.teacher_name,
-        secretary_name: classItem.secretary_name,
-        church_name: classItem.church_name
-      });
-    } else {
-      setEditingClass(null);
-      const activeQuarter = quarters.find(q => q.is_active);
-      setFormData({
-        quarter_id: activeQuarter?.id || '',
-        class_name: '',
-        teacher_name: '',
-        secretary_name: '',
-        church_name: 'Kanyanya Seventh-day Adventist Church'
-      });
-    }
-    setShowModal(true);
-    setMessage({ type: '', text: '' });
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingClass(null);
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage({ type: '', text: '' });
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
       if (editingClass) {
         await classService.update(editingClass.id, formData);
-        setMessage({ type: 'success', text: 'Class updated successfully!' });
+        setSuccess('Class updated successfully!');
       } else {
         await classService.create(formData);
-        setMessage({ type: 'success', text: 'Class created successfully!' });
+        setSuccess('Class created successfully!');
       }
 
-      setTimeout(() => {
-        handleCloseModal();
-        loadClasses();
-      }, 1500);
+      loadClasses();
+      resetForm();
+      setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: error.response?.data?.message || 'Failed to save class' 
-      });
+      console.error('Error saving class:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to save class';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (classId, className) => {
-    if (!window.confirm(`Are you sure you want to delete ${className}? This will also delete all weekly data for this class!`)) {
+  const handleEdit = (classItem) => {
+    setEditingClass(classItem);
+    setFormData({
+      class_name: classItem.class_name,
+      teacher_name: classItem.teacher_name,
+      secretary_name: classItem.secretary_name,
+      quarter_id: classItem.quarter_id
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this class?')) {
       return;
     }
 
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
     try {
-      await classService.delete(classId);
-      setMessage({ type: 'success', text: 'Class deleted successfully' });
+      await classService.delete(id);
+      setSuccess('Class deleted successfully!');
       loadClasses();
+      setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Failed to delete class. It may have associated data.' 
-      });
+      console.error('Error deleting class:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to delete class';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  const resetForm = () => {
+    setFormData({
+      class_name: '',
+      teacher_name: '',
+      secretary_name: '',
+      quarter_id: ''
+    });
+    setEditingClass(null);
+    setShowForm(false);
+  };
+
+  const handleAddMember = async () => {
+    if (!newMemberName.trim()) {
+      setError('Member name cannot be empty');
+      return;
+    }
+
+    if (!selectedClassForMembers) {
+      setError('Please select a class first');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      await classMemberService.create({
+        class_id: selectedClassForMembers,
+        member_name: newMemberName.trim()
+      });
+
+      const memberName = newMemberName.trim();
+      setNewMemberName('');
+      loadClassMembers(selectedClassForMembers);
+      setSuccess(`"${memberName}" added successfully!`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error adding member:', error);
+      
+      // Get error message from backend response
+      const errorMessage = error.response?.data?.message 
+        || error.response?.data?.error
+        || error.message 
+        || 'Failed to add member. Please try again.';
+      
+      setError(errorMessage);
+      
+      // Don't auto-clear error - let user read it
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMember = async (memberId) => {
+    if (!window.confirm('Are you sure you want to remove this member?')) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await classMemberService.delete(memberId);
+      setSuccess('Member removed successfully!');
+      loadClassMembers(selectedClassForMembers);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to remove member';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClassSelectForMembers = (classId) => {
+    setSelectedClassForMembers(classId);
+    setError('');
+    setSuccess('');
+    if (classId) {
+      loadClassMembers(classId);
+    } else {
+      setClassMembers([]);
+    }
+  };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Class Management</h1>
-          <p className="text-gray-600 mt-1">Manage Sabbath School classes and assignments</p>
+          <p className="text-gray-600 mt-1">Manage Sabbath School classes and members</p>
         </div>
         <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all"
+          onClick={() => setShowForm(!showForm)}
+          className="btn-primary flex items-center space-x-2"
         >
-          <Plus className="h-5 w-5" />
-          <span>Add Class</span>
+          {showForm ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+          <span>{showForm ? 'Cancel' : 'Add Class'}</span>
         </button>
       </div>
 
-      {message.text && (
-        <div className={`mb-6 p-4 rounded-lg flex items-start ${
-          message.type === 'success' ? 'bg-green-50 border border-green-200' :
-          'bg-red-50 border border-red-200'
-        }`}>
-          {message.type === 'success' ? (
-            <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
-          ) : (
-            <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
-          )}
-          <p className={`text-sm ${
-            message.type === 'success' ? 'text-green-800' : 'text-red-800'
-          }`}>{message.text}</p>
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-800">Error</p>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Filter */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex items-center space-x-4">
-          <label className="text-sm font-medium text-gray-700">Filter by Quarter:</label>
-          <select
-            value={selectedQuarter}
-            onChange={(e) => setSelectedQuarter(e.target.value)}
-            className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white max-w-xs"
-          >
-            <option value="all">All Quarters</option>
-            {quarters.map(quarter => (
-              <option key={quarter.id} value={quarter.id}>
-                {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-gray-500">
-            {classes.length} {classes.length === 1 ? 'class' : 'classes'} found
-          </span>
+      {/* Success Message */}
+      {success && (
+        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
+          <div className="flex items-start">
+            <CheckCircle className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-green-800">Success</p>
+              <p className="text-sm text-green-700 mt-1">{success}</p>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Classes Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {classes.map((classItem) => (
-          <div key={classItem.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-indigo-100 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-indigo-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{classItem.class_name}</h3>
-                  {classItem.quarter?.is_active && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                      Active Quarter
-                    </span>
-                  )}
-                </div>
+      {/* Class Form */}
+      {showForm && (
+        <div className="card">
+          <h2 className="text-xl font-semibold mb-6">
+            {editingClass ? 'Edit Class' : 'Add New Class'}
+          </h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Class Name *</label>
+                <input
+                  type="text"
+                  required
+                  className="input"
+                  value={formData.class_name}
+                  onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
+                  placeholder="e.g., Bible Class 3"
+                />
               </div>
-              <div className="flex space-x-1">
-                <button
-                  onClick={() => handleOpenModal(classItem)}
-                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-                  title="Edit"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(classItem.id, classItem.class_name)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2 text-sm">
-                <Calendar className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">Quarter:</span>
-                <span className="font-medium text-gray-900">
-                  {classItem.quarter?.name} {classItem.quarter?.year}
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-2 text-sm">
-                <User className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">Teacher:</span>
-                <span className="font-medium text-gray-900">{classItem.teacher_name}</span>
-              </div>
-
-              <div className="flex items-center space-x-2 text-sm">
-                <User className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">Secretary:</span>
-                <span className="font-medium text-gray-900">{classItem.secretary_name}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {classes.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No classes found</h3>
-            <p className="text-gray-600 mb-4">
-              {selectedQuarter === 'all' 
-                ? 'Create your first class to start tracking Sabbath School data'
-                : 'No classes for selected quarter. Create one to get started.'}
-            </p>
-            <button
-              onClick={() => handleOpenModal()}
-              className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Add Class</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Add/Edit Class Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-xl font-semibold text-gray-900">
-                {editingClass ? 'Edit Class' : 'Add New Class'}
-              </h3>
-              <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {message.text && (
-                <div className={`p-3 rounded-lg flex items-start text-sm ${
-                  message.type === 'success' ? 'bg-green-50 text-green-800' :
-                  'bg-red-50 text-red-800'
-                }`}>
-                  {message.type === 'success' ? (
-                    <CheckCircle className="h-4 w-4 mr-2 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
-                  )}
-                  {message.text}
-                </div>
-              )}
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Quarter</label>
+                <label className="label">Quarter *</label>
                 <select
-                  name="quarter_id"
-                  value={formData.quarter_id}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
                   required
+                  className="input"
+                  value={formData.quarter_id}
+                  onChange={(e) => setFormData({ ...formData, quarter_id: e.target.value })}
                 >
                   <option value="">Select Quarter</option>
-                  {quarters.map(quarter => (
+                  {quarters.map((quarter) => (
                     <option key={quarter.id} value={quarter.id}>
                       {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
                     </option>
@@ -338,79 +301,212 @@ const ClassManagement = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Class Name</label>
+                <label className="label">Teacher Name *</label>
                 <input
                   type="text"
-                  name="class_name"
-                  value={formData.class_name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                  placeholder="e.g., Young Adults, Women's Class, Men's Class"
                   required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Teacher Name</label>
-                <input
-                  type="text"
-                  name="teacher_name"
+                  className="input"
                   value={formData.teacher_name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                  placeholder="Enter teacher's full name"
-                  required
+                  onChange={(e) => setFormData({ ...formData, teacher_name: e.target.value })}
+                  placeholder="Teacher's full name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Class Secretary Name</label>
+                <label className="label">Secretary Name *</label>
                 <input
                   type="text"
-                  name="secretary_name"
+                  required
+                  className="input"
                   value={formData.secretary_name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                  placeholder="Enter class secretary's full name"
-                  required
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  For record keeping only - class secretaries don't log in to the system
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Church Name</label>
-                <input
-                  type="text"
-                  name="church_name"
-                  value={formData.church_name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                  required
+                  onChange={(e) => setFormData({ ...formData, secretary_name: e.target.value })}
+                  placeholder="Secretary's full name"
                 />
               </div>
+            </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
+            <div className="flex space-x-3 pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <Save className="h-5 w-5" />
+                <span>{editingClass ? 'Update Class' : 'Create Class'}</span>
+              </button>
+              
+              {editingClass && (
                 <button
                   type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
+                  onClick={resetForm}
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all"
-                >
-                  <Save className="h-5 w-5" />
-                  <span>{editingClass ? 'Update Class' : 'Create Class'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
+              )}
+            </div>
+          </form>
         </div>
       )}
+
+      {/* Classes List */}
+      <div className="card">
+        <h2 className="text-xl font-semibold mb-6">Existing Classes</h2>
+        
+        {loading && !classes.length ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          </div>
+        ) : classes.length === 0 ? (
+          <p className="text-center text-gray-500 py-8">No classes found. Create your first class above.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Secretary</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quarter</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {classes.map((classItem) => {
+                  const quarter = quarters.find(q => q.id === classItem.quarter_id);
+                  return (
+                    <tr key={classItem.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{classItem.class_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">{classItem.teacher_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">{classItem.secretary_name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">
+                          {quarter ? `${quarter.name} ${quarter.year}` : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleEdit(classItem)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Edit class"
+                          >
+                            <Edit2 className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(classItem.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete class"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Class Members Management */}
+      <div className="card">
+        <h2 className="text-xl font-semibold mb-6 flex items-center">
+          <Users className="h-6 w-6 mr-2 text-indigo-600" />
+          Manage Class Members
+        </h2>
+
+        <div className="space-y-4">
+          {/* Class Selection */}
+          <div>
+            <label className="label">Select Class</label>
+            <select
+              className="input max-w-md"
+              value={selectedClassForMembers}
+              onChange={(e) => handleClassSelectForMembers(e.target.value)}
+            >
+              <option value="">Choose a class to manage members</option>
+              {classes.map((classItem) => (
+                <option key={classItem.id} value={classItem.id}>
+                  {classItem.class_name} - {classItem.teacher_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Add Member Form */}
+          {selectedClassForMembers && (
+            <>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  className="input flex-1 max-w-md"
+                  placeholder="Enter member name (e.g., John Doe)"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddMember();
+                    }
+                  }}
+                />
+                <button
+                  onClick={handleAddMember}
+                  disabled={loading || !newMemberName.trim()}
+                  className="btn-primary flex items-center space-x-2"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span>Add Member</span>
+                </button>
+              </div>
+
+              {/* Members List */}
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                  Class Members ({classMembers.length})
+                </h3>
+                
+                {loading && !classMembers.length ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                  </div>
+                ) : classMembers.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No members in this class yet.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {classMembers.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100"
+                      >
+                        <span className="text-sm font-medium text-gray-900">
+                          {member.member_name}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteMember(member.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Remove member"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
