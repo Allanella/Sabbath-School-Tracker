@@ -53,29 +53,59 @@ const WeeklyDataEntry = () => {
 
   const loadClasses = async () => {
     try {
+      console.log('Loading classes...');
       const response = await classService.getAll();
-      const classesData = response.data || [];
-      setClasses(classesData);
-      if (classesData.length > 0) {
-        setSelectedClass(classesData[0].id);
+      console.log('Classes response:', response);
+      
+      // Extract data properly - handle both response.data and response.data.data
+      const classesData = response.data?.data || response.data || [];
+      console.log('Extracted classes data:', classesData);
+      
+      // Ensure it's an array
+      if (Array.isArray(classesData)) {
+        setClasses(classesData);
+        if (classesData.length > 0) {
+          setSelectedClass(classesData[0].id);
+        } else {
+          setMessage({ 
+            type: 'error', 
+            text: 'No classes available. Please create classes in Admin → Classes first.' 
+          });
+        }
       } else {
+        console.error('Classes data is not an array:', classesData);
+        setClasses([]);
         setMessage({ 
           type: 'error', 
-          text: 'No classes available. Please create classes in Admin → Classes first.' 
+          text: 'Invalid data format received for classes.' 
         });
       }
     } catch (error) {
       console.error('Failed to load classes:', error);
+      setClasses([]);
       setMessage({ type: 'error', text: 'Failed to load classes' });
     }
   };
 
   const loadMembers = async () => {
     try {
+      console.log('Loading members for class:', selectedClass);
       const response = await classMemberService.getByClass(selectedClass);
-      setMembers(response.data || []);
+      console.log('Members response:', response);
+      
+      // Extract data properly
+      const membersData = response.data?.data || response.data || [];
+      console.log('Extracted members data:', membersData);
+      
+      if (Array.isArray(membersData)) {
+        setMembers(membersData);
+      } else {
+        console.error('Members data is not an array:', membersData);
+        setMembers([]);
+      }
     } catch (error) {
       console.error('Failed to load members:', error);
+      setMembers([]);
     }
   };
 
@@ -103,10 +133,14 @@ const WeeklyDataEntry = () => {
       
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Failed to save member. Please try again.' 
-      });
+      console.error('Error adding member:', error);
+      
+      // Extract error message from backend
+      const errorMessage = error.response?.data?.message 
+        || error.response?.data?.error
+        || 'Failed to save member. Please try again.';
+      
+      setMessage({ type: 'error', text: errorMessage });
     }
   };
 
@@ -125,7 +159,9 @@ const WeeklyDataEntry = () => {
       loadMembers();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to remove member.' });
+      console.error('Error deleting member:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to remove member.';
+      setMessage({ type: 'error', text: errorMessage });
     }
   };
 
@@ -141,26 +177,22 @@ const WeeklyDataEntry = () => {
   };
 
   const formatPaymentsForSave = (payments) => {
-    // Return empty string if no payments or all are zero
     if (!payments || Object.keys(payments).length === 0) {
       return '';
     }
     
-    // Convert {memberId: amount} to "Name: amount, Name: amount"
     const entries = Object.entries(payments)
       .filter(([id, amount]) => amount && amount > 0)
       .map(([id, amount]) => {
         const member = members.find(m => m.id === id);
         return member ? `${member.member_name}: ${amount}` : null;
       })
-      .filter(Boolean); // Remove null entries
+      .filter(Boolean);
     
-    // Return empty string if no valid entries
     return entries.length > 0 ? entries.join(', ') : '';
   };
 
   const parsePaymentsFromSaved = (paymentString) => {
-    // Convert "Name: amount, Name: amount" back to {memberId: amount}
     if (!paymentString || paymentString.trim() === '') return {};
     
     const payments = {};
@@ -184,7 +216,6 @@ const WeeklyDataEntry = () => {
         const data = response.data;
         setFormData(data);
         
-        // Parse saved payment data
         setPaymentsLessonEnglish(parsePaymentsFromSaved(data.members_paid_lesson_english));
         setPaymentsLessonLuganda(parsePaymentsFromSaved(data.members_paid_lesson_luganda));
         setPaymentsMorningWatchEnglish(parsePaymentsFromSaved(data.members_paid_morning_watch_english));
@@ -236,7 +267,6 @@ const WeeklyDataEntry = () => {
         class_id: selectedClass,
         week_number: parseInt(weekNumber),
         ...formData,
-        // Save as "Name: amount, Name: amount" or empty string
         members_paid_lesson_english: formatPaymentsForSave(paymentsLessonEnglish),
         members_paid_lesson_luganda: formatPaymentsForSave(paymentsLessonLuganda),
         members_paid_morning_watch_english: formatPaymentsForSave(paymentsMorningWatchEnglish),
@@ -251,7 +281,6 @@ const WeeklyDataEntry = () => {
         setMessage({ type: 'success', text: '🎉 Data submitted successfully! Redirecting to dashboard...' });
       }
 
-      // Scroll to top to see success message
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
       setTimeout(() => {
@@ -262,7 +291,6 @@ const WeeklyDataEntry = () => {
         type: 'error',
         text: error.response?.data?.message || 'Failed to save data. Please try again.',
       });
-      // Scroll to top to see error message
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
