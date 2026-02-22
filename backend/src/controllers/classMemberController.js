@@ -19,6 +19,7 @@ const classMemberController = {
         data
       });
     } catch (error) {
+      console.error('Error in getByClass:', error);
       next(error);
     }
   },
@@ -27,6 +28,10 @@ const classMemberController = {
   create: async (req, res, next) => {
     try {
       const { class_id, member_name } = req.body;
+
+      console.log('=== CREATE MEMBER REQUEST ===');
+      console.log('Class ID:', class_id);
+      console.log('Member Name:', member_name);
 
       // Check if member already exists in ANY class (case-insensitive)
       const { data: existing, error: checkError } = await supabase
@@ -43,6 +48,12 @@ const classMemberController = {
         .ilike('member_name', member_name)
         .maybeSingle();
 
+      if (checkError) {
+        console.error('Error checking existing member:', checkError);
+      }
+
+      console.log('Existing member check result:', existing);
+
       if (existing) {
         const className = existing.class?.class_name || 'Unknown Class';
         const teacherName = existing.class?.teacher_name || '';
@@ -51,6 +62,8 @@ const classMemberController = {
           ? `"${member_name}" is already a member of ${className} (Teacher: ${teacherName})`
           : `"${member_name}" is already a member of ${className}`;
         
+        console.log('Duplicate detected, sending error:', errorMsg);
+        
         return res.status(400).json({
           success: false,
           message: errorMsg
@@ -58,6 +71,8 @@ const classMemberController = {
       }
 
       // If no existing member found, create new one
+      console.log('No duplicate found, creating member...');
+      
       const { data, error } = await supabase
         .from('class_members')
         .insert([{ class_id, member_name }])
@@ -65,8 +80,13 @@ const classMemberController = {
         .single();
 
       if (error) {
+        console.error('Supabase insert error:', error);
+        console.error('Error code:', error.code);
+        
         // Handle unique constraint violation
         if (error.code === '23505') {
+          console.log('Constraint violation detected, fetching duplicate info...');
+          
           // Fetch the class info for the duplicate
           const { data: duplicateInfo } = await supabase
             .from('class_members')
@@ -86,6 +106,8 @@ const classMemberController = {
             ? `"${member_name}" already exists in ${className} (Teacher: ${teacherName})`
             : `"${member_name}" already exists in ${className}`;
 
+          console.log('Constraint error message:', errorMsg);
+
           return res.status(400).json({
             success: false,
             message: errorMsg
@@ -94,11 +116,14 @@ const classMemberController = {
         throw error;
       }
 
+      console.log('Member created successfully:', data);
+
       res.status(201).json({
         success: true,
         data
       });
     } catch (error) {
+      console.error('Unhandled error in create:', error);
       next(error);
     }
   },
@@ -108,6 +133,10 @@ const classMemberController = {
     try {
       const { id } = req.params;
       const { member_name } = req.body;
+
+      console.log('=== UPDATE MEMBER REQUEST ===');
+      console.log('Member ID:', id);
+      console.log('New Name:', member_name);
 
       // Check if new name already exists for a different member
       const { data: existing, error: checkError } = await supabase
@@ -124,6 +153,8 @@ const classMemberController = {
         .neq('id', id)
         .maybeSingle();
 
+      console.log('Existing member check result:', existing);
+
       if (existing) {
         const className = existing.class?.class_name || 'another class';
         const teacherName = existing.class?.teacher_name || '';
@@ -131,6 +162,8 @@ const classMemberController = {
         const errorMsg = teacherName
           ? `"${member_name}" is already a member of ${className} (Teacher: ${teacherName})`
           : `"${member_name}" is already a member of ${className}`;
+
+        console.log('Duplicate detected during update:', errorMsg);
 
         return res.status(400).json({
           success: false,
@@ -146,6 +179,8 @@ const classMemberController = {
         .single();
 
       if (error) {
+        console.error('Supabase update error:', error);
+        
         // Handle unique constraint violation
         if (error.code === '23505') {
           // Fetch the class info for the duplicate
@@ -168,6 +203,8 @@ const classMemberController = {
             ? `"${member_name}" already exists in ${className} (Teacher: ${teacherName})`
             : `"${member_name}" already exists in ${className}`;
 
+          console.log('Constraint error on update:', errorMsg);
+
           return res.status(400).json({
             success: false,
             message: errorMsg
@@ -176,11 +213,14 @@ const classMemberController = {
         throw error;
       }
 
+      console.log('Member updated successfully:', data);
+
       res.json({
         success: true,
         data
       });
     } catch (error) {
+      console.error('Unhandled error in update:', error);
       next(error);
     }
   },
@@ -190,18 +230,27 @@ const classMemberController = {
     try {
       const { id } = req.params;
 
+      console.log('=== DELETE MEMBER REQUEST ===');
+      console.log('Member ID:', id);
+
       const { error } = await supabase
         .from('class_members')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+
+      console.log('Member deleted successfully');
 
       res.json({
         success: true,
         message: 'Member removed successfully'
       });
     } catch (error) {
+      console.error('Unhandled error in delete:', error);
       next(error);
     }
   }
