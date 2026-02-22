@@ -57,7 +57,7 @@ const ClassManagement = () => {
     setLoading(true);
     try {
       const response = await classMemberService.getByClass(classId);
-      setClassMembers(response.data || []);
+      setClassMembers(response.data?.data || []);
       setError('');
     } catch (error) {
       console.error('Failed to load class members:', error);
@@ -141,8 +141,9 @@ const ClassManagement = () => {
   };
 
   const handleAddMember = async () => {
+    // Validation
     if (!newMemberName.trim()) {
-      setError('Member name cannot be empty');
+      setError('Please enter a member name');
       return;
     }
 
@@ -151,6 +152,7 @@ const ClassManagement = () => {
       return;
     }
 
+    // Clear previous messages
     setError('');
     setSuccess('');
     setLoading(true);
@@ -161,32 +163,60 @@ const ClassManagement = () => {
         member_name: newMemberName.trim()
       });
 
+      // Success
       const memberName = newMemberName.trim();
       setNewMemberName('');
       loadClassMembers(selectedClassForMembers);
-      setSuccess(`"${memberName}" added successfully!`);
+      setSuccess(`✓ "${memberName}" has been added successfully!`);
       
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 4000);
+
     } catch (error) {
-      console.error('Error adding member:', error);
+      console.error('=== FULL ERROR ===', error);
       
-      // Get error message from backend response
-      const errorMessage = error.response?.data?.message 
-        || error.response?.data?.error
-        || error.message 
-        || 'Failed to add member. Please try again.';
+      let errorMessage = 'Failed to add member. Please try again.';
       
+      if (error.response) {
+        console.log('Error status:', error.response.status);
+        console.log('Error data:', error.response.data);
+        
+        // Extract error message from backend
+        if (error.response.data) {
+          if (typeof error.response.data === 'string') {
+            errorMessage = error.response.data;
+          } else if (error.response.data.message) {
+            errorMessage = error.response.data.message;
+          } else if (error.response.data.error) {
+            errorMessage = error.response.data.error;
+          }
+        }
+        
+        // Fallback based on status code
+        if (errorMessage === 'Failed to add member. Please try again.') {
+          if (error.response.status === 400) {
+            errorMessage = 'Member validation failed. Please check the name.';
+          } else if (error.response.status === 409) {
+            errorMessage = 'This member already exists in the system.';
+          } else if (error.response.status === 500) {
+            errorMessage = 'Server error. Please try again later.';
+          }
+        }
+      } else if (error.request) {
+        errorMessage = 'Cannot connect to server. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.log('Final error message:', errorMessage);
       setError(errorMessage);
       
-      // Don't auto-clear error - let user read it
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteMember = async (memberId) => {
-    if (!window.confirm('Are you sure you want to remove this member?')) {
+    if (!window.confirm('Are you sure you want to remove this member from the class?')) {
       return;
     }
 
@@ -196,12 +226,16 @@ const ClassManagement = () => {
 
     try {
       await classMemberService.delete(memberId);
-      setSuccess('Member removed successfully!');
+      setSuccess('✓ Member removed successfully!');
       loadClassMembers(selectedClassForMembers);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      console.error('Error deleting member:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to remove member';
+      console.error('Error removing member:', error);
+      
+      const errorMessage = error.response?.data?.message 
+        || error.response?.data?.error
+        || 'Failed to remove member. Please try again.';
+      
       setError(errorMessage);
     } finally {
       setLoading(false);
