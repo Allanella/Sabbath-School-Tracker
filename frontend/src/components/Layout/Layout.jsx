@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import InstallPWA from '../Common/InstallPWA';
 import {
   Menu,
   X,
@@ -192,6 +193,9 @@ const Layout = () => {
           </div>
         </footer>
       </div>
+
+      {/* PWA Install Prompt */}
+      <InstallPWA />
     </div>
   );
 };
