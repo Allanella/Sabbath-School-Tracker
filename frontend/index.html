@@ -10,19 +10,21 @@
     <meta name="description" content="Kanyanya SDA Church Sabbath School Tracker - Manage attendance, offerings, and member data" />
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- Apple Touch Icons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png" />
+    <!-- Apple Touch Icons - Updated paths -->
+    <link rel="apple-touch-icon" href="/icon-512x512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-512x512.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-512x512.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icon-512x512.png" />
     
     <!-- iOS Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SS Tracker" />
     
     <!-- Microsoft Tiles -->
     <meta name="msapplication-TileColor" content="#4F46E5" />
-    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+    <meta name="msapplication-TileImage" content="/icon-512x512.png" />
     
     <title>Sabbath School Tracker - Kanyanya SDA Church</title>
   </head>
@@ -30,19 +32,82 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
-    <!-- Register Service Worker -->
+    <!-- Register Service Worker with Debugging -->
     <script>
+      console.log('=== PWA SETUP DEBUG ===');
+      console.log('Service Worker support:', 'serviceWorker' in navigator);
+      console.log('Current protocol:', window.location.protocol);
+      console.log('Current host:', window.location.host);
+      
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
+          console.log('Attempting to register service worker...');
+          
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-              console.log('SW registered:', registration);
+              console.log('✅ SW registered successfully:', registration);
+              console.log('SW scope:', registration.scope);
+              console.log('SW state:', registration.active?.state);
             })
             .catch((error) => {
-              console.log('SW registration failed:', error);
+              console.error('❌ SW registration failed:', error);
             });
         });
+      } else {
+        console.error('❌ Service Workers not supported in this browser');
       }
+
+      // Listen for install prompt
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('✅ beforeinstallprompt event fired!');
+        console.log('Install prompt is available');
+        deferredPrompt = e;
+      });
+
+      // Check if already installed
+      window.addEventListener('appinstalled', () => {
+        console.log('✅ App was successfully installed!');
+      });
+
+      // Check display mode
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        console.log('✅ App is running in standalone mode (already installed)');
+      } else {
+        console.log('ℹ️ App is running in browser mode (not installed yet)');
+      }
+
+      // Check if manifest is accessible
+      fetch('/manifest.json')
+        .then(response => {
+          if (response.ok) {
+            console.log('✅ Manifest file is accessible');
+            return response.json();
+          } else {
+            console.error('❌ Manifest file not found:', response.status);
+          }
+        })
+        .then(manifest => {
+          if (manifest) {
+            console.log('✅ Manifest loaded:', manifest);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error loading manifest:', error);
+        });
+
+      // Check if icon is accessible
+      fetch('/icon-512x512.png')
+        .then(response => {
+          if (response.ok) {
+            console.log('✅ App icon is accessible');
+          } else {
+            console.error('❌ App icon not found:', response.status);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error loading icon:', error);
+        });
     </script>
   </body>
 </html>
