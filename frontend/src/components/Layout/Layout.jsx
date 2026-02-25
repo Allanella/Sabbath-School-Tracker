@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import InstallPWA from '../Common/InstallPWA';
@@ -18,13 +18,49 @@ import {
   TrendingUp,
   Trophy,
   Crown,
-  Receipt
+  Receipt,
+  Download
 } from 'lucide-react';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstallButton(false);
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      alert('Installation not available. Please use your browser menu to install.');
+      return;
+    }
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setShowInstallButton(false);
+    }
+    
+    setDeferredPrompt(null);
+  };
 
   const handleLogout = () => {
     logout();
@@ -120,6 +156,18 @@ const Layout = () => {
               <span className="text-sm font-medium">{item.name}</span>
             </Link>
           ))}
+
+          {/* Install App Button in Sidebar */}
+          {showInstallButton && (
+            <button
+              onClick={handleInstall}
+              className="flex items-center space-x-3 px-4 py-3 rounded-lg
+                         bg-green-600 hover:bg-green-700 transition w-full mt-4"
+            >
+              <Download className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm font-medium">Install App</span>
+            </button>
+          )}
         </nav>
 
         {/* User info + logout - fixed at bottom */}
@@ -162,7 +210,19 @@ const Layout = () => {
               Kanyanya SDA Church - Sabbath School Tracker
             </h2>
 
-            <div className="w-10" />
+            {/* Install Button in Header */}
+            {showInstallButton && (
+              <button
+                onClick={handleInstall}
+                className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                title="Install App"
+              >
+                <Download className="h-4 w-4" />
+                <span>Install</span>
+              </button>
+            )}
+
+            {!showInstallButton && <div className="w-10" />}
           </div>
         </header>
 
