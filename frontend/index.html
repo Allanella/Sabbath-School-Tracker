@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <!-- PWA Meta Tags -->
@@ -10,11 +10,11 @@
     <meta name="description" content="Kanyanya SDA Church Sabbath School Tracker - Manage attendance, offerings, and member data" />
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- Apple Touch Icons - Updated paths -->
-    <link rel="apple-touch-icon" href="/icon-512x512.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon-512x512.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/icon-512x512.png" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/icon-512x512.png" />
+    <!-- Apple Touch Icons - Updated to use SVG -->
+    <link rel="apple-touch-icon" href="/icons/icon-512x512.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.svg" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-192x192.svg" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-192x192.svg" />
     
     <!-- iOS Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes">
@@ -24,7 +24,7 @@
     
     <!-- Microsoft Tiles -->
     <meta name="msapplication-TileColor" content="#4F46E5" />
-    <meta name="msapplication-TileImage" content="/icon-512x512.png" />
+    <meta name="msapplication-TileImage" content="/icons/icon-512x512.svg" />
     
     <title>Sabbath School Tracker - Kanyanya SDA Church</title>
   </head>
@@ -96,17 +96,29 @@
           console.error('❌ Error loading manifest:', error);
         });
 
-      // Check if icon is accessible
-      fetch('/icon-512x512.png')
+      // Check if icons are accessible
+      fetch('/icons/icon-512x512.svg')
         .then(response => {
           if (response.ok) {
-            console.log('✅ App icon is accessible');
+            console.log('✅ 512x512 icon is accessible');
           } else {
-            console.error('❌ App icon not found:', response.status);
+            console.error('❌ 512x512 icon not found:', response.status);
           }
         })
         .catch(error => {
-          console.error('❌ Error loading icon:', error);
+          console.error('❌ Error loading 512 icon:', error);
+        });
+
+      fetch('/icons/icon-192x192.svg')
+        .then(response => {
+          if (response.ok) {
+            console.log('✅ 192x192 icon is accessible');
+          } else {
+            console.error('❌ 192x192 icon not found:', response.status);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error loading 192 icon:', error);
         });
     </script>
   </body>
