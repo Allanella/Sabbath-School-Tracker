@@ -14,6 +14,7 @@ const WeeklyDataEntry = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [manualOffline, setManualOffline] = useState(false);
   
   // Members management state
   const [members, setMembers] = useState([]);
@@ -40,46 +41,42 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  // Load classes on mount
   useEffect(() => {
     loadClasses();
   }, []);
 
-  // Online/offline detection with polling
+  // Enhanced online/offline detection
   useEffect(() => {
-    setIsOnline(navigator.onLine);
-    
-    console.log('Setting up online/offline listeners');
-    console.log('Initial online status:', navigator.onLine);
+    const updateOnlineStatus = () => {
+      const actualStatus = navigator.onLine;
+      console.log('Browser reports online:', actualStatus);
+      console.log('Manual offline mode:', manualOffline);
+      setIsOnline(actualStatus && !manualOffline);
+    };
+
+    updateOnlineStatus();
 
     const handleOnline = () => {
       console.log('🟢 ONLINE event fired');
-      setIsOnline(true);
+      updateOnlineStatus();
     };
     
     const handleOffline = () => {
       console.log('🔴 OFFLINE event fired');
-      setIsOnline(false);
+      updateOnlineStatus();
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Poll every 2 seconds as backup
-    const intervalId = setInterval(() => {
-      const currentStatus = navigator.onLine;
-      if (currentStatus !== isOnline) {
-        console.log('Polling detected status change:', currentStatus);
-        setIsOnline(currentStatus);
-      }
-    }, 2000);
+    const intervalId = setInterval(updateOnlineStatus, 2000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       clearInterval(intervalId);
     };
-  }, [isOnline]);
+  }, [manualOffline]);
 
   useEffect(() => {
     if (selectedClass) {
@@ -307,17 +304,16 @@ const WeeklyDataEntry = () => {
       members_paid_morning_watch_luganda: formatPaymentsForSave(paymentsMorningWatchLuganda),
     };
 
-    // Check online status directly
-    const isCurrentlyOnline = navigator.onLine;
+    const isActuallyOnline = navigator.onLine && !manualOffline;
     
     console.log('=== SUBMIT DEBUG ===');
-    console.log('State isOnline:', isOnline);
-    console.log('Navigator.onLine:', isCurrentlyOnline);
+    console.log('Navigator.onLine:', navigator.onLine);
+    console.log('Manual Offline Mode:', manualOffline);
+    console.log('Final Status (Actually Online):', isActuallyOnline);
     console.log('Data to submit:', dataToSubmit);
 
     try {
-      // Use navigator.onLine directly
-      if (!isCurrentlyOnline) {
+      if (!isActuallyOnline) {
         console.log('🔴 OFFLINE MODE - Saving to IndexedDB...');
         
         await offlineStorage.savePendingData({ data: dataToSubmit });
@@ -341,7 +337,6 @@ const WeeklyDataEntry = () => {
 
       console.log('🟢 ONLINE MODE - Submitting to server...');
 
-      // Online - submit normally
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
         setMessage({ type: 'success', text: '✅ Data updated successfully! Redirecting...' });
@@ -358,9 +353,6 @@ const WeeklyDataEntry = () => {
     } catch (error) {
       console.error('❌ Submit error:', error);
       
-      // Network error - save offline
-      console.log('Attempting offline save due to error...');
-      
       try {
         await offlineStorage.savePendingData({ data: dataToSubmit });
         setMessage({ 
@@ -375,7 +367,7 @@ const WeeklyDataEntry = () => {
         console.error('Offline save failed:', offlineError);
         setMessage({
           type: 'error',
-          text: 'Failed to save data both online and offline. Please try again.'
+          text: 'Failed to save data. Please try again.'
         });
       }
       
@@ -390,22 +382,37 @@ const WeeklyDataEntry = () => {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Weekly Data Entry</h1>
         
-        {/* Online Status Debug & Offline Indicator */}
-        <div className="flex items-center space-x-4">
-          {/* Debug Status Indicator */}
-          <div className={`px-4 py-2 rounded-lg border-2 ${isOnline ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
+        {/* Enhanced Status Controls */}
+        <div className="flex items-center space-x-3">
+          {/* Manual Offline Toggle */}
+          <button
+            type="button"
+            onClick={() => setManualOffline(!manualOffline)}
+            className={`px-4 py-2 rounded-lg border-2 font-medium transition-all text-sm ${
+              manualOffline 
+                ? 'bg-orange-100 border-orange-500 text-orange-800 hover:bg-orange-200' 
+                : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {manualOffline ? '🔴 Test Offline Mode (Click for Online)' : '🟢 Online (Click to Test Offline)'}
+          </button>
+
+          {/* Status Indicator */}
+          <div className={`px-4 py-2 rounded-lg border-2 ${
+            isOnline && !manualOffline 
+              ? 'bg-green-50 border-green-500' 
+              : 'bg-red-50 border-red-500'
+          }`}>
             <span className="text-sm font-medium">
-              {isOnline ? '🟢 Online' : '🔴 Offline'}
+              {isOnline && !manualOffline ? '🟢 Online' : '🔴 Offline'}
             </span>
           </div>
-          
-          {/* Offline Mode Badge */}
-          {!isOnline && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-orange-100 border-2 border-orange-500 rounded-lg">
-              <WifiOff className="h-5 w-5 text-orange-600" />
-              <span className="text-sm font-medium text-orange-800">Offline Mode Active</span>
-            </div>
-          )}
+
+          {/* Debug Info */}
+          <div className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded border">
+            <div>Browser: {navigator.onLine ? '✓ Online' : '✗ Offline'}</div>
+            <div>Mode: {manualOffline ? '✗ Manual OFF' : '✓ Normal'}</div>
+          </div>
         </div>
       </div>
 
@@ -560,16 +567,10 @@ const WeeklyDataEntry = () => {
           </div>
         )}
 
-        {/* ALL YOUR EXISTING FORM SECTIONS GO HERE */}
-        {/* Attendance & Participation, Payment Tracking, Additional Notes */}
-        {/* I'm keeping all your existing code for these sections */}
-        {/* Copy them from your current file - they stay exactly the same */}
-
-        {/* Attendance & Participation - OFFERING FIRST */}
+        {/* Attendance & Participation */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Attendance & Participation</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* OFFERING FIRST - Full Width */}
             <div className="md:col-span-2 bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
               <label className="block text-sm font-bold text-green-800 mb-2 flex items-center">
                 <DollarSign className="h-5 w-5 mr-2" />
@@ -674,11 +675,11 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Payment Tracking - Individual Amounts */}
+        {/* Payment Tracking */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center space-x-2 mb-4">
             <DollarSign className="h-6 w-6 text-green-600" />
-            <h2 className="text-xl font-semibold">Lesson & Morning Watch Payments (Individual Amounts)</h2>
+            <h2 className="text-xl font-semibold">Lesson & Morning Watch Payments</h2>
           </div>
           
           <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
@@ -696,9 +697,7 @@ const WeeklyDataEntry = () => {
               {/* Lesson English */}
               <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
-                  <span className="flex items-center">
-                    📚 Lesson (English)
-                  </span>
+                  <span>📚 Lesson (English)</span>
                   <span className="bg-green-600 text-white px-4 py-1 rounded-full text-sm font-bold">
                     Total: {calculateTotal(paymentsLessonEnglish).toLocaleString()} UGX
                   </span>
@@ -727,9 +726,7 @@ const WeeklyDataEntry = () => {
               {/* Lesson Luganda */}
               <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
-                  <span className="flex items-center">
-                    📚 Lesson (Luganda)
-                  </span>
+                  <span>📚 Lesson (Luganda)</span>
                   <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">
                     Total: {calculateTotal(paymentsLessonLuganda).toLocaleString()} UGX
                   </span>
@@ -758,9 +755,7 @@ const WeeklyDataEntry = () => {
               {/* Morning Watch English */}
               <div className="border-2 border-purple-200 rounded-lg p-4 bg-purple-50">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
-                  <span className="flex items-center">
-                    🌅 Morning Watch (English)
-                  </span>
+                  <span>🌅 Morning Watch (English)</span>
                   <span className="bg-purple-600 text-white px-4 py-1 rounded-full text-sm font-bold">
                     Total: {calculateTotal(paymentsMorningWatchEnglish).toLocaleString()} UGX
                   </span>
@@ -789,9 +784,7 @@ const WeeklyDataEntry = () => {
               {/* Morning Watch Luganda */}
               <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
-                  <span className="flex items-center">
-                    🌅 Morning Watch (Luganda)
-                  </span>
+                  <span>🌅 Morning Watch (Luganda)</span>
                   <span className="bg-orange-600 text-white px-4 py-1 rounded-full text-sm font-bold">
                     Total: {calculateTotal(paymentsMorningWatchLuganda).toLocaleString()} UGX
                   </span>
@@ -894,7 +887,7 @@ const WeeklyDataEntry = () => {
         </div>
       </form>
 
-      {/* Add/Edit Member Modal */}
+      {/* Member Modal */}
       {showMemberModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
@@ -957,7 +950,6 @@ const WeeklyDataEntry = () => {
         </div>
       )}
 
-      {/* CSS Animation */}
       <style>{`
         @keyframes fadeIn {
           from {
