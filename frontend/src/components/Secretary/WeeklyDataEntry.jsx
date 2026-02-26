@@ -40,21 +40,46 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
+  // Load classes on mount
   useEffect(() => {
     loadClasses();
+  }, []);
 
-    // Listen for online/offline events
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+  // Online/offline detection with polling
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    
+    console.log('Setting up online/offline listeners');
+    console.log('Initial online status:', navigator.onLine);
+
+    const handleOnline = () => {
+      console.log('🟢 ONLINE event fired');
+      setIsOnline(true);
+    };
+    
+    const handleOffline = () => {
+      console.log('🔴 OFFLINE event fired');
+      setIsOnline(false);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Poll every 2 seconds as backup
+    const intervalId = setInterval(() => {
+      const currentStatus = navigator.onLine;
+      if (currentStatus !== isOnline) {
+        console.log('Polling detected status change:', currentStatus);
+        setIsOnline(currentStatus);
+      }
+    }, 2000);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [isOnline]);
 
   useEffect(() => {
     if (selectedClass) {
@@ -282,11 +307,23 @@ const WeeklyDataEntry = () => {
       members_paid_morning_watch_luganda: formatPaymentsForSave(paymentsMorningWatchLuganda),
     };
 
+    // Check online status directly
+    const isCurrentlyOnline = navigator.onLine;
+    
+    console.log('=== SUBMIT DEBUG ===');
+    console.log('State isOnline:', isOnline);
+    console.log('Navigator.onLine:', isCurrentlyOnline);
+    console.log('Data to submit:', dataToSubmit);
+
     try {
-      // Check if online
-      if (!isOnline) {
-        // Save offline
+      // Use navigator.onLine directly
+      if (!isCurrentlyOnline) {
+        console.log('🔴 OFFLINE MODE - Saving to IndexedDB...');
+        
         await offlineStorage.savePendingData({ data: dataToSubmit });
+        
+        console.log('✅ Saved offline successfully');
+        
         setMessage({ 
           type: 'warning', 
           text: '📴 You\'re offline! Data saved locally and will sync when you\'re back online.' 
@@ -298,8 +335,11 @@ const WeeklyDataEntry = () => {
           navigate('/secretary');
         }, 3000);
         
+        setLoading(false);
         return;
       }
+
+      console.log('🟢 ONLINE MODE - Submitting to server...');
 
       // Online - submit normally
       if (formData.id) {
@@ -316,13 +356,10 @@ const WeeklyDataEntry = () => {
         navigate('/secretary');
       }, 2000);
     } catch (error) {
-      console.error('Submit error:', error);
+      console.error('❌ Submit error:', error);
       
-      // If online but request failed, offer to save offline
-      setMessage({
-        type: 'error',
-        text: error.response?.data?.message || 'Network error. Saving offline...'
-      });
+      // Network error - save offline
+      console.log('Attempting offline save due to error...');
       
       try {
         await offlineStorage.savePendingData({ data: dataToSubmit });
@@ -338,7 +375,7 @@ const WeeklyDataEntry = () => {
         console.error('Offline save failed:', offlineError);
         setMessage({
           type: 'error',
-          text: 'Failed to save data. Please try again.'
+          text: 'Failed to save data both online and offline. Please try again.'
         });
       }
       
@@ -353,13 +390,23 @@ const WeeklyDataEntry = () => {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Weekly Data Entry</h1>
         
-        {/* Offline Indicator */}
-        {!isOnline && (
-          <div className="flex items-center space-x-2 px-4 py-2 bg-orange-100 border-2 border-orange-500 rounded-lg">
-            <WifiOff className="h-5 w-5 text-orange-600" />
-            <span className="text-sm font-medium text-orange-800">Offline Mode</span>
+        {/* Online Status Debug & Offline Indicator */}
+        <div className="flex items-center space-x-4">
+          {/* Debug Status Indicator */}
+          <div className={`px-4 py-2 rounded-lg border-2 ${isOnline ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
+            <span className="text-sm font-medium">
+              {isOnline ? '🟢 Online' : '🔴 Offline'}
+            </span>
           </div>
-        )}
+          
+          {/* Offline Mode Badge */}
+          {!isOnline && (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-orange-100 border-2 border-orange-500 rounded-lg">
+              <WifiOff className="h-5 w-5 text-orange-600" />
+              <span className="text-sm font-medium text-orange-800">Offline Mode Active</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {message.text && (
@@ -453,10 +500,6 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Rest of the form remains exactly the same... */}
-        {/* I'm keeping the rest of your existing form code unchanged */}
-        {/* Just showing the key changes above */}
-
         {/* Class Members Management */}
         {selectedClass && (
           <div className="bg-white rounded-lg shadow p-6">
@@ -517,10 +560,321 @@ const WeeklyDataEntry = () => {
           </div>
         )}
 
-        {/* Continue with all your existing form sections... */}
-        {/* Attendance, Payments, Notes, etc. - keep all existing code */}
+        {/* ALL YOUR EXISTING FORM SECTIONS GO HERE */}
+        {/* Attendance & Participation, Payment Tracking, Additional Notes */}
+        {/* I'm keeping all your existing code for these sections */}
+        {/* Copy them from your current file - they stay exactly the same */}
 
-        {/* Submit Button - keep your existing one */}
+        {/* Attendance & Participation - OFFERING FIRST */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Attendance & Participation</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* OFFERING FIRST - Full Width */}
+            <div className="md:col-span-2 bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border-2 border-green-200">
+              <label className="block text-sm font-bold text-green-800 mb-2 flex items-center">
+                <DollarSign className="h-5 w-5 mr-2" />
+                Offering Given for Global Mission (UGX)
+              </label>
+              <input
+                type="number"
+                name="offering_global_mission"
+                value={formData.offering_global_mission}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:border-green-500 focus:ring-4 focus:ring-green-100 outline-none transition-all text-lg font-semibold"
+                min="0"
+                step="0.01"
+                placeholder="Enter offering amount"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Total Attendance</label>
+              <input
+                type="number"
+                name="total_attendance"
+                value={formData.total_attendance}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Member Visits</label>
+              <input
+                type="number"
+                name="member_visits"
+                value={formData.member_visits}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Conducted Bible Studies</label>
+              <input
+                type="number"
+                name="members_conducted_bible_studies"
+                value={formData.members_conducted_bible_studies}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Helped Others</label>
+              <input
+                type="number"
+                name="members_helped_others"
+                value={formData.members_helped_others}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Members Who Studied Lesson During Week</label>
+              <input
+                type="number"
+                name="members_studied_lesson"
+                value={formData.members_studied_lesson}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Visitors</label>
+              <input
+                type="number"
+                name="number_of_visitors"
+                value={formData.number_of_visitors}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Bible Study Guides Distributed</label>
+              <input
+                type="number"
+                name="bible_study_guides_distributed"
+                value={formData.bible_study_guides_distributed}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                min="0"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Tracking - Individual Amounts */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <DollarSign className="h-6 w-6 text-green-600" />
+            <h2 className="text-xl font-semibold">Lesson & Morning Watch Payments (Individual Amounts)</h2>
+          </div>
+          
+          <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+            <p className="text-sm text-blue-800">
+              <strong>Instructions:</strong> Enter the amount each member paid this week. Leave blank (0) for members who didn't pay.
+            </p>
+          </div>
+
+          {members.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">
+              Please add class members first to track payments.
+            </p>
+          ) : (
+            <div className="space-y-8">
+              {/* Lesson English */}
+              <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    📚 Lesson (English)
+                  </span>
+                  <span className="bg-green-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsLessonEnglish).toLocaleString()} UGX
+                  </span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {members.map((member) => (
+                    <div key={`le-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsLessonEnglish[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonEnglish)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Lesson Luganda */}
+              <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    📚 Lesson (Luganda)
+                  </span>
+                  <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsLessonLuganda).toLocaleString()} UGX
+                  </span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {members.map((member) => (
+                    <div key={`ll-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsLessonLuganda[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonLuganda)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Morning Watch English */}
+              <div className="border-2 border-purple-200 rounded-lg p-4 bg-purple-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    🌅 Morning Watch (English)
+                  </span>
+                  <span className="bg-purple-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsMorningWatchEnglish).toLocaleString()} UGX
+                  </span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {members.map((member) => (
+                    <div key={`mwe-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsMorningWatchEnglish[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchEnglish)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Morning Watch Luganda */}
+              <div className="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    🌅 Morning Watch (Luganda)
+                  </span>
+                  <span className="bg-orange-600 text-white px-4 py-1 rounded-full text-sm font-bold">
+                    Total: {calculateTotal(paymentsMorningWatchLuganda).toLocaleString()} UGX
+                  </span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {members.map((member) => (
+                    <div key={`mwl-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={paymentsMorningWatchLuganda[member.id] || ''}
+                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchLuganda)}
+                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none text-right"
+                          placeholder="0"
+                          min="0"
+                          step="100"
+                        />
+                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grand Total Summary */}
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg p-6">
+                <h3 className="text-xl font-bold mb-4">📊 Week {weekNumber} Payment Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm opacity-90">Lesson (English)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsLessonEnglish).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">Lesson (Luganda)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsLessonLuganda).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">MW (English)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsMorningWatchEnglish).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">MW (Luganda)</p>
+                    <p className="text-2xl font-bold">{calculateTotal(paymentsMorningWatchLuganda).toLocaleString()}</p>
+                    <p className="text-xs opacity-75">UGX</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-white/30">
+                  <p className="text-sm opacity-90">Total Collections This Week</p>
+                  <p className="text-3xl font-bold">
+                    {(
+                      calculateTotal(paymentsLessonEnglish) +
+                      calculateTotal(paymentsLessonLuganda) +
+                      calculateTotal(paymentsMorningWatchEnglish) +
+                      calculateTotal(paymentsMorningWatchLuganda)
+                    ).toLocaleString()} UGX
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Additional Notes */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Additional Notes (Optional)</h2>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Notes/Comments</label>
+            <textarea
+              name="members_summary"
+              value={formData.members_summary}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+              rows="4"
+              placeholder="Any additional notes, comments, or observations..."
+            />
+          </div>
+        </div>
+
+        {/* Submit Button */}
         <div className="flex justify-end space-x-4">
           <button 
             type="button" 
@@ -540,14 +894,70 @@ const WeeklyDataEntry = () => {
         </div>
       </form>
 
-      {/* Keep your existing modal code */}
+      {/* Add/Edit Member Modal */}
       {showMemberModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          {/* Your existing modal code */}
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">
+                {editingMember ? 'Edit Member' : 'Add New Member'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowMemberModal(false);
+                  setEditingMember(null);
+                  setNewMemberName('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Member Name
+              </label>
+              <input
+                type="text"
+                value={newMemberName}
+                onChange={(e) => setNewMemberName(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddMember();
+                  }
+                }}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                placeholder="Enter member's full name"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t">
+              <button
+                onClick={() => {
+                  setShowMemberModal(false);
+                  setEditingMember(null);
+                  setNewMemberName('');
+                }}
+                className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddMember}
+                disabled={!newMemberName.trim()}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {editingMember ? 'Update' : 'Add'} Member
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Keep your existing CSS */}
+      {/* CSS Animation */}
       <style>{`
         @keyframes fadeIn {
           from {
