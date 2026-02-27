@@ -4,7 +4,7 @@ import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import classMemberService from '../../services/classMemberService';
 import offlineStorage from '../../utils/offlineStorage';
-import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff, RefreshCw } from 'lucide-react';
 
 const WeeklyDataEntry = () => {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ const WeeklyDataEntry = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [manualOffline, setManualOffline] = useState(false);
+  const [pendingMembersCount, setPendingMembersCount] = useState(0);
   
   // Members management state
   const [members, setMembers] = useState([]);
@@ -43,6 +44,7 @@ const WeeklyDataEntry = () => {
 
   useEffect(() => {
     loadClasses();
+    checkPendingMembers();
   }, []);
 
   // Enhanced online/offline detection
@@ -80,12 +82,17 @@ const WeeklyDataEntry = () => {
 
   useEffect(() => {
     if (selectedClass) {
-      loadMembers();
+      loadMembersWithLocal();
       if (weekNumber) {
         checkExistingData();
       }
     }
   }, [selectedClass, weekNumber]);
+
+  const checkPendingMembers = () => {
+    const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+    setPendingMembersCount(localMembers.length);
+  };
 
   const loadClasses = async () => {
     try {
@@ -142,9 +149,66 @@ const WeeklyDataEntry = () => {
     }
   };
 
+  const loadMembersWithLocal = async () => {
+    try {
+      await loadMembers();
+      
+      // Load pending local members
+      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+      const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data.class_id === selectedClass);
+      
+      if (pendingAdds.length > 0) {
+        const tempMembers = pendingAdds.map(item => item.data);
+        setMembers(prev => [...prev, ...tempMembers]);
+        
+        console.log('Loaded pending local members:', tempMembers);
+      }
+    } catch (error) {
+      console.error('Error loading members with local:', error);
+    }
+  };
+
   const handleAddMember = async () => {
     if (!newMemberName.trim()) return;
 
+    // Check if offline
+    const isActuallyOnline = navigator.onLine && !manualOffline;
+
+    if (!isActuallyOnline) {
+      // Offline mode - just add to local state
+      setMessage({ 
+        type: 'warning', 
+        text: '📴 Offline: Member added locally. Will sync when online.' 
+      });
+
+      const tempId = `temp-${Date.now()}`;
+      const newMember = {
+        id: tempId,
+        member_name: newMemberName.trim(),
+        class_id: selectedClass,
+        isLocal: true
+      };
+
+      setMembers([...members, newMember]);
+      setNewMemberName('');
+      setEditingMember(null);
+      setShowMemberModal(false);
+
+      // Store in localStorage
+      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+      localMembers.push({
+        action: 'create',
+        data: newMember,
+        timestamp: Date.now()
+      });
+      localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
+      checkPendingMembers();
+
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      return;
+    }
+
+    // Online mode - proceed normally
     try {
       if (editingMember) {
         await classMemberService.update(editingMember.id, {
@@ -185,6 +249,33 @@ const WeeklyDataEntry = () => {
   const handleDeleteMember = async (memberId) => {
     if (!window.confirm('Are you sure you want to remove this member?')) return;
 
+    // Check if offline
+    const isActuallyOnline = navigator.onLine && !manualOffline;
+
+    if (!isActuallyOnline) {
+      // Offline mode - remove from local state
+      setMessage({ 
+        type: 'warning', 
+        text: '📴 Offline: Member removed locally. Will sync when online.' 
+      });
+
+      setMembers(members.filter(m => m.id !== memberId));
+
+      // Store in localStorage
+      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+      localMembers.push({
+        action: 'delete',
+        memberId: memberId,
+        timestamp: Date.now()
+      });
+      localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
+      checkPendingMembers();
+
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      return;
+    }
+
+    // Online mode - proceed normally
     try {
       await classMemberService.delete(memberId);
       setMessage({ type: 'success', text: 'Member removed successfully!' });
@@ -195,6 +286,59 @@ const WeeklyDataEntry = () => {
       const errorMessage = error.response?.data?.message || 'Failed to remove member.';
       setMessage({ type: 'error', text: errorMessage });
     }
+  };
+
+  const syncPendingMembers = async () => {
+    const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+    
+    if (localMembers.length === 0) {
+      setMessage({ type: 'info', text: 'No pending members to sync.' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 2000);
+      return;
+    }
+
+    setLoading(true);
+    console.log('Syncing pending members:', localMembers);
+
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    for (const item of localMembers) {
+      try {
+        if (item.action === 'create') {
+          await classMemberService.create({
+            class_id: item.data.class_id,
+            member_name: item.data.member_name
+          });
+          console.log('✅ Synced member:', item.data.member_name);
+          syncedCount++;
+        } else if (item.action === 'delete') {
+          // Skip if it was a temp member
+          if (!item.memberId.startsWith('temp-')) {
+            await classMemberService.delete(item.memberId);
+            console.log('✅ Synced delete:', item.memberId);
+            syncedCount++;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to sync member:', item, error);
+        failedCount++;
+      }
+    }
+
+    // Clear pending members
+    localStorage.removeItem('pendingMembers');
+    checkPendingMembers();
+    
+    // Reload members from server
+    await loadMembers();
+    
+    setMessage({ 
+      type: 'success', 
+      text: `✅ Synced ${syncedCount} member(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}!` 
+    });
+    setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    setLoading(false);
   };
 
   const handlePaymentChange = (memberId, amount, setPayments) => {
@@ -384,6 +528,19 @@ const WeeklyDataEntry = () => {
         
         {/* Enhanced Status Controls */}
         <div className="flex items-center space-x-3">
+          {/* Sync Pending Members Button */}
+          {pendingMembersCount > 0 && (
+            <button
+              type="button"
+              onClick={syncPendingMembers}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center space-x-2 disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Sync {pendingMembersCount} Pending Member{pendingMembersCount > 1 ? 's' : ''}</span>
+            </button>
+          )}
+
           {/* Manual Offline Toggle */}
           <button
             type="button"
@@ -515,6 +672,11 @@ const WeeklyDataEntry = () => {
                 <Users className="h-6 w-6 text-indigo-600" />
                 <h2 className="text-xl font-semibold">Class Members</h2>
                 <span className="text-sm text-gray-500">({members.length} members)</span>
+                {members.some(m => m.isLocal) && (
+                  <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                    {members.filter(m => m.isLocal).length} pending sync
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -535,9 +697,18 @@ const WeeklyDataEntry = () => {
                 {members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      member.isLocal 
+                        ? 'bg-orange-50 border-orange-200' 
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
                   >
-                    <span className="text-sm font-medium text-gray-900">{member.member_name}</span>
+                    <div className="flex items-center space-x-2 flex-1">
+                      <span className="text-sm font-medium text-gray-900">{member.member_name}</span>
+                      {member.isLocal && (
+                        <span className="text-xs text-orange-600">●</span>
+                      )}
+                    </div>
                     <div className="flex space-x-1">
                       <button
                         type="button"
