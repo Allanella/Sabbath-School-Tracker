@@ -90,8 +90,14 @@ const WeeklyDataEntry = () => {
   }, [selectedClass, weekNumber]);
 
   const checkPendingMembers = () => {
-    const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-    setPendingMembersCount(localMembers.length);
+    try {
+      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+      setPendingMembersCount(localMembers.length);
+      console.log('Pending members count:', localMembers.length);
+    } catch (error) {
+      console.error('Error checking pending members:', error);
+      setPendingMembersCount(0);
+    }
   };
 
   const loadClasses = async () => {
@@ -169,46 +175,73 @@ const WeeklyDataEntry = () => {
   };
 
   const handleAddMember = async () => {
-    if (!newMemberName.trim()) return;
+    if (!newMemberName.trim()) {
+      setMessage({ type: 'error', text: 'Please enter a member name.' });
+      return;
+    }
 
     // Check if offline
     const isActuallyOnline = navigator.onLine && !manualOffline;
 
+    console.log('=== ADD MEMBER DEBUG ===');
+    console.log('Is Online:', isActuallyOnline);
+    console.log('Member Name:', newMemberName);
+    console.log('Selected Class:', selectedClass);
+
     if (!isActuallyOnline) {
-      // Offline mode - just add to local state
-      setMessage({ 
-        type: 'warning', 
-        text: '📴 Offline: Member added locally. Will sync when online.' 
-      });
+      console.log('🔴 OFFLINE MODE - Adding member locally');
+      
+      try {
+        // Offline mode - just add to local state
+        const tempId = `temp-${Date.now()}`;
+        const newMember = {
+          id: tempId,
+          member_name: newMemberName.trim(),
+          class_id: selectedClass,
+          isLocal: true
+        };
 
-      const tempId = `temp-${Date.now()}`;
-      const newMember = {
-        id: tempId,
-        member_name: newMemberName.trim(),
-        class_id: selectedClass,
-        isLocal: true
-      };
+        console.log('New member object:', newMember);
 
-      setMembers([...members, newMember]);
-      setNewMemberName('');
-      setEditingMember(null);
-      setShowMemberModal(false);
+        setMembers([...members, newMember]);
+        setNewMemberName('');
+        setEditingMember(null);
+        setShowMemberModal(false);
 
-      // Store in localStorage
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      localMembers.push({
-        action: 'create',
-        data: newMember,
-        timestamp: Date.now()
-      });
-      localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-      checkPendingMembers();
+        // Store in localStorage
+        const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+        localMembers.push({
+          action: 'create',
+          data: newMember,
+          timestamp: Date.now()
+        });
+        localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
+        
+        console.log('✅ Saved to localStorage:', localMembers);
+        
+        checkPendingMembers();
 
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-      return;
+        setMessage({ 
+          type: 'warning', 
+          text: '📴 Offline: Member added locally. Will sync when online.' 
+        });
+
+        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        return;
+
+      } catch (offlineError) {
+        console.error('❌ OFFLINE SAVE ERROR:', offlineError);
+        setMessage({ 
+          type: 'error', 
+          text: `Offline save failed: ${offlineError.message}` 
+        });
+        return;
+      }
     }
 
     // Online mode - proceed normally
+    console.log('🟢 ONLINE MODE - Saving to server');
+    
     try {
       if (editingMember) {
         await classMemberService.update(editingMember.id, {
@@ -230,11 +263,16 @@ const WeeklyDataEntry = () => {
       
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      console.error('Error adding member:', error);
+      console.error('❌ ONLINE SAVE ERROR:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       
       const errorMessage = error.response?.data?.message 
         || error.response?.data?.error
-        || 'Failed to save member. Please try again.';
+        || `Failed to save member: ${error.message}`;
       
       setMessage({ type: 'error', text: errorMessage });
     }
@@ -252,93 +290,123 @@ const WeeklyDataEntry = () => {
     // Check if offline
     const isActuallyOnline = navigator.onLine && !manualOffline;
 
+    console.log('=== DELETE MEMBER DEBUG ===');
+    console.log('Is Online:', isActuallyOnline);
+    console.log('Member ID:', memberId);
+
     if (!isActuallyOnline) {
-      // Offline mode - remove from local state
-      setMessage({ 
-        type: 'warning', 
-        text: '📴 Offline: Member removed locally. Will sync when online.' 
-      });
+      console.log('🔴 OFFLINE MODE - Removing member locally');
+      
+      try {
+        // Offline mode - remove from local state
+        setMembers(members.filter(m => m.id !== memberId));
 
-      setMembers(members.filter(m => m.id !== memberId));
+        // Store in localStorage
+        const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+        localMembers.push({
+          action: 'delete',
+          memberId: memberId,
+          timestamp: Date.now()
+        });
+        localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
+        
+        console.log('✅ Saved delete to localStorage:', localMembers);
+        
+        checkPendingMembers();
 
-      // Store in localStorage
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      localMembers.push({
-        action: 'delete',
-        memberId: memberId,
-        timestamp: Date.now()
-      });
-      localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-      checkPendingMembers();
+        setMessage({ 
+          type: 'warning', 
+          text: '📴 Offline: Member removed locally. Will sync when online.' 
+        });
 
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-      return;
+        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        return;
+
+      } catch (offlineError) {
+        console.error('❌ OFFLINE DELETE ERROR:', offlineError);
+        setMessage({ 
+          type: 'error', 
+          text: `Offline delete failed: ${offlineError.message}` 
+        });
+        return;
+      }
     }
 
     // Online mode - proceed normally
+    console.log('🟢 ONLINE MODE - Deleting from server');
+    
     try {
       await classMemberService.delete(memberId);
       setMessage({ type: 'success', text: 'Member removed successfully!' });
       loadMembers();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      console.error('Error deleting member:', error);
+      console.error('❌ ONLINE DELETE ERROR:', error);
       const errorMessage = error.response?.data?.message || 'Failed to remove member.';
       setMessage({ type: 'error', text: errorMessage });
     }
   };
 
   const syncPendingMembers = async () => {
-    const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-    
-    if (localMembers.length === 0) {
-      setMessage({ type: 'info', text: 'No pending members to sync.' });
-      setTimeout(() => setMessage({ type: '', text: '' }), 2000);
-      return;
-    }
-
-    setLoading(true);
-    console.log('Syncing pending members:', localMembers);
-
-    let syncedCount = 0;
-    let failedCount = 0;
-
-    for (const item of localMembers) {
-      try {
-        if (item.action === 'create') {
-          await classMemberService.create({
-            class_id: item.data.class_id,
-            member_name: item.data.member_name
-          });
-          console.log('✅ Synced member:', item.data.member_name);
-          syncedCount++;
-        } else if (item.action === 'delete') {
-          // Skip if it was a temp member
-          if (!item.memberId.startsWith('temp-')) {
-            await classMemberService.delete(item.memberId);
-            console.log('✅ Synced delete:', item.memberId);
-            syncedCount++;
-          }
-        }
-      } catch (error) {
-        console.error('Failed to sync member:', item, error);
-        failedCount++;
+    try {
+      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+      
+      if (localMembers.length === 0) {
+        setMessage({ type: 'info', text: 'No pending members to sync.' });
+        setTimeout(() => setMessage({ type: '', text: '' }), 2000);
+        return;
       }
-    }
 
-    // Clear pending members
-    localStorage.removeItem('pendingMembers');
-    checkPendingMembers();
-    
-    // Reload members from server
-    await loadMembers();
-    
-    setMessage({ 
-      type: 'success', 
-      text: `✅ Synced ${syncedCount} member(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}!` 
-    });
-    setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    setLoading(false);
+      setLoading(true);
+      console.log('Syncing pending members:', localMembers);
+
+      let syncedCount = 0;
+      let failedCount = 0;
+
+      for (const item of localMembers) {
+        try {
+          if (item.action === 'create') {
+            await classMemberService.create({
+              class_id: item.data.class_id,
+              member_name: item.data.member_name
+            });
+            console.log('✅ Synced member:', item.data.member_name);
+            syncedCount++;
+          } else if (item.action === 'delete') {
+            // Skip if it was a temp member
+            if (!item.memberId.startsWith('temp-')) {
+              await classMemberService.delete(item.memberId);
+              console.log('✅ Synced delete:', item.memberId);
+              syncedCount++;
+            } else {
+              console.log('⏭️ Skipped temp member delete:', item.memberId);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to sync member:', item, error);
+          failedCount++;
+        }
+      }
+
+      // Clear pending members
+      localStorage.removeItem('pendingMembers');
+      checkPendingMembers();
+      
+      // Reload members from server
+      await loadMembers();
+      
+      setMessage({ 
+        type: 'success', 
+        text: `✅ Synced ${syncedCount} member(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}!` 
+      });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      
+    } catch (error) {
+      console.error('Sync error:', error);
+      setMessage({ type: 'error', text: 'Failed to sync members.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePaymentChange = (memberId, amount, setPayments) => {
@@ -706,7 +774,7 @@ const WeeklyDataEntry = () => {
                     <div className="flex items-center space-x-2 flex-1">
                       <span className="text-sm font-medium text-gray-900">{member.member_name}</span>
                       {member.isLocal && (
-                        <span className="text-xs text-orange-600">●</span>
+                        <span className="text-xs text-orange-600" title="Pending sync">●</span>
                       )}
                     </div>
                     <div className="flex space-x-1">
@@ -737,6 +805,10 @@ const WeeklyDataEntry = () => {
             )}
           </div>
         )}
+
+        {/* ALL YOUR EXISTING FORM SECTIONS CONTINUE HERE */}
+        {/* I'm keeping them exactly as they were - just copy from your current file */}
+        {/* Attendance & Participation, Payment Tracking, Additional Notes, Submit Button */}
 
         {/* Attendance & Participation */}
         <div className="bg-white rounded-lg shadow p-6">
@@ -846,7 +918,7 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Payment Tracking */}
+        {/* Payment Tracking - keeping all your existing payment sections exactly as they are */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center space-x-2 mb-4">
             <DollarSign className="h-6 w-6 text-green-600" />
@@ -865,6 +937,9 @@ const WeeklyDataEntry = () => {
             </p>
           ) : (
             <div className="space-y-8">
+              {/* All your existing payment sections - Lesson English, Lesson Luganda, Morning Watch English, Morning Watch Luganda, Grand Total */}
+              {/* Copy them exactly from your current file - they work perfectly */}
+              
               {/* Lesson English */}
               <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
