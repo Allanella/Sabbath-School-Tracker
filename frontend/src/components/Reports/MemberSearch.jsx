@@ -50,7 +50,7 @@ const MemberSearch = () => {
         } else if (response.data.members && Array.isArray(response.data.members)) {
           // Nested in members property
           results = response.data.members;
-        } else if (typeof response.data === 'object') {
+        } else if (typeof response.data === 'object' && !Array.isArray(response.data)) {
           // Single object - wrap in array
           results = [response.data];
         }
