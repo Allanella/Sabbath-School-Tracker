@@ -19,6 +19,7 @@ const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
 const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
 const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
 const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMemberRoutes'));
+const memberRoutes = require(path.join(ROUTES_PATH, 'memberRoutes'));
 
 // -------------------- MIDDLEWARE --------------------
 const errorHandler = require(path.join(MIDDLEWARE_PATH, 'errorHandler'));
@@ -92,6 +93,7 @@ app.use('/api/quarters', quarterRoutes);
 app.use('/api/weekly-data', weeklyDataRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/class-members', classMemberRoutes);
+app.use('/api/members', memberRoutes);
 
 // -------------------- ROOT --------------------
 app.get('/', (req, res) => {
