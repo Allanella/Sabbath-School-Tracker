@@ -4,11 +4,13 @@ const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
     if (response.data.success) {
-      // Remove this line - no token in response body
-      // localStorage.setItem('token', response.data.data.token);
-      
-      // Keep this - store user info
+      // Store user info
       localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      
+      // Store token if it exists in response
+      if (response.data.data.token) {
+        localStorage.setItem('token', response.data.data.token);
+      }
     }
     return response.data;
   },
@@ -17,6 +19,11 @@ const authService = {
     const response = await api.post('/auth/register', userData);
     if (response.data.success) {
       localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      
+      // Store token if it exists in response
+      if (response.data.data.token) {
+        localStorage.setItem('token', response.data.data.token);
+      }
     }
     return response.data;
   },
@@ -35,6 +42,10 @@ const authService = {
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+
+  getToken: () => {
+    return localStorage.getItem('token');
   },
 
   getProfile: async () => {
