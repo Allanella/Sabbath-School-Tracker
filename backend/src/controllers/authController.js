@@ -74,6 +74,7 @@ const authController = {
             full_name: newUser.full_name,
             role: newUser.role,
           },
+          token: token, // Send token in response body
         },
       });
     } catch (err) {
@@ -121,6 +122,7 @@ const authController = {
             full_name: user.full_name,
             role: user.role,
           },
+          token: token, // Send token in response body
         },
       });
     } catch (err) {
