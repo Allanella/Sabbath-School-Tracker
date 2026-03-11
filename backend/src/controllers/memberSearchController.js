@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const supabase = require('../config/database');
 
 const searchMembers = async (req, res) => {
   try {
@@ -15,29 +15,46 @@ const searchMembers = async (req, res) => {
 
     const searchTerm = `%${query.trim()}%`;
 
-    const result = await pool.query(
-      `SELECT 
-        cm.id as member_id,
-        cm.member_name,
-        c.id as class_id,
-        c.class_name,
-        c.teacher_name,
-        q.name as quarter_name,
-        q.year as quarter_year
-      FROM class_members cm
-      JOIN classes c ON cm.class_id = c.id
-      LEFT JOIN quarters q ON c.quarter_id = q.id
-      WHERE LOWER(cm.member_name) LIKE LOWER($1)
-      ORDER BY cm.member_name ASC`,
-      [searchTerm]
-    );
+    const { data, error } = await supabase
+      .from('class_members')
+      .select(`
+        id,
+        member_name,
+        classes!inner (
+          id,
+          class_name,
+          teacher_name,
+          quarters (
+            name,
+            year
+          )
+        )
+      `)
+      .ilike('member_name', searchTerm)
+      .order('member_name');
 
-    console.log('Search results:', result.rows.length, 'members found');
+    if (error) {
+      console.error('Search error:', error);
+      throw error;
+    }
+
+    // Transform the data to flatten the structure
+    const results = data.map(member => ({
+      member_id: member.id,
+      member_name: member.member_name,
+      class_id: member.classes.id,
+      class_name: member.classes.class_name,
+      teacher_name: member.classes.teacher_name,
+      quarter_name: member.classes.quarters?.name || null,
+      quarter_year: member.classes.quarters?.year || null
+    }));
+
+    console.log('Search results:', results.length, 'members found');
 
     res.json({
       success: true,
-      data: result.rows,
-      count: result.rows.length
+      data: results,
+      count: results.length
     });
   } catch (error) {
     console.error('Member search error:', error);
