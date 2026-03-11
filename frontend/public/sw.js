@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ss-tracker-v1';
+const CACHE_NAME = 'ss-tracker-v1773250147';
 const urlsToCache = [
   '/',
   '/login',
