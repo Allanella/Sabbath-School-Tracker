@@ -4,6 +4,9 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+console.log('🔍 DEBUG - API_URL loaded:', API_URL);
+console.log('🔍 DEBUG - Environment:', import.meta.env.MODE);
+
 const MemberSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -25,7 +28,12 @@ const MemberSearch = () => {
     setSearched(false);
 
     try {
+      console.log('=== MEMBER SEARCH DEBUG ===');
       console.log('Searching for:', searchQuery);
+      console.log('API_URL constant:', API_URL);
+      console.log('Full URL being called:', `${API_URL}/members/search`);
+      console.log('Token exists:', !!localStorage.getItem('token'));
+      console.log('Token preview:', localStorage.getItem('token')?.substring(0, 20) + '...');
       
       const response = await axios.get(`${API_URL}/members/search`, {
         params: { query: searchQuery.trim() },
@@ -64,8 +72,11 @@ const MemberSearch = () => {
       setSearched(true);
       
     } catch (err) {
-      console.error('Search error:', err);
+      console.error('=== SEARCH ERROR ===');
+      console.error('Error object:', err);
       console.error('Error response:', err.response);
+      console.error('Error status:', err.response?.status);
+      console.error('Error data:', err.response?.data);
       
       const errorMessage = err.response?.data?.message 
         || err.response?.data?.error
@@ -91,6 +102,13 @@ const MemberSearch = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Member Search</h1>
         <p className="text-gray-600">Search for members across all classes</p>
+      </div>
+
+      {/* Debug Info Banner */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-xs text-blue-800 font-mono">
+          🔍 Debug: API_URL = {API_URL}
+        </p>
       </div>
 
       {/* Search Form */}
