@@ -19,7 +19,8 @@ import {
   Trophy,
   Crown,
   Receipt,
-  Download
+  Download,
+  History
 } from 'lucide-react';
 
 const Layout = () => {
@@ -74,12 +75,14 @@ const Layout = () => {
       { name: 'Quarters', href: '/admin/quarters', icon: Calendar },
       { name: 'Classes', href: '/admin/classes', icon: BookOpen },
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
+      { name: 'Payment Management', href: '/secretary/payments', icon: DollarSign },
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
       { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
       { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
+      { name: 'Payment History', href: '/reports/payment-history', icon: History },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
@@ -87,12 +90,14 @@ const Layout = () => {
     ss_secretary: [
       { name: 'Dashboard', href: '/secretary', icon: Home },
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
+      { name: 'Payment Management', href: '/secretary/payments', icon: DollarSign },
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
       { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
       { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
       { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
       { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
+      { name: 'Payment History', href: '/reports/payment-history', icon: History },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
     ],
@@ -103,6 +108,7 @@ const Layout = () => {
       { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
       { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
       { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
+      { name: 'Payment History', href: '/reports/payment-history', icon: History },
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
