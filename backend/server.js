@@ -54,32 +54,6 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// -------------------- TEMPORARY MIGRATION ENDPOINT --------------------
-// ⚠️ REMOVE THIS AFTER MIGRATION IS COMPLETE!
-app.get('/migrate-payments-secret-endpoint-12345', async (req, res) => {
-  try {
-    console.log('🚀 Starting payment migration via HTTP endpoint...');
-    const { migratePaymentData } = require('./src/scripts/migratePaymentData');
-    
-    // Run migration
-    await migratePaymentData();
-    
-    console.log('✅ Migration completed successfully!');
-    res.json({ 
-      success: true, 
-      message: 'Payment data migration completed successfully! Check server logs for details.',
-      instructions: 'Now remove this endpoint from server.js for security'
-    });
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-});
-
 // -------------------- API ROUTES --------------------
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
