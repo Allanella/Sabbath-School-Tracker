@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Calendar, TrendingUp, Download, Search, Filter } from 'lucide-react';
 import memberPaymentService from '../../services/memberPaymentService';
+import api from '../../services/api';
 
 const PaymentHistory = () => {
-  const [members, setMembers] = useState([]);
+  const [allMembers, setAllMembers] = useState([]);
+  const [filteredMembers, setFilteredMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [memberTotals, setMemberTotals] = useState(null);
@@ -11,6 +13,7 @@ const PaymentHistory = () => {
   const [selectedQuarter, setSelectedQuarter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loadingMembers, setLoadingMembers] = useState(true);
 
   useEffect(() => {
     loadQuarters();
@@ -23,11 +26,23 @@ const PaymentHistory = () => {
     }
   }, [selectedMember, selectedQuarter]);
 
+  useEffect(() => {
+    // Filter members based on search query
+    if (searchQuery.trim() === '') {
+      setFilteredMembers(allMembers);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = allMembers.filter(member =>
+        member.member_name.toLowerCase().includes(query)
+      );
+      setFilteredMembers(filtered);
+    }
+  }, [searchQuery, allMembers]);
+
   const loadQuarters = async () => {
     try {
-      const response = await fetch('/api/quarters');
-      const data = await response.json();
-      setQuarters(data.data || []);
+      const response = await api.get('/quarters');
+      setQuarters(response.data.data || []);
     } catch (error) {
       console.error('Failed to load quarters:', error);
     }
@@ -35,11 +50,50 @@ const PaymentHistory = () => {
 
   const loadAllMembers = async () => {
     try {
-      const response = await fetch('/api/class-members');
-      const data = await response.json();
-      setMembers(data.data || []);
+      setLoadingMembers(true);
+      
+      // Get all classes
+      const classesResponse = await api.get('/classes');
+      const classes = classesResponse.data.data || [];
+      
+      console.log('Classes found:', classes.length);
+      
+      // Get members from all classes
+      const allMembersPromises = classes.map(cls =>
+        api.get(`/class-members?class_id=${cls.id}`)
+          .then(res => ({
+            classId: cls.id,
+            className: cls.class_name,
+            members: res.data.data || []
+          }))
+          .catch(err => {
+            console.error(`Failed to load members for class ${cls.class_name}:`, err);
+            return { classId: cls.id, className: cls.class_name, members: [] };
+          })
+      );
+      
+      const allClassMembers = await Promise.all(allMembersPromises);
+      
+      // Flatten all members and add class info
+      const membersList = [];
+      allClassMembers.forEach(({ className, members }) => {
+        members.forEach(member => {
+          membersList.push({
+            ...member,
+            displayClassName: className
+          });
+        });
+      });
+      
+      console.log('Total members loaded:', membersList.length);
+      
+      setAllMembers(membersList);
+      setFilteredMembers(membersList);
+      
     } catch (error) {
       console.error('Failed to load members:', error);
+    } finally {
+      setLoadingMembers(false);
     }
   };
 
@@ -69,10 +123,6 @@ const PaymentHistory = () => {
       setLoading(false);
     }
   };
-
-  const filteredMembers = members.filter(member =>
-    member.member_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const exportMemberHistory = () => {
     if (!selectedMember || paymentHistory.length === 0) return;
@@ -146,29 +196,41 @@ const PaymentHistory = () => {
               />
             </div>
 
-            {/* Member List */}
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
-              {filteredMembers.map((member) => (
-                <button
-                  key={member.id}
-                  onClick={() => setSelectedMember(member)}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition ${
-                    selectedMember?.id === member.id
-                      ? 'bg-blue-100 border-2 border-blue-500'
-                      : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                  }`}
-                >
-                  <p className="font-medium text-gray-900">{member.member_name}</p>
-                  <p className="text-sm text-gray-600">
-                    {member.classes?.class_name || 'Unknown Class'}
-                  </p>
-                </button>
-              ))}
+            {/* Loading State */}
+            {loadingMembers && (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-sm text-gray-600 mt-2">Loading members...</p>
+              </div>
+            )}
 
-              {filteredMembers.length === 0 && (
-                <p className="text-center text-gray-500 py-8">No members found</p>
-              )}
-            </div>
+            {/* Member List */}
+            {!loadingMembers && (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {filteredMembers.map((member) => (
+                  <button
+                    key={member.id}
+                    onClick={() => setSelectedMember(member)}
+                    className={`w-full text-left px-4 py-3 rounded-lg transition ${
+                      selectedMember?.id === member.id
+                        ? 'bg-blue-100 border-2 border-blue-500'
+                        : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
+                    }`}
+                  >
+                    <p className="font-medium text-gray-900">{member.member_name}</p>
+                    <p className="text-sm text-gray-600">
+                      {member.displayClassName || 'Unknown Class'}
+                    </p>
+                  </button>
+                ))}
+
+                {filteredMembers.length === 0 && !loadingMembers && (
+                  <p className="text-center text-gray-500 py-8">
+                    {searchQuery ? 'No members match your search' : 'No members found'}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -187,7 +249,7 @@ const PaymentHistory = () => {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">{selectedMember.member_name}</h2>
-                    <p className="text-gray-600">{selectedMember.classes?.class_name || 'Unknown Class'}</p>
+                    <p className="text-gray-600">{selectedMember.displayClassName || 'Unknown Class'}</p>
                   </div>
                   <div className="flex gap-2">
                     <select
@@ -270,7 +332,6 @@ const PaymentHistory = () => {
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Week</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quarter</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Lessons</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Adult Lessons</th>
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Morning Watch</th>
@@ -295,9 +356,6 @@ const PaymentHistory = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 Week {payment.week_number}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                {payment.quarters?.name} {payment.quarters?.year}
-                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
                                 {memberPaymentService.formatCurrency(lessonTotal)}
                               </td>
@@ -316,7 +374,7 @@ const PaymentHistory = () => {
                       </tbody>
                       <tfoot className="bg-gray-50 border-t-2">
                         <tr>
-                          <td colSpan="6" className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                          <td colSpan="5" className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
                             Grand Total:
                           </td>
                           <td className="px-6 py-4 text-right text-lg font-bold text-blue-600">
