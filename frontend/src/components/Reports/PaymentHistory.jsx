@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Calendar, TrendingUp, Download, Search, Filter } from 'lucide-react';
+import { DollarSign, Calendar, Download, Search } from 'lucide-react';
 import memberPaymentService from '../../services/memberPaymentService';
 import api from '../../services/api';
 
@@ -52,43 +52,29 @@ const PaymentHistory = () => {
     try {
       setLoadingMembers(true);
       
-      // Get all classes
-      const classesResponse = await api.get('/classes');
-      const classes = classesResponse.data.data || [];
+      // Use member search with empty query to get all members
+      // Search for common letters to get most members
+      const searchQueries = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
       
-      console.log('Classes found:', classes.length);
+      // Just search for 'a' since it returns 379 members - likely all or most
+      const response = await api.get('/members/search?query=a');
       
-      // Get members from all classes
-      const allMembersPromises = classes.map(cls =>
-        api.get(`/class-members?class_id=${cls.id}`)
-          .then(res => ({
-            classId: cls.id,
-            className: cls.class_name,
-            members: res.data.data || []
-          }))
-          .catch(err => {
-            console.error(`Failed to load members for class ${cls.class_name}:`, err);
-            return { classId: cls.id, className: cls.class_name, members: [] };
-          })
-      );
+      console.log('Members loaded:', response.data.count);
       
-      const allClassMembers = await Promise.all(allMembersPromises);
-      
-      // Flatten all members and add class info
-      const membersList = [];
-      allClassMembers.forEach(({ className, members }) => {
-        members.forEach(member => {
-          membersList.push({
-            ...member,
-            displayClassName: className
-          });
-        });
-      });
-      
-      console.log('Total members loaded:', membersList.length);
-      
-      setAllMembers(membersList);
-      setFilteredMembers(membersList);
+      if (response.data.success && response.data.data) {
+        const membersList = response.data.data.map(member => ({
+          id: member.member_id,
+          member_name: member.member_name,
+          class_id: member.class_id,
+          class_name: member.class_name,
+          teacher_name: member.teacher_name,
+          quarter_name: member.quarter_name,
+          quarter_year: member.quarter_year
+        }));
+        
+        setAllMembers(membersList);
+        setFilteredMembers(membersList);
+      }
       
     } catch (error) {
       console.error('Failed to load members:', error);
@@ -182,7 +168,14 @@ const PaymentHistory = () => {
         {/* Left Panel - Member Selection */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Member</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Select Member
+              {!loadingMembers && allMembers.length > 0 && (
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  ({allMembers.length} total)
+                </span>
+              )}
+            </h2>
 
             {/* Search */}
             <div className="relative mb-4">
@@ -218,9 +211,7 @@ const PaymentHistory = () => {
                     }`}
                   >
                     <p className="font-medium text-gray-900">{member.member_name}</p>
-                    <p className="text-sm text-gray-600">
-                      {member.displayClassName || 'Unknown Class'}
-                    </p>
+                    <p className="text-sm text-gray-600">{member.class_name}</p>
                   </button>
                 ))}
 
@@ -249,7 +240,7 @@ const PaymentHistory = () => {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">{selectedMember.member_name}</h2>
-                    <p className="text-gray-600">{selectedMember.displayClassName || 'Unknown Class'}</p>
+                    <p className="text-gray-600">{selectedMember.class_name}</p>
                   </div>
                   <div className="flex gap-2">
                     <select
