@@ -19,6 +19,7 @@ const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
 const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMemberRoutes'));
 const memberRoutes = require(path.join(ROUTES_PATH, 'memberRoutes'));
 const memberPaymentRoutes = require(path.join(ROUTES_PATH, 'memberPayment.routes'));
+const quarterCopyRoutes = require(path.join(ROUTES_PATH, 'quarterCopy.routes'));
 
 // -------------------- MIDDLEWARE --------------------
 const allowedOrigins = [
@@ -64,6 +65,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/class-members', classMemberRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/member-payments', memberPaymentRoutes);
+app.use('/api/quarters', quarterCopyRoutes);
 
 // -------------------- ROOT --------------------
 app.get('/', (req, res) => {

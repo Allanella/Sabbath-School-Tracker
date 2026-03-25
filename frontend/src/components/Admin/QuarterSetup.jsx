@@ -9,19 +9,28 @@ import {
   Save,
   AlertCircle,
   Star,
+  Copy,
 } from "lucide-react";
 
 const QuarterSetup = () => {
   const [quarters, setQuarters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [selectedQuarter, setSelectedQuarter] = useState(null);
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [copying, setCopying] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "Q1",
     year: new Date().getFullYear(),
     start_date: "",
     end_date: "",
+  });
+
+  const [copyData, setCopyData] = useState({
+    sourceQuarterId: "",
+    targetQuarterId: ""
   });
 
   useEffect(() => {
@@ -69,6 +78,60 @@ const QuarterSetup = () => {
       start_date: "",
       end_date: "",
     });
+  };
+
+  const handleOpenCopyModal = (quarter) => {
+    setSelectedQuarter(quarter);
+    setCopyData({
+      sourceQuarterId: "",
+      targetQuarterId: quarter.id
+    });
+    setShowCopyModal(true);
+    setMessage({ type: "", text: "" });
+  };
+
+  const handleCloseCopyModal = () => {
+    setShowCopyModal(false);
+    setSelectedQuarter(null);
+    setCopyData({
+      sourceQuarterId: "",
+      targetQuarterId: ""
+    });
+  };
+
+  const handleCopyQuarter = async (e) => {
+    e.preventDefault();
+    setMessage({ type: "", text: "" });
+
+    if (!copyData.sourceQuarterId) {
+      setMessage({ type: "error", text: "Please select a quarter to copy from" });
+      return;
+    }
+
+    try {
+      setCopying(true);
+      const response = await quarterService.copyFromPreviousQuarter(
+        copyData.sourceQuarterId,
+        copyData.targetQuarterId
+      );
+
+      setMessage({
+        type: "success",
+        text: `Successfully copied ${response.data.classes_copied} classes and ${response.data.members_copied} members!`,
+      });
+
+      setTimeout(() => {
+        handleCloseCopyModal();
+        loadQuarters();
+      }, 2000);
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Failed to copy quarter data",
+      });
+    } finally {
+      setCopying(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -290,22 +353,30 @@ const QuarterSetup = () => {
               </div>
             </div>
 
-            <div className="flex space-x-2 pt-4 border-t">
+            <div className="flex flex-col space-y-2 pt-4 border-t">
               {!q.is_active && (
                 <button
                   onClick={() => handleSetActive(q.id)}
-                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm"
+                  className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm"
                 >
                   Set Active
                 </button>
               )}
 
               <button
+                onClick={() => handleOpenCopyModal(q)}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm flex items-center justify-center space-x-2"
+              >
+                <Copy className="h-4 w-4" />
+                <span>Copy Classes & Members</span>
+              </button>
+
+              <button
                 onClick={() => handleDelete(q.id, q.name, q.year)}
-                className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm"
-                title="Delete Quarter"
+                className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm flex items-center justify-center space-x-2"
               >
                 <Trash2 className="h-4 w-4" />
+                <span>Delete Quarter</span>
               </button>
             </div>
           </div>
@@ -332,7 +403,7 @@ const QuarterSetup = () => {
         )}
       </div>
 
-      {/* MODAL */}
+      {/* CREATE QUARTER MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
@@ -432,6 +503,112 @@ const QuarterSetup = () => {
                 <button type="submit" className="btn-primary flex items-center space-x-2">
                   <Save className="h-5 w-5" />
                   <span>Create Quarter</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* COPY CLASSES MODAL */}
+      {showCopyModal && selectedQuarter && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Copy Classes & Members
+              </h3>
+
+              <button
+                onClick={handleCloseCopyModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCopyQuarter} className="p-6 space-y-4">
+              {message.text && (
+                <div
+                  className={`p-3 rounded-lg flex items-start text-sm ${
+                    message.type === "success"
+                      ? "bg-green-50 text-green-800"
+                      : "bg-red-50 text-red-800"
+                  }`}
+                >
+                  {message.type === "success" ? (
+                    <CheckCircle className="h-4 w-4 mr-2 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5" />
+                  )}
+                  {message.text}
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <span className="font-semibold">Target Quarter:</span> {selectedQuarter.name} {selectedQuarter.year}
+                </p>
+              </div>
+
+              <div>
+                <label className="label">Copy From Quarter</label>
+                <select
+                  value={copyData.sourceQuarterId}
+                  onChange={(e) => setCopyData({ ...copyData, sourceQuarterId: e.target.value })}
+                  className="input"
+                  required
+                >
+                  <option value="">Select a quarter to copy from</option>
+                  {quarters
+                    .filter(q => q.id !== selectedQuarter.id)
+                    .map(q => (
+                      <option key={q.id} value={q.id}>
+                        {q.name} {q.year}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                <p className="font-medium mb-2">What will be copied:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>All classes with teacher names</li>
+                  <li>All class members</li>
+                </ul>
+                <p className="mt-2 font-medium">What will NOT be copied:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Weekly attendance data</li>
+                  <li>Payment records</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={handleCloseCopyModal} 
+                  className="btn-secondary"
+                  disabled={copying}
+                >
+                  Cancel
+                </button>
+
+                <button 
+                  type="submit" 
+                  className="btn-primary flex items-center space-x-2"
+                  disabled={copying}
+                >
+                  {copying ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Copying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-5 w-5" />
+                      <span>Copy Data</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
