@@ -40,8 +40,16 @@ const QuarterSetup = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data);
+
+      if (response && response.data) {
+        setQuarters(response.data);
+      } else {
+        setQuarters([]);
+      }
+
     } catch (error) {
+      console.error("Load quarters error:", error);
+      setQuarters([]);
       setMessage({ type: "error", text: "Failed to load quarters" });
     } finally {
       setLoading(false);
@@ -72,12 +80,6 @@ const QuarterSetup = () => {
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setFormData({
-      name: "Q1",
-      year: new Date().getFullYear(),
-      start_date: "",
-      end_date: "",
-    });
   };
 
   const handleOpenCopyModal = (quarter) => {
@@ -118,32 +120,85 @@ const QuarterSetup = () => {
 
       setMessage({
         type: "success",
-        text: `Successfully copied ${response.data.classes_copied} classes and ${response.data.members_copied} members!`,
+        text: `Successfully copied ${response?.data?.classes_copied || 0} classes and ${response?.data?.members_copied || 0} members!`,
       });
 
       setTimeout(() => {
         handleCloseCopyModal();
         loadQuarters();
       }, 2000);
+
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.response?.data?.message || "Failed to copy quarter data",
+        text: error?.response?.data?.message || "Failed to copy quarter data",
       });
     } finally {
       setCopying(false);
     }
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (name === "name" || name === "year") {
+      const year = name === "year" ? value : formData.year;
+      const qName = name === "name" ? value : formData.name;
+
+      const dates = getQuarterDates(qName, year);
+
+      setFormData((prev) => ({
+        ...prev,
+        start_date: dates.start,
+        end_date: dates.end,
+      }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage({ type: "", text: "" });
+
+    try {
+      await quarterService.create(formData);
+
+      setMessage({
+        type: "success",
+        text: "Quarter created successfully!",
+      });
+
+      setTimeout(() => {
+        handleCloseModal();
+        loadQuarters();
+      }, 1500);
+
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error?.response?.data?.message ||
+          "Failed to create quarter. It may already exist.",
+      });
+    }
+  };
+
   const handleSetActive = async (quarterId) => {
     try {
       await quarterService.setActive(quarterId);
+
       setMessage({
         type: "success",
         text: "Active quarter updated successfully!",
       });
+
       loadQuarters();
-    } catch {
+
+    } catch (error) {
       setMessage({ type: "error", text: "Failed to set active quarter" });
     }
   };
@@ -154,15 +209,49 @@ const QuarterSetup = () => {
 
     try {
       await quarterService.delete(id);
+
       setMessage({
         type: "success",
         text: "Quarter deleted successfully",
       });
+
       loadQuarters();
-    } catch {
+
+    } catch (error) {
       setMessage({
         type: "error",
         text: "Failed to delete quarter. It may have associated data.",
+      });
+    }
+  };
+
+  const handleQuickCreate = async () => {
+    const year = new Date().getFullYear();
+    const list = ["Q1", "Q2", "Q3", "Q4"];
+
+    try {
+      for (const q of list) {
+        const dates = getQuarterDates(q, year);
+
+        await quarterService.create({
+          name: q,
+          year,
+          start_date: dates.start,
+          end_date: dates.end,
+        });
+      }
+
+      setMessage({
+        type: "success",
+        text: `All quarters for ${year} created!`,
+      });
+
+      loadQuarters();
+
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: "Some quarters already existed or failed to create",
       });
     }
   };
@@ -178,76 +267,92 @@ const QuarterSetup = () => {
   return (
     <div>
 
-{/* COPY CLASSES MODAL */}
-
-{showCopyModal && selectedQuarter && (
-  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
-
-    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-
-      <div className="flex justify-between items-center p-6 border-b">
-        <h3 className="text-xl font-semibold text-gray-900">
-          Copy Classes & Members
-        </h3>
-
-        <button onClick={handleCloseCopyModal}>
-          <X className="h-6 w-6" />
-        </button>
-      </div>
-
-      <form onSubmit={handleCopyQuarter} className="p-6 space-y-4">
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            <span className="font-semibold">Target Quarter:</span>{" "}
-            {selectedQuarter.name} {selectedQuarter.year}
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Quarter Management</h1>
+          <p className="text-gray-600 mt-1">
+            Manage Sabbath School quarters (13 weeks each)
           </p>
         </div>
 
-        <div>
-          <label className="label">Copy From Quarter</label>
+        <div className="flex space-x-3">
+          <button onClick={handleQuickCreate} className="btn-secondary flex items-center space-x-2">
+            <Calendar className="h-5 w-5" />
+            <span>Create All for {new Date().getFullYear()}</span>
+          </button>
 
-          <select
-            value={copyData.sourceQuarterId}
-            onChange={(e) =>
-              setCopyData({
-                ...copyData,
-                sourceQuarterId: e.target.value,
-              })
-            }
-            className="input"
-            required
-          >
-
-            <option value="">Select a quarter to copy from</option>
-
-            {quarters
-              .filter(q => q.id !== selectedQuarter.id)
-              .sort((a, b) => {
-                // Sort by year descending, then by quarter name descending
-                if (a.year !== b.year) return b.year - a.year;
-                return b.name.localeCompare(a.name);
-              })
-              .map(q => (
-                <option key={q.id} value={q.id}>
-                  {q.name} {q.year}
-                </option>
-              ))}
-
-          </select>
-        </div>
-
-        <div className="flex justify-end pt-4">
-          <button type="submit" className="btn-primary flex items-center space-x-2">
-            <Copy className="h-5 w-5" />
-            <span>Copy Data</span>
+          <button onClick={handleOpenModal} className="btn-primary flex items-center space-x-2">
+            <Plus className="h-5 w-5" />
+            <span>Add Quarter</span>
           </button>
         </div>
+      </div>
 
-      </form>
-    </div>
-  </div>
-)}
+      {/* QUARTERS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        {quarters?.map((q) => (
+          <div key={q.id} className="card">
+            <h3 className="text-xl font-bold">{q.name} {q.year}</h3>
+
+            <div className="flex flex-col space-y-2 mt-4">
+
+              {!q.is_active && (
+                <button
+                  onClick={() => handleSetActive(q.id)}
+                  className="btn-primary"
+                >
+                  Set Active
+                </button>
+              )}
+
+              <button
+                onClick={() => handleOpenCopyModal(q)}
+                className="btn-secondary flex items-center justify-center space-x-2"
+              >
+                <Copy className="h-4 w-4" />
+                <span>Copy Classes & Members</span>
+              </button>
+
+              <button
+                onClick={() => handleDelete(q.id, q.name, q.year)}
+                className="btn-danger flex items-center justify-center space-x-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete Quarter</span>
+              </button>
+
+            </div>
+          </div>
+        ))}
+
+      </div>
+
+      {/* COPY MODAL */}
+      {showCopyModal && selectedQuarter && (
+        <select
+          value={copyData.sourceQuarterId}
+          onChange={(e) => setCopyData({ ...copyData, sourceQuarterId: e.target.value })}
+          className="input"
+          required
+        >
+          <option value="">Select a quarter to copy from</option>
+
+          {quarters
+            ?.filter(q => q.id !== selectedQuarter?.id)
+            .sort((a, b) => {
+              if (a.year !== b.year) return b.year - a.year;
+              return b.name.localeCompare(a.name);
+            })
+            .map(q => (
+              <option key={q.id} value={q.id}>
+                {q.name} {q.year}
+              </option>
+            ))}
+
+        </select>
+      )}
 
     </div>
   );
