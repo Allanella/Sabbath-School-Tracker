@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import InstallPWA from '../Common/InstallPWA';
+import React, { useState, useEffect } from "react";
+import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import InstallPWA from "../Common/InstallPWA";
+
 import {
   Menu,
   X,
@@ -21,7 +22,7 @@ import {
   Receipt,
   Download,
   History
-} from 'lucide-react';
+} from "lucide-react";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,25 +40,25 @@ const Layout = () => {
       setShowInstallButton(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener("beforeinstallprompt", handler);
 
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia("(display-mode: standalone)").matches) {
       setShowInstallButton(false);
     }
 
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
-      alert('Installation not available. Please use your browser menu to install.');
+      alert("Installation not available. Please use your browser menu to install.");
       return;
     }
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
 
-    if (outcome === 'accepted') {
+    if (outcome === "accepted") {
       setShowInstallButton(false);
     }
 
@@ -66,56 +67,63 @@ const Layout = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const navigation = {
     admin: [
-      { name: 'Dashboard', href: '/admin', icon: Home },
-      { name: 'Users', href: '/admin/users', icon: Users },
-      { name: 'Quarters', href: '/admin/quarters', icon: Calendar },
-      { name: 'Classes', href: '/admin/classes', icon: BookOpen },
-      { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
-      { name: 'Payment Management', href: '/secretary/payments', icon: DollarSign },
-      { name: 'Member Search', href: '/reports/member-search', icon: Search },
-      { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
-      { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
-      { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
-      { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
-      { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
-      { name: 'Payment History', href: '/reports/payment-history', icon: History },
-      { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
-      { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
-      { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
+      { name: "Dashboard", href: "/admin", icon: Home },
+      { name: "Users", href: "/admin/users", icon: Users },
+
+      { name: "Enter Data", href: "/secretary/entry", icon: FileText },
+      { name: "Payment Management", href: "/secretary/payments", icon: DollarSign },
+
+      { name: "Member Search", href: "/reports/member-search", icon: Search },
+      { name: "Class Search", href: "/reports/class-search", icon: BookOpen },
+      { name: "Performance Comparison", href: "/reports/performance", icon: TrendingUp },
+      { name: "Class Rankings", href: "/reports/rankings", icon: Trophy },
+      { name: "Overall Champion", href: "/reports/champion", icon: Crown },
+
+      { name: "Payment Report", href: "/reports/payments", icon: Receipt },
+      { name: "Payment History", href: "/reports/payment-history", icon: History },
+
+      { name: "Weekly Reports", href: "/reports/weekly", icon: FileText },
+      { name: "Quarterly Reports", href: "/reports/quarterly", icon: BarChart3 },
+      { name: "Financial Reports", href: "/reports/financial", icon: DollarSign },
     ],
 
     ss_secretary: [
-      { name: 'Dashboard', href: '/secretary', icon: Home },
-      { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
-      { name: 'Payment Management', href: '/secretary/payments', icon: DollarSign },
-      { name: 'Member Search', href: '/reports/member-search', icon: Search },
-      { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
-      { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
-      { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
-      { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
-      { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
-      { name: 'Payment History', href: '/reports/payment-history', icon: History },
-      { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
-      { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
+      { name: "Dashboard", href: "/secretary", icon: Home },
+      { name: "Enter Data", href: "/secretary/entry", icon: FileText },
+      { name: "Payment Management", href: "/secretary/payments", icon: DollarSign },
+
+      { name: "Member Search", href: "/reports/member-search", icon: Search },
+      { name: "Class Search", href: "/reports/class-search", icon: BookOpen },
+      { name: "Performance Comparison", href: "/reports/performance", icon: TrendingUp },
+      { name: "Class Rankings", href: "/reports/rankings", icon: Trophy },
+      { name: "Overall Champion", href: "/reports/champion", icon: Crown },
+
+      { name: "Payment Report", href: "/reports/payments", icon: Receipt },
+      { name: "Payment History", href: "/reports/payment-history", icon: History },
+
+      { name: "Weekly Reports", href: "/reports/weekly", icon: FileText },
+      { name: "Quarterly Reports", href: "/reports/quarterly", icon: BarChart3 },
     ],
 
     viewer: [
-      { name: 'Member Search', href: '/reports/member-search', icon: Search },
-      { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
-      { name: 'Performance Comparison', href: '/reports/performance', icon: TrendingUp },
-      { name: 'Class Rankings', href: '/reports/rankings', icon: Trophy },
-      { name: 'Overall Champion', href: '/reports/champion', icon: Crown },
-      { name: 'Payment Report', href: '/reports/payments', icon: Receipt },
-      { name: 'Payment History', href: '/reports/payment-history', icon: History },
-      { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
-      { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
-      { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
-    ]
+      { name: "Member Search", href: "/reports/member-search", icon: Search },
+      { name: "Class Search", href: "/reports/class-search", icon: BookOpen },
+      { name: "Performance Comparison", href: "/reports/performance", icon: TrendingUp },
+      { name: "Class Rankings", href: "/reports/rankings", icon: Trophy },
+      { name: "Overall Champion", href: "/reports/champion", icon: Crown },
+
+      { name: "Payment Report", href: "/reports/payments", icon: Receipt },
+      { name: "Payment History", href: "/reports/payment-history", icon: History },
+
+      { name: "Weekly Reports", href: "/reports/weekly", icon: FileText },
+      { name: "Quarterly Reports", href: "/reports/quarterly", icon: BarChart3 },
+      { name: "Financial Reports", href: "/reports/financial", icon: DollarSign },
+    ],
   };
 
   const currentNav = navigation[user?.role] || navigation.viewer;
@@ -127,12 +135,12 @@ const Layout = () => {
       <aside
         className={`fixed top-0 left-0 z-30 h-screen w-64 bg-indigo-800 text-white
         transform transition-transform duration-300
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         flex flex-col`}
       >
-
         <div className="flex items-center justify-between p-4 border-b border-indigo-700">
           <h1 className="text-xl font-bold">SS Tracker</h1>
+
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
             <X className="h-6 w-6" />
           </button>
@@ -141,20 +149,36 @@ const Layout = () => {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
 
-          {user?.role === 'admin' && (
-            <Link
-              to="/admin/classes"
-              className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition ${
-                location.pathname === '/admin/classes'
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-200 hover:bg-indigo-700'
-              }`}
-            >
-              <Users className="h-5 w-5" />
-              <span>Class Setup</span>
-            </Link>
+          {/* ADMIN SETUP LINKS */}
+          {user?.role === "admin" && (
+            <>
+              <Link
+                to="/admin/quarters"
+                className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition ${
+                  location.pathname === "/admin/quarters"
+                    ? "bg-indigo-700"
+                    : "text-gray-200 hover:bg-indigo-700"
+                }`}
+              >
+                <Calendar className="h-5 w-5" />
+                <span>Quarter Setup</span>
+              </Link>
+
+              <Link
+                to="/admin/classes"
+                className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition ${
+                  location.pathname === "/admin/classes"
+                    ? "bg-indigo-700"
+                    : "text-gray-200 hover:bg-indigo-700"
+                }`}
+              >
+                <Users className="h-5 w-5" />
+                <span>Class Setup</span>
+              </Link>
+            </>
           )}
 
+          {/* OTHER NAVIGATION */}
           {currentNav.map((item) => (
             <Link
               key={item.name}
@@ -162,8 +186,8 @@ const Layout = () => {
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition ${
                 location.pathname === item.href
-                  ? 'bg-indigo-700'
-                  : 'hover:bg-indigo-700'
+                  ? "bg-indigo-700"
+                  : "hover:bg-indigo-700"
               }`}
             >
               <item.icon className="h-5 w-5" />
@@ -171,6 +195,7 @@ const Layout = () => {
             </Link>
           ))}
 
+          {/* INSTALL APP BUTTON */}
           {showInstallButton && (
             <button
               onClick={handleInstall}
@@ -182,7 +207,7 @@ const Layout = () => {
           )}
         </nav>
 
-        {/* User Section */}
+        {/* USER INFO */}
         <div className="p-4 border-t border-indigo-700 bg-indigo-900">
           <p className="text-xs text-indigo-300">Logged in as</p>
           <p className="font-semibold text-sm">{user?.full_name}</p>
@@ -197,9 +222,10 @@ const Layout = () => {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* MAIN */}
       <div className="lg:ml-64 flex flex-col min-h-screen">
 
+        {/* HEADER */}
         <header className="bg-white shadow sticky top-0 z-10">
           <div className="flex items-center justify-between px-4 py-4">
 
@@ -223,19 +249,23 @@ const Layout = () => {
           </div>
         </header>
 
+        {/* PAGE CONTENT */}
         <main className="flex-1 p-6">
           <Outlet />
         </main>
 
-        {/* Footer */}
+        {/* FOOTER */}
         <footer className="bg-white border-t py-4">
           <div className="flex items-center justify-between text-sm text-gray-600 px-6">
             <p>© {new Date().getFullYear()} Kanyanya SDA Church</p>
+
             <div className="flex items-center space-x-1">
               <span>Developed with</span>
               <Heart className="h-4 w-4 text-red-500 fill-current animate-pulse" />
               <span>by</span>
-              <span className="font-semibold text-indigo-600">Baliddawa Allan</span>
+              <span className="font-semibold text-indigo-600">
+                Baliddawa Allan
+              </span>
             </div>
           </div>
         </footer>
