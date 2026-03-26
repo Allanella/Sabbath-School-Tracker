@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import InstallPWA from '../Common/InstallPWA';
 import {
@@ -27,8 +27,10 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
+
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handler = (e) => {
@@ -39,7 +41,6 @@ const Layout = () => {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setShowInstallButton(false);
     }
@@ -55,11 +56,11 @@ const Layout = () => {
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
+
     if (outcome === 'accepted') {
       setShowInstallButton(false);
     }
-    
+
     setDeferredPrompt(null);
   };
 
@@ -87,6 +88,7 @@ const Layout = () => {
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
       { name: 'Financial Reports', href: '/reports/financial', icon: DollarSign },
     ],
+
     ss_secretary: [
       { name: 'Dashboard', href: '/secretary', icon: Home },
       { name: 'Enter Data', href: '/secretary/entry', icon: FileText },
@@ -101,6 +103,7 @@ const Layout = () => {
       { name: 'Weekly Reports', href: '/reports/weekly', icon: FileText },
       { name: 'Quarterly Reports', href: '/reports/quarterly', icon: BarChart3 },
     ],
+
     viewer: [
       { name: 'Member Search', href: '/reports/member-search', icon: Search },
       { name: 'Class Search', href: '/reports/class-search', icon: BookOpen },
@@ -119,80 +122,74 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
 
       {/* Sidebar */}
       <aside
-        className={`
-          fixed top-0 left-0 z-30 h-screen w-64
-          bg-indigo-800 text-white
-          transform transition-transform duration-300
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          flex flex-col
-        `}
+        className={`fixed top-0 left-0 z-30 h-screen w-64 bg-indigo-800 text-white
+        transform transition-transform duration-300
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        flex flex-col`}
       >
-        {/* Sidebar header */}
-        <div className="flex items-center justify-between p-4 border-b border-indigo-700 flex-shrink-0">
+
+        <div className="flex items-center justify-between p-4 border-b border-indigo-700">
           <h1 className="text-xl font-bold">SS Tracker</h1>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden"
-          >
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Navigation - scrollable if too many items */}
+        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+
+          {user?.role === 'admin' && (
+            <Link
+              to="/admin/classes"
+              className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition ${
+                location.pathname === '/admin/classes'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-gray-200 hover:bg-indigo-700'
+              }`}
+            >
+              <Users className="h-5 w-5" />
+              <span>Class Setup</span>
+            </Link>
+          )}
+
           {currentNav.map((item) => (
             <Link
               key={item.name}
               to={item.href}
               onClick={() => setSidebarOpen(false)}
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg
-                         hover:bg-indigo-700 transition"
+              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition ${
+                location.pathname === item.href
+                  ? 'bg-indigo-700'
+                  : 'hover:bg-indigo-700'
+              }`}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <item.icon className="h-5 w-5" />
               <span className="text-sm font-medium">{item.name}</span>
             </Link>
           ))}
 
-          {/* Install App Button in Sidebar */}
           {showInstallButton && (
             <button
               onClick={handleInstall}
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg
-                         bg-green-600 hover:bg-green-700 transition w-full mt-4"
+              className="flex items-center space-x-3 px-4 py-3 rounded-lg bg-green-600 hover:bg-green-700 w-full mt-4"
             >
-              <Download className="h-5 w-5 flex-shrink-0" />
-              <span className="text-sm font-medium">Install App</span>
+              <Download className="h-5 w-5" />
+              <span>Install App</span>
             </button>
           )}
         </nav>
 
-        {/* User info + logout - fixed at bottom */}
-        <div className="flex-shrink-0 p-4 border-t border-indigo-700 bg-indigo-900">
-          <div className="mb-3">
-            <p className="text-xs text-indigo-300 mb-1">Logged in as</p>
-            <p className="font-semibold text-sm truncate" title={user?.full_name}>
-              {user?.full_name}
-            </p>
-            <p className="text-xs text-indigo-300 capitalize mt-0.5">
-              {user?.role === 'ss_secretary' ? 'SS Secretary' : user?.role}
-            </p>
-          </div>
+        {/* User Section */}
+        <div className="p-4 border-t border-indigo-700 bg-indigo-900">
+          <p className="text-xs text-indigo-300">Logged in as</p>
+          <p className="font-semibold text-sm">{user?.full_name}</p>
 
           <button
             onClick={handleLogout}
-            className="flex items-center justify-center space-x-2 w-full
-                       px-4 py-2.5 bg-indigo-700 rounded-lg
-                       hover:bg-indigo-600 transition text-sm font-medium"
+            className="flex items-center justify-center space-x-2 w-full mt-3 px-4 py-2 bg-indigo-700 rounded-lg hover:bg-indigo-600"
           >
             <LogOut className="h-4 w-4" />
             <span>Logout</span>
@@ -200,15 +197,13 @@ const Layout = () => {
         </div>
       </aside>
 
-      {/* Main content area */}
+      {/* Main */}
       <div className="lg:ml-64 flex flex-col min-h-screen">
-        {/* Top bar */}
+
         <header className="bg-white shadow sticky top-0 z-10">
           <div className="flex items-center justify-between px-4 py-4">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden"
-            >
+
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden">
               <Menu className="h-6 w-6 text-gray-700" />
             </button>
 
@@ -216,51 +211,36 @@ const Layout = () => {
               Kanyanya SDA Church - Sabbath School Tracker
             </h2>
 
-            {/* Install Button in Header */}
             {showInstallButton && (
               <button
                 onClick={handleInstall}
-                className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
-                title="Install App"
+                className="hidden md:flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg"
               >
                 <Download className="h-4 w-4" />
                 <span>Install</span>
               </button>
             )}
-
-            {!showInstallButton && <div className="w-10" />}
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 p-6">
           <Outlet />
         </main>
 
-        {/* Footer with developer credit */}
-        <footer className="bg-white border-t border-gray-200 py-4 mt-auto">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-center justify-between text-sm text-gray-600">
-              {/* Left side - Copyright */}
-              <div className="mb-2 md:mb-0 text-center md:text-left">
-                <p>© {new Date().getFullYear()} Kanyanya SDA Church. All rights reserved.</p>
-              </div>
-
-              {/* Right side - Developer Credit */}
-              <div className="flex items-center justify-center space-x-1">
-                <span>Developed with</span>
-                <Heart className="h-4 w-4 text-red-500 fill-current animate-pulse" />
-                <span>by</span>
-                <span className="font-semibold text-indigo-600">
-                  Baliddawa Allan
-                </span>
-              </div>
+        {/* Footer */}
+        <footer className="bg-white border-t py-4">
+          <div className="flex items-center justify-between text-sm text-gray-600 px-6">
+            <p>© {new Date().getFullYear()} Kanyanya SDA Church</p>
+            <div className="flex items-center space-x-1">
+              <span>Developed with</span>
+              <Heart className="h-4 w-4 text-red-500 fill-current animate-pulse" />
+              <span>by</span>
+              <span className="font-semibold text-indigo-600">Baliddawa Allan</span>
             </div>
           </div>
         </footer>
       </div>
 
-      {/* PWA Install Prompt */}
       <InstallPWA />
     </div>
   );

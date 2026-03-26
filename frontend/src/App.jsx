@@ -7,6 +7,7 @@ import AdminDashboard from './components/Admin/Dashboard';
 import UserManagement from './components/Admin/UserManagement';
 import QuarterSetup from './components/Admin/QuarterSetup';
 import ClassManagement from './components/Admin/ClassManagement';
+import ClassSetup from './components/Admin/ClassSetup';
 import SecretaryDashboard from './components/Secretary/SecretaryDashboard';
 import WeeklyDataEntry from './components/Secretary/WeeklyDataEntry';
 import PaymentManagement from './components/Secretary/PaymentManagement';
@@ -37,6 +38,7 @@ function App() {
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="admin/quarters" element={<QuarterSetup />} />
             <Route path="admin/classes" element={<ClassManagement />} />
+            <Route path="/admin/classes" element={<ClassSetup />} />
             
             {/* Secretary Routes */}
             <Route path="secretary" element={<SecretaryDashboard />} />
