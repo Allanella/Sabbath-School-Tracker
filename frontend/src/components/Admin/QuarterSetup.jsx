@@ -40,16 +40,8 @@ const QuarterSetup = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-
-      if (response && response.data) {
-        setQuarters(response.data);
-      } else {
-        setQuarters([]);
-      }
-
+      setQuarters(response.data);
     } catch (error) {
-      console.error("Load quarters error:", error);
-      setQuarters([]);
       setMessage({ type: "error", text: "Failed to load quarters" });
     } finally {
       setLoading(false);
@@ -80,6 +72,12 @@ const QuarterSetup = () => {
 
   const handleCloseModal = () => {
     setShowModal(false);
+    setFormData({
+      name: "Q1",
+      year: new Date().getFullYear(),
+      start_date: "",
+      end_date: "",
+    });
   };
 
   const handleOpenCopyModal = (quarter) => {
@@ -99,6 +97,7 @@ const QuarterSetup = () => {
       sourceQuarterId: "",
       targetQuarterId: ""
     });
+    setMessage({ type: "", text: "" });
   };
 
   const handleCopyQuarter = async (e) => {
@@ -112,7 +111,6 @@ const QuarterSetup = () => {
 
     try {
       setCopying(true);
-
       const response = await quarterService.copyFromPreviousQuarter(
         copyData.sourceQuarterId,
         copyData.targetQuarterId
@@ -120,18 +118,18 @@ const QuarterSetup = () => {
 
       setMessage({
         type: "success",
-        text: `Successfully copied ${response?.data?.classes_copied || 0} classes and ${response?.data?.members_copied || 0} members!`,
+        text: `Successfully copied ${response.data.classes_copied} classes and ${response.data.members_copied} members!`,
       });
 
       setTimeout(() => {
         handleCloseCopyModal();
         loadQuarters();
       }, 2000);
-
     } catch (error) {
+      console.error('Copy error:', error);
       setMessage({
         type: "error",
-        text: error?.response?.data?.message || "Failed to copy quarter data",
+        text: error.response?.data?.message || "Failed to copy quarter data",
       });
     } finally {
       setCopying(false);
@@ -166,7 +164,6 @@ const QuarterSetup = () => {
 
     try {
       await quarterService.create(formData);
-
       setMessage({
         type: "success",
         text: "Quarter created successfully!",
@@ -176,12 +173,11 @@ const QuarterSetup = () => {
         handleCloseModal();
         loadQuarters();
       }, 1500);
-
     } catch (error) {
       setMessage({
         type: "error",
         text:
-          error?.response?.data?.message ||
+          error.response?.data?.message ||
           "Failed to create quarter. It may already exist.",
       });
     }
@@ -190,33 +186,31 @@ const QuarterSetup = () => {
   const handleSetActive = async (quarterId) => {
     try {
       await quarterService.setActive(quarterId);
-
       setMessage({
         type: "success",
         text: "Active quarter updated successfully!",
       });
-
       loadQuarters();
-
     } catch (error) {
       setMessage({ type: "error", text: "Failed to set active quarter" });
     }
   };
 
   const handleDelete = async (id, name, year) => {
-    if (!window.confirm(`Delete ${name} ${year}? This will remove all related classes and data!`))
+    if (
+      !window.confirm(
+        `Delete ${name} ${year}? This will remove all related classes and data!`
+      )
+    )
       return;
 
     try {
       await quarterService.delete(id);
-
       setMessage({
         type: "success",
         text: "Quarter deleted successfully",
       });
-
       loadQuarters();
-
     } catch (error) {
       setMessage({
         type: "error",
@@ -232,7 +226,6 @@ const QuarterSetup = () => {
     try {
       for (const q of list) {
         const dates = getQuarterDates(q, year);
-
         await quarterService.create({
           name: q,
           year,
@@ -240,14 +233,11 @@ const QuarterSetup = () => {
           end_date: dates.end,
         });
       }
-
       setMessage({
         type: "success",
         text: `All quarters for ${year} created!`,
       });
-
       loadQuarters();
-
     } catch (error) {
       setMessage({
         type: "error",
@@ -265,10 +255,9 @@ const QuarterSetup = () => {
   }
 
   return (
-    <div>
-
+    <div className="max-w-7xl mx-auto">
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Quarter Management</h1>
           <p className="text-gray-600 mt-1">
@@ -276,32 +265,101 @@ const QuarterSetup = () => {
           </p>
         </div>
 
-        <div className="flex space-x-3">
-          <button onClick={handleQuickCreate} className="btn-secondary flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button onClick={handleQuickCreate} className="btn-secondary flex items-center justify-center space-x-2">
             <Calendar className="h-5 w-5" />
             <span>Create All for {new Date().getFullYear()}</span>
           </button>
 
-          <button onClick={handleOpenModal} className="btn-primary flex items-center space-x-2">
+          <button onClick={handleOpenModal} className="btn-primary flex items-center justify-center space-x-2">
             <Plus className="h-5 w-5" />
             <span>Add Quarter</span>
           </button>
         </div>
       </div>
 
-      {/* QUARTERS */}
+      {/* ALERT */}
+      {message.text && (
+        <div
+          className={`mb-6 p-4 rounded-lg flex items-start ${
+            message.type === "success"
+              ? "bg-green-50 border border-green-200"
+              : "bg-red-50 border border-red-200"
+          }`}
+        >
+          {message.type === "success" ? (
+            <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+          )}
+          <p
+            className={`text-sm ${
+              message.type === "success"
+                ? "text-green-800"
+                : "text-red-800"
+            }`}
+          >
+            {message.text}
+          </p>
+        </div>
+      )}
+
+      {/* QUARTER LIST */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {quarters.map((q) => (
+          <div
+            key={q.id}
+            className={`bg-white rounded-lg shadow-md p-6 relative ${
+              q.is_active ? "ring-2 ring-primary-500 bg-primary-50" : ""
+            }`}
+          >
+            {q.is_active && (
+              <div className="absolute top-4 right-4">
+                <Star className="h-6 w-6 text-primary-600 fill-current" />
+              </div>
+            )}
 
-        {quarters?.map((q) => (
-          <div key={q.id} className="card">
-            <h3 className="text-xl font-bold">{q.name} {q.year}</h3>
+            <div className="mb-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <Calendar className="h-6 w-6 text-primary-600" />
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {q.name} {q.year}
+                </h3>
+              </div>
 
-            <div className="flex flex-col space-y-2 mt-4">
+              {q.is_active && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                  Active Quarter
+                </span>
+              )}
+            </div>
 
+            <div className="space-y-2 text-sm text-gray-600 mb-4">
+              <div className="flex justify-between">
+                <span>Start Date:</span>
+                <span className="font-medium text-gray-900">
+                  {new Date(q.start_date).toLocaleDateString()}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span>End Date:</span>
+                <span className="font-medium text-gray-900">
+                  {new Date(q.end_date).toLocaleDateString()}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span>Duration:</span>
+                <span className="font-medium text-gray-900">13 weeks</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
               {!q.is_active && (
                 <button
                   onClick={() => handleSetActive(q.id)}
-                  className="btn-primary"
+                  className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium"
                 >
                   Set Active
                 </button>
@@ -309,7 +367,7 @@ const QuarterSetup = () => {
 
               <button
                 onClick={() => handleOpenCopyModal(q)}
-                className="btn-secondary flex items-center justify-center space-x-2"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium flex items-center justify-center space-x-2"
               >
                 <Copy className="h-4 w-4" />
                 <span>Copy Classes & Members</span>
@@ -317,43 +375,239 @@ const QuarterSetup = () => {
 
               <button
                 onClick={() => handleDelete(q.id, q.name, q.year)}
-                className="btn-danger flex items-center justify-center space-x-2"
+                className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-medium flex items-center justify-center space-x-2"
               >
                 <Trash2 className="h-4 w-4" />
                 <span>Delete Quarter</span>
               </button>
-
             </div>
           </div>
         ))}
 
+        {quarters.length === 0 && (
+          <div className="col-span-full text-center py-12">
+            <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No quarters created yet
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Create your first quarter to start tracking Sabbath School data
+            </p>
+
+            <button
+              onClick={handleOpenModal}
+              className="btn-primary inline-flex items-center space-x-2"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Create Quarter</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* COPY MODAL */}
-      {showCopyModal && selectedQuarter && (
-        <select
-          value={copyData.sourceQuarterId}
-          onChange={(e) => setCopyData({ ...copyData, sourceQuarterId: e.target.value })}
-          className="input"
-          required
-        >
-          <option value="">Select a quarter to copy from</option>
+      {/* CREATE QUARTER MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">Add New Quarter</h3>
 
-          {quarters
-            ?.filter(q => q.id !== selectedQuarter?.id)
-            .sort((a, b) => {
-              if (a.year !== b.year) return b.year - a.year;
-              return b.name.localeCompare(a.name);
-            })
-            .map(q => (
-              <option key={q.id} value={q.id}>
-                {q.name} {q.year}
-              </option>
-            ))}
+              <button
+                onClick={handleCloseModal}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
 
-        </select>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quarter</label>
+                <select
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                >
+                  <option value="Q1">Q1 (Jan–Mar)</option>
+                  <option value="Q2">Q2 (Apr–Jun)</option>
+                  <option value="Q3">Q3 (Jul–Sep)</option>
+                  <option value="Q4">Q4 (Oct–Dec)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                <input
+                  type="number"
+                  name="year"
+                  value={formData.year}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  min="2020"
+                  max="2100"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  name="start_date"
+                  value={formData.start_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  name="end_date"
+                  value={formData.end_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                <p className="font-medium mb-1">Note:</p>
+                <p>Quarters are 13-week cycles. Dates auto-update based on your selection.</p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button type="button" onClick={handleCloseModal} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition font-medium">
+                  Cancel
+                </button>
+
+                <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium flex items-center space-x-2">
+                  <Save className="h-5 w-5" />
+                  <span>Create Quarter</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
+      {/* COPY CLASSES MODAL */}
+      {showCopyModal && selectedQuarter && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Copy Classes & Members
+              </h3>
+
+              <button
+                onClick={handleCloseCopyModal}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCopyQuarter} className="p-6 space-y-4">
+              {message.text && (
+                <div
+                  className={`p-3 rounded-lg flex items-start text-sm ${
+                    message.type === "success"
+                      ? "bg-green-50 border border-green-200 text-green-800"
+                      : "bg-red-50 border border-red-200 text-red-800"
+                  }`}
+                >
+                  {message.type === "success" ? (
+                    <CheckCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                  )}
+                  <span>{message.text}</span>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <span className="font-semibold">Copy TO:</span> {selectedQuarter.name} {selectedQuarter.year}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Copy FROM Quarter
+                </label>
+                <select
+                  value={copyData.sourceQuarterId}
+                  onChange={(e) => setCopyData({ ...copyData, sourceQuarterId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  required
+                >
+                  <option value="">Select a quarter to copy from</option>
+                  {quarters
+                    .filter(q => q.id !== selectedQuarter.id)
+                    .sort((a, b) => {
+                      // Sort by year descending, then by quarter name descending
+                      if (a.year !== b.year) return b.year - a.year;
+                      const qOrder = { Q4: 4, Q3: 3, Q2: 2, Q1: 1 };
+                      return qOrder[b.name] - qOrder[a.name];
+                    })
+                    .map(q => (
+                      <option key={q.id} value={q.id}>
+                        {q.name} {q.year}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                <p className="font-medium mb-2">✅ What will be copied:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>All classes with teacher names</li>
+                  <li>All class members</li>
+                </ul>
+                <p className="mt-3 font-medium">❌ What will NOT be copied:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Weekly attendance data</li>
+                  <li>Payment records</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={handleCloseCopyModal} 
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition font-medium"
+                  disabled={copying}
+                >
+                  Cancel
+                </button>
+
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center space-x-2 min-w-[140px] justify-center"
+                  disabled={copying}
+                >
+                  {copying ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Copying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-5 w-5" />
+                      <span>Copy Data</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
