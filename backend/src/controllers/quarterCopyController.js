@@ -31,20 +31,23 @@ const copyQuarterData = async (req, res) => {
 
     // Step 2: Copy each class and its members
     for (const sourceClass of sourceClasses) {
-      // Create new class in target quarter
+      // Create new class in target quarter with all required fields
       const { data: newClass, error: newClassError } = await supabase
         .from('classes')
         .insert({
           quarter_id: target_quarter_id,
           class_name: sourceClass.class_name,
-          teacher_name: sourceClass.teacher_name
+          teacher_name: sourceClass.teacher_name,
+          secretary_name: sourceClass.secretary_name || '', // Provide default empty string if null
+          secretary_id: sourceClass.secretary_id,
+          church_name: sourceClass.church_name
         })
         .select()
         .single();
 
       if (newClassError) {
         console.error(`Error creating class ${sourceClass.class_name}:`, newClassError);
-        continue; // Skip this class if it already exists
+        continue; // Skip this class if it fails
       }
 
       totalClassesCopied++;
