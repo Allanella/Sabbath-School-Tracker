@@ -6,7 +6,34 @@ const checkRole = require('../middleware/roleCheck');
 
 router.use(authenticate);
 
-// Get all members for a class
+// Get all members with optional class filter via query parameter
+router.get('/', async (req, res, next) => {
+  try {
+    const { class_id } = req.query;
+
+    let query = supabase
+      .from('class_members')
+      .select('*')
+      .eq('is_active', true)
+      .order('member_name');
+
+    // Filter by class_id if provided
+    if (class_id) {
+      query = query.eq('class_id', class_id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Get members error:', error);
+    next(error);
+  }
+});
+
+// Get all members for a class (alternative route)
 router.get('/class/:class_id', async (req, res, next) => {
   try {
     const { class_id } = req.params;
@@ -27,12 +54,39 @@ router.get('/class/:class_id', async (req, res, next) => {
   }
 });
 
+// Get single member
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+      .from('class_members')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found'
+      });
+    }
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Get member error:', error);
+    next(error);
+  }
+});
+
 // Create new member
 router.post('/', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
   try {
     const { class_id, member_name } = req.body;
 
-    console.log('Creating member:', { class_id, member_name }); // Debug
+    console.log('Creating member:', { class_id, member_name });
 
     const { data, error } = await supabase
       .from('class_members')
