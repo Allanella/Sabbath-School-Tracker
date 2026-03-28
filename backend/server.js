@@ -67,6 +67,7 @@ app.use('/api/class-members', classMemberRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/member-payments', memberPaymentRoutes);
 
+
 // -------------------- ROOT --------------------
 app.get('/', (req, res) => {
   res.json({ message: 'Sabbath School Tracker API' });

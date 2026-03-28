@@ -14,7 +14,6 @@ router.get('/', async (req, res, next) => {
     let query = supabase
       .from('class_members')
       .select('*')
-      .eq('is_active', true)
       .order('member_name');
 
     // Filter by class_id if provided
@@ -26,10 +25,14 @@ router.get('/', async (req, res, next) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: data || [] });
   } catch (error) {
     console.error('Get members error:', error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch members',
+      error: error.message
+    });
   }
 });
 
@@ -42,15 +45,18 @@ router.get('/class/:class_id', async (req, res, next) => {
       .from('class_members')
       .select('*')
       .eq('class_id', class_id)
-      .eq('is_active', true)
       .order('member_name');
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: data || [] });
   } catch (error) {
     console.error('Get members error:', error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch members',
+      error: error.message
+    });
   }
 });
 
@@ -77,7 +83,11 @@ router.get('/:id', async (req, res, next) => {
     res.json({ success: true, data });
   } catch (error) {
     console.error('Get member error:', error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch member',
+      error: error.message
+    });
   }
 });
 
@@ -106,7 +116,11 @@ router.post('/', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
     });
   } catch (error) {
     console.error('Create member error:', error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create member',
+      error: error.message
+    });
   }
 });
 
@@ -132,7 +146,11 @@ router.put('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next) =>
     });
   } catch (error) {
     console.error('Update member error:', error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update member',
+      error: error.message
+    });
   }
 });
 
@@ -154,7 +172,11 @@ router.delete('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next)
     });
   } catch (error) {
     console.error('Delete member error:', error);
-    next(error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete member',
+      error: error.message
+    });
   }
 });
 
