@@ -7,7 +7,7 @@ const checkRole = require('../middleware/roleCheck');
 router.use(authenticate);
 
 // Get all members with optional class filter via query parameter
-router.get('/', async (req, res, next) => {
+router.get('/', async (req, res) => {
   try {
     const { class_id } = req.query;
 
@@ -37,7 +37,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // Get all members for a class (alternative route)
-router.get('/class/:class_id', async (req, res, next) => {
+router.get('/class/:class_id', async (req, res) => {
   try {
     const { class_id } = req.params;
 
@@ -61,7 +61,7 @@ router.get('/class/:class_id', async (req, res, next) => {
 });
 
 // Get single member
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -92,7 +92,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // Create new member
-router.post('/', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
+router.post('/', checkRole('admin', 'ss_secretary'), async (req, res) => {
   try {
     const { class_id, member_name } = req.body;
 
@@ -125,7 +125,7 @@ router.post('/', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
 });
 
 // Update member
-router.put('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
+router.put('/:id', checkRole('admin', 'ss_secretary'), async (req, res) => {
   try {
     const { id } = req.params;
     const { member_name } = req.body;
@@ -155,7 +155,7 @@ router.put('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next) =>
 });
 
 // Delete member (soft delete)
-router.delete('/:id', checkRole('admin', 'ss_secretary'), async (req, res, next) => {
+router.delete('/:id', checkRole('admin', 'ss_secretary'), async (req, res) => {
   try {
     const { id } = req.params;
 
