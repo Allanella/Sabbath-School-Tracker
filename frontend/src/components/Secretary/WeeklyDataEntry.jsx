@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import classService from "../../services/classService";
-import weeklyDataService from "../../services/WeeklyDataService";
-import classMemberService from "../../services/classMemberService";
-import offlineStorage from "../../utils/offlineStorage";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import classService from '../../services/classService';
+import weeklyDataService from '../../services/WeeklyDataService';
+import classMemberService from '../../services/classMemberService';
+import offlineStorage from '../../utils/offlineStorage';
+
 import {
   Save,
   AlertCircle,
@@ -15,30 +16,44 @@ import {
   Users,
   DollarSign,
   WifiOff,
-  RefreshCw,
-} from "lucide-react";
+  RefreshCw
+} from 'lucide-react';
 
 const WeeklyDataEntry = () => {
+
   const navigate = useNavigate();
 
+  /* ===============================
+     STATE
+  =============================== */
+
   const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedClass, setSelectedClass] = useState('');
   const [weekNumber, setWeekNumber] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: "", text: "" });
+
+  const [message, setMessage] = useState({ type: '', text: '' });
 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [manualOffline, setManualOffline] = useState(false);
 
+  const [pendingMembersCount, setPendingMembersCount] = useState(0);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  /* Members state */
   const [members, setMembers] = useState([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
-  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberName, setNewMemberName] = useState('');
   const [editingMember, setEditingMember] = useState(null);
 
-  const isDevelopment = process.env.NODE_ENV === "development";
+  /* Payments */
+  const [paymentsLessonEnglish, setPaymentsLessonEnglish] = useState({});
+  const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
+  const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
+  const [paymentsMorningWatchLuganda, setPaymentsMorningWatchLuganda] = useState({});
 
   const [formData, setFormData] = useState({
-    sabbath_date: "",
+    sabbath_date: '',
     total_attendance: 0,
     member_visits: 0,
     members_conducted_bible_studies: 0,
@@ -47,118 +62,187 @@ const WeeklyDataEntry = () => {
     number_of_visitors: 0,
     bible_study_guides_distributed: 0,
     offering_global_mission: 0,
-    members_summary: "",
+    members_summary: '',
   });
 
-  /*
-  =====================================
-  LOAD CLASSES ON PAGE LOAD
-  =====================================
-  */
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+
+  /* ===============================
+     EFFECTS
+  =============================== */
+
+  // Load classes on mount
   useEffect(() => {
     loadClasses();
     checkPendingMembers();
   }, []);
 
-  /*
-  =====================================
-  LISTEN FOR QUARTER CHANGES
-  =====================================
-  */
+  // Quarter change listener
   useEffect(() => {
     const handleQuarterChange = () => {
       loadClasses();
     };
 
-    window.addEventListener("quarterChanged", handleQuarterChange);
+    window.addEventListener('quarterChanged', handleQuarterChange);
 
     return () => {
-      window.removeEventListener("quarterChanged", handleQuarterChange);
+      window.removeEventListener('quarterChanged', handleQuarterChange);
     };
   }, []);
 
-  /*
-  =====================================
-  ONLINE / OFFLINE DETECTION
-  =====================================
-  */
+  // Online / Offline detection
   useEffect(() => {
+
     const updateOnlineStatus = () => {
+
       const actualStatus = navigator.onLine;
+      const wasOffline = !isOnline;
       const nowOnline = actualStatus && !manualOffline;
 
+      if (isDevelopment) {
+        console.log('Browser reports online:', actualStatus);
+        console.log('Manual offline mode:', manualOffline);
+      }
+
       setIsOnline(nowOnline);
+
+      if (wasOffline && nowOnline) {
+        autoSyncPendingData();
+      }
     };
 
-    const handleOnline = () => updateOnlineStatus();
-    const handleOffline = () => updateOnlineStatus();
+    updateOnlineStatus();
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    const handleOnline = () => {
+      if (isDevelopment) console.log('🟢 ONLINE event fired');
+      updateOnlineStatus();
+    };
 
-    const interval = setInterval(updateOnlineStatus, 2000);
+    const handleOffline = () => {
+      if (isDevelopment) console.log('🔴 OFFLINE event fired');
+      updateOnlineStatus();
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const intervalId = setInterval(updateOnlineStatus, 2000);
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(intervalId);
     };
-  }, [manualOffline]);
 
-  /*
-  =====================================
-  LOAD MEMBERS WHEN CLASS CHANGES
-  =====================================
-  */
+  }, [isOnline, manualOffline]);
+
+  // Load members when class or week changes
   useEffect(() => {
-    if (selectedClass) {
-      loadMembers();
-    }
-  }, [selectedClass]);
 
-  /*
-  =====================================
-  LOAD CLASSES
-  =====================================
-  */
+    if (selectedClass) {
+      loadMembersWithLocal();
+
+      if (weekNumber) {
+        checkExistingData();
+      }
+    }
+
+  }, [selectedClass, weekNumber]);
+
+
+  /* ===============================
+     UTILITY FUNCTIONS
+  =============================== */
+
+  const showToast = (msg) => {
+    setShowSuccessToast(true);
+    setMessage({ type: 'success', text: msg });
+
+    setTimeout(() => {
+      setShowSuccessToast(false);
+      setMessage({ type: '', text: '' });
+    }, 3000);
+  };
+
+  const calculateTotal = (payments) => {
+    return Object.values(payments).reduce(
+      (sum, amount) => sum + (parseFloat(amount) || 0),
+      0
+    );
+  };
+
+
+  /* ===============================
+     DATA LOADING FUNCTIONS
+  =============================== */
+
   const loadClasses = async () => {
+
     try {
-      const quarterId = localStorage.getItem("selectedQuarterId");
+
+      const quarterId = localStorage.getItem('selectedQuarterId');
 
       if (!quarterId) {
         setMessage({
-          type: "error",
-          text: "Please select a quarter first from the sidebar",
+          type: 'error',
+          text: 'Please select a quarter first from the sidebar'
         });
         return;
       }
 
-      const response = await classService.getByQuarter(quarterId);
+      if (isDevelopment)
+        console.log('Loading classes for quarter:', quarterId);
+
+      const response = await api.get(`/classes?quarter_id=${quarterId}`);
+
       const classesData = response.data?.data || response.data || [];
 
       if (Array.isArray(classesData)) {
+
         setClasses(classesData);
 
         if (classesData.length > 0) {
           setSelectedClass(classesData[0].id);
         }
+
       } else {
+
+        console.error('Classes data is not an array:', classesData);
+
         setClasses([]);
+
+        setMessage({
+          type: 'error',
+          text: 'Invalid data format received for classes.'
+        });
       }
+
     } catch (error) {
-      console.error("Failed to load classes", error);
+
+      console.error('Failed to load classes:', error);
+
       setClasses([]);
+
+      setMessage({
+        type: 'error',
+        text: 'Failed to load classes'
+      });
+
     }
+
   };
 
-  /*
-  =====================================
-  LOAD MEMBERS
-  =====================================
-  */
+
   const loadMembers = async () => {
+
     try {
+
+      if (isDevelopment)
+        console.log('Loading members for class:', selectedClass);
+
       const response = await classMemberService.getByClass(selectedClass);
+
       const membersData = response.data?.data || response.data || [];
 
       if (Array.isArray(membersData)) {
@@ -166,54 +250,77 @@ const WeeklyDataEntry = () => {
       } else {
         setMembers([]);
       }
+
     } catch (error) {
-      console.error("Failed to load members", error);
+
+      console.error('Failed to load members:', error);
       setMembers([]);
+
     }
+
   };
 
-  /*
-  =====================================
-  CHECK LOCAL OFFLINE MEMBERS
-  =====================================
-  */
-  const checkPendingMembers = () => {
+
+  const loadMembersWithLocal = async () => {
+
     try {
+
+      await loadMembers();
+
       const localMembers = JSON.parse(
-        localStorage.getItem("pendingMembers") || "[]"
+        localStorage.getItem('pendingMembers') || '[]'
       );
-      if (isDevelopment) {
-        console.log("Pending members:", localMembers.length);
+
+      const pendingAdds = localMembers.filter(
+        m => m.action === 'create' && m.data.class_id === selectedClass
+      );
+
+      if (pendingAdds.length > 0) {
+
+        const tempMembers = pendingAdds.map(item => item.data);
+
+        setMembers(prev => [...prev, ...tempMembers]);
+
+        if (isDevelopment)
+          console.log('Loaded pending local members:', tempMembers);
       }
+
     } catch (error) {
-      console.error("Error checking pending members", error);
+
+      console.error('Error loading members with local:', error);
+
     }
+
   };
+
+
+  /* ===============================
+     MEMBER MANAGEMENT
+  =============================== */
+
+  const handleEditMember = (member) => {
+    setEditingMember(member);
+    setNewMemberName(member.member_name);
+    setShowMemberModal(true);
+  };
+
+  const handlePaymentChange = (memberId, amount, setPayments) => {
+    setPayments(prev => ({
+      ...prev,
+      [memberId]: parseFloat(amount) || 0
+    }));
+  };
+
+
+  /* ===============================
+     RETURN UI
+  =============================== */
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Weekly Data Entry</h1>
-
-      {message.text && (
-        <div className="mb-4 p-3 rounded bg-red-100 text-red-700">
-          {message.text}
-        </div>
-      )}
-
-      <div className="mb-4">
-        <label className="block font-medium mb-1">Select Class</label>
-        <select
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="border rounded p-2 w-full"
-        >
-          {classes.map((cls) => (
-            <option key={cls.id} value={cls.id}>
-              {cls.class_name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <h1 className="text-xl font-bold">
+        Weekly Data Entry
+      </h1>
     </div>
   );
 };
