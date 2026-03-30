@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import InstallPWA from "../Common/InstallPWA";
+import quarterService from "../../services/quarterService";
 
 import {
   Menu,
@@ -28,6 +29,8 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
+  const [quarters, setQuarters] = useState([]);
+  const [selectedQuarter, setSelectedQuarter] = useState(null);
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -48,6 +51,52 @@ const Layout = () => {
 
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  useEffect(() => {
+    loadQuarters();
+  }, []);
+
+  const loadQuarters = async () => {
+    try {
+      const response = await quarterService.getAll();
+      const quartersList = response.data || [];
+      setQuarters(quartersList);
+      
+      // Check if there's a saved quarter in localStorage
+      const savedQuarterId = localStorage.getItem('selectedQuarterId');
+      
+      if (savedQuarterId) {
+        const savedQuarter = quartersList.find(q => q.id === savedQuarterId);
+        if (savedQuarter) {
+          setSelectedQuarter(savedQuarter);
+          return;
+        }
+      }
+      
+      // Auto-select active quarter
+      const active = quartersList.find(q => q.is_active);
+      if (active) {
+        setSelectedQuarter(active);
+        localStorage.setItem('selectedQuarterId', active.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0]);
+        localStorage.setItem('selectedQuarterId', quartersList[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load quarters:', error);
+    }
+  };
+
+  const handleQuarterChange = (quarterId) => {
+    const quarter = quarters.find(q => q.id === quarterId);
+    setSelectedQuarter(quarter);
+    localStorage.setItem('selectedQuarterId', quarterId);
+    
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('quarterChanged', { 
+      detail: { quarterId, quarter } 
+    }));
+  };
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
@@ -146,6 +195,28 @@ const Layout = () => {
           </button>
         </div>
 
+        {/* QUARTER SELECTOR */}
+        <div className="p-4 bg-indigo-900 border-b border-indigo-700">
+          <label className="block text-xs font-medium text-indigo-300 mb-2">
+            Current Quarter
+          </label>
+          {quarters.length > 0 ? (
+            <select
+              value={selectedQuarter?.id || ''}
+              onChange={(e) => handleQuarterChange(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-indigo-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-indigo-800 text-white"
+            >
+              {quarters.map(q => (
+                <option key={q.id} value={q.id} className="bg-indigo-800">
+                  {q.name} {q.year} {q.is_active ? '★' : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-xs text-indigo-300 italic">No quarters available</p>
+          )}
+        </div>
+
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
 
@@ -233,9 +304,17 @@ const Layout = () => {
               <Menu className="h-6 w-6 text-gray-700" />
             </button>
 
-            <h2 className="text-xl font-semibold text-gray-800">
-              Kanyanya SDA Church - Sabbath School Tracker
-            </h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">
+                Kanyanya SDA Church - Sabbath School Tracker
+              </h2>
+              {selectedQuarter && (
+                <p className="text-sm text-gray-600 mt-1">
+                  📅 {selectedQuarter.name} {selectedQuarter.year}
+                  {selectedQuarter.is_active && <span className="ml-2 text-green-600 font-medium">● Active</span>}
+                </p>
+              )}
+            </div>
 
             {showInstallButton && (
               <button
