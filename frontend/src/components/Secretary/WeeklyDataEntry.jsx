@@ -56,6 +56,19 @@ const WeeklyDataEntry = () => {
       const actualStatus = navigator.onLine;
       const wasOffline = !isOnline;
       const nowOnline = actualStatus && !manualOffline;
+
+      // Listen for quarter changes from Layout
+useEffect(() => {
+  const handleQuarterChange = (event) => {
+    loadClasses(); // Reload classes when quarter changes
+  };
+  
+  window.addEventListener('quarterChanged', handleQuarterChange);
+  
+  return () => {
+    window.removeEventListener('quarterChanged', handleQuarterChange);
+  };
+}, []);
       
       if (isDevelopment) {
         console.log('Browser reports online:', actualStatus);
@@ -145,9 +158,16 @@ const WeeklyDataEntry = () => {
   };
 
   const loadClasses = async () => {
-    try {
-      if (isDevelopment) console.log('Loading classes...');
-      const response = await classService.getAll();
+  try {
+    const quarterId = localStorage.getItem('selectedQuarterId');
+    
+    if (!quarterId) {
+      setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar' });
+      return;
+    }
+    
+    if (isDevelopment) console.log('Loading classes for quarter:', quarterId);
+    const response = await api.get(`/classes?quarter_id=${quarterId}`);
       
       const classesData = response.data?.data || response.data || [];
       

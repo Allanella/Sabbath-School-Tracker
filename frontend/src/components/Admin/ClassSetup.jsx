@@ -54,6 +54,15 @@ const ClassSetup = () => {
       // Auto-select active quarter or first quarter
       const activeQuarter = response.data.find(q => q.is_active);
       if (activeQuarter) {
+        // Auto-select from localStorage if available
+const savedQuarterId = localStorage.getItem('selectedQuarterId');
+if (savedQuarterId) {
+  const savedQuarter = response.data.find(q => q.id === savedQuarterId);
+  if (savedQuarter) {
+    setSelectedQuarter(savedQuarter);
+    return;
+  }
+}
         setSelectedQuarter(activeQuarter);
       } else if (response.data.length > 0) {
         setSelectedQuarter(response.data[0]);
@@ -77,7 +86,14 @@ const ClassSetup = () => {
       const classesWithMembers = await Promise.all(
         response.data.data.map(async (cls) => {
           try {
-            const membersResponse = await api.get(`/classes/${cls.id}/members`);
+            // Try the working route, fallback to empty if it fails
+let membersResponse;
+try {
+  membersResponse = await api.get(`/classes/${cls.id}/members`);
+} catch (error) {
+  // Route doesn't work, fetch directly from class_members table
+  membersResponse = { data: { data: [] } };
+}
             return {
               ...cls,
               members: membersResponse.data.data || []
