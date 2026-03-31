@@ -46,23 +46,40 @@ const ClassSetup = () => {
     }
   }, [selectedQuarter]);
 
+  // Listen for quarter changes from Layout
+  useEffect(() => {
+    const handleQuarterChange = (event) => {
+      const quarter = quarters.find(q => q.id === event.detail.quarterId);
+      if (quarter) {
+        setSelectedQuarter(quarter);
+      }
+    };
+    
+    window.addEventListener('quarterChanged', handleQuarterChange);
+    
+    return () => {
+      window.removeEventListener('quarterChanged', handleQuarterChange);
+    };
+  }, [quarters]);
+
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
       setQuarters(response.data || []);
       
+      // Auto-select from localStorage if available
+      const savedQuarterId = localStorage.getItem('selectedQuarterId');
+      if (savedQuarterId) {
+        const savedQuarter = response.data.find(q => q.id === savedQuarterId);
+        if (savedQuarter) {
+          setSelectedQuarter(savedQuarter);
+          return;
+        }
+      }
+      
       // Auto-select active quarter or first quarter
       const activeQuarter = response.data.find(q => q.is_active);
       if (activeQuarter) {
-        // Auto-select from localStorage if available
-const savedQuarterId = localStorage.getItem('selectedQuarterId');
-if (savedQuarterId) {
-  const savedQuarter = response.data.find(q => q.id === savedQuarterId);
-  if (savedQuarter) {
-    setSelectedQuarter(savedQuarter);
-    return;
-  }
-}
         setSelectedQuarter(activeQuarter);
       } else if (response.data.length > 0) {
         setSelectedQuarter(response.data[0]);
@@ -86,14 +103,15 @@ if (savedQuarterId) {
       const classesWithMembers = await Promise.all(
         response.data.data.map(async (cls) => {
           try {
-            // Try the working route, fallback to empty if it fails
-let membersResponse;
-try {
-  membersResponse = await api.get(`/classes/${cls.id}/members`);
-} catch (error) {
-  // Route doesn't work, fetch directly from class_members table
-  membersResponse = { data: { data: [] } };
-}
+            // Try the API route first, fallback to empty array if it fails
+            let membersResponse;
+            try {
+              membersResponse = await api.get(`/classes/${cls.id}/members`);
+            } catch (error) {
+              console.warn(`Could not load members for class ${cls.id}, using empty array`);
+              membersResponse = { data: { data: [] } };
+            }
+            
             return {
               ...cls,
               members: membersResponse.data.data || []
@@ -274,6 +292,7 @@ try {
               onChange={(e) => {
                 const quarter = quarters.find(q => q.id === e.target.value);
                 setSelectedQuarter(quarter);
+                localStorage.setItem('selectedQuarterId', e.target.value);
               }}
               className="w-full md:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             >

@@ -208,7 +208,7 @@ const Layout = () => {
             >
               {quarters.map(q => (
                 <option key={q.id} value={q.id} className="bg-indigo-800">
-                  {q.name} {q.year} {q.is_active ? '(Active)' : ''} {selectedQuarter?.id === q.id ? '🔹' : ''}
+                  {selectedQuarter?.id === q.id ? '🔹 ' : ''}{q.name} {q.year} {q.is_active ? '(Active)' : ''}
                 </option>
               ))}
             </select>
