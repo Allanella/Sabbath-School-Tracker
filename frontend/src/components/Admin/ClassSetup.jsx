@@ -36,22 +36,15 @@ const ClassSetup = () => {
     member_name: ''
   });
 
-  useEffect(() => {
-    loadQuarters();
-  }, []);
-
-  useEffect(() => {
-    if (selectedQuarter) {
-      loadClasses();
-    }
-  }, [selectedQuarter]);
-
   // Listen for quarter changes from Layout
   useEffect(() => {
-    const handleQuarterChange = (event) => {
-      const quarter = quarters.find(q => q.id === event.detail.quarterId);
-      if (quarter) {
-        setSelectedQuarter(quarter);
+    const handleQuarterChange = () => {
+      const quarterId = localStorage.getItem('selectedQuarterId');
+      if (quarterId) {
+        const quarter = quarters.find(q => q.id === quarterId);
+        if (quarter) {
+          setSelectedQuarter(quarter);
+        }
       }
     };
     
@@ -61,6 +54,16 @@ const ClassSetup = () => {
       window.removeEventListener('quarterChanged', handleQuarterChange);
     };
   }, [quarters]);
+
+  useEffect(() => {
+    loadQuarters();
+  }, []);
+
+  useEffect(() => {
+    if (selectedQuarter) {
+      loadClasses();
+    }
+  }, [selectedQuarter]);
 
   const loadQuarters = async () => {
     try {
@@ -103,12 +106,13 @@ const ClassSetup = () => {
       const classesWithMembers = await Promise.all(
         response.data.data.map(async (cls) => {
           try {
-            // Try the API route first, fallback to empty array if it fails
+            // Try the working route, fallback to empty if it fails
             let membersResponse;
             try {
               membersResponse = await api.get(`/classes/${cls.id}/members`);
             } catch (error) {
-              console.warn(`Could not load members for class ${cls.id}, using empty array`);
+              console.error(`Failed to load members for class ${cls.id}:`, error);
+              // Route doesn't work, return empty members
               membersResponse = { data: { data: [] } };
             }
             
