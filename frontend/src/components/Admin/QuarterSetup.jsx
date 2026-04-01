@@ -306,7 +306,14 @@ const QuarterSetup = () => {
 
       {/* QUARTER LIST */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {quarters.map((q) => (
+        {quarters
+          .sort((a, b) => {
+            // Sort by year descending, then by quarter name descending (Q4, Q3, Q2, Q1)
+            if (a.year !== b.year) return b.year - a.year;
+            const qOrder = { Q4: 4, Q3: 3, Q2: 2, Q1: 1 };
+            return qOrder[b.name] - qOrder[a.name];
+          })
+          .map((q) => (
           <div
             key={q.id}
             className={`bg-white rounded-lg shadow-md p-6 relative ${
