@@ -53,11 +53,12 @@ const copyQuarterData = async (req, res) => {
       totalClassesCopied++;
       console.log(`Created class: ${newClass.class_name}`);
 
-      // Get members from source class - DIRECTLY from database
+      // Get members from source class
       const { data: sourceMembers, error: membersError } = await supabase
         .from('class_members')
         .select('*')
-        .eq('class_id', sourceClass.id);
+        .eq('class_id', sourceClass.id)
+        .eq('is_active', true);
 
       if (membersError) {
         console.error(`Error fetching members for class ${sourceClass.class_name}:`, membersError);
@@ -70,7 +71,8 @@ const copyQuarterData = async (req, res) => {
       if (sourceMembers.length > 0) {
         const membersToInsert = sourceMembers.map(member => ({
           class_id: newClass.id,
-          member_name: member.member_name
+          member_name: member.member_name,
+          is_active: true
         }));
 
         const { data: newMembers, error: insertMembersError } = await supabase
@@ -82,7 +84,7 @@ const copyQuarterData = async (req, res) => {
           console.error(`Error inserting members for ${newClass.class_name}:`, insertMembersError);
         } else {
           totalMembersCopied += newMembers.length;
-          console.log(`Copied ${newMembers.length} members to ${newClass.class_name}`);
+          console.log(`✅ Copied ${newMembers.length} members to ${newClass.class_name}`);
         }
       }
     }
