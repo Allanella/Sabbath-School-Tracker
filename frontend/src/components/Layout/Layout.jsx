@@ -87,10 +87,31 @@ const Layout = () => {
     }
   };
 
-  const handleQuarterChange = (quarterId) => {
+  const handleQuarterChange = async (quarterId) => {
     const quarter = quarters.find(q => q.id === quarterId);
     setSelectedQuarter(quarter);
     localStorage.setItem('selectedQuarterId', quarterId);
+    
+    // Auto-set as active quarter in database
+    try {
+      await quarterService.setActive(quarterId);
+      
+      // Update local state to reflect the change
+      setQuarters(quarters.map(q => ({
+        ...q,
+        is_active: q.id === quarterId
+      })));
+      
+      // Update selectedQuarter to reflect active status
+      setSelectedQuarter({
+        ...quarter,
+        is_active: true
+      });
+      
+      console.log(`✅ ${quarter.name} ${quarter.year} set as active quarter`);
+    } catch (error) {
+      console.error('Failed to set active quarter:', error);
+    }
     
     // Dispatch custom event to notify other components
     window.dispatchEvent(new CustomEvent('quarterChanged', { 
