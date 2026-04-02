@@ -36,6 +36,18 @@ const QuarterSetup = () => {
   useEffect(() => {
     loadQuarters();
   }, []);
+  // Listen for quarter changes from sidebar
+useEffect(() => {
+  const handleQuarterChange = () => {
+    loadQuarters(); // Reload quarters when selection changes
+  };
+  
+  window.addEventListener('quarterChanged', handleQuarterChange);
+  
+  return () => {
+    window.removeEventListener('quarterChanged', handleQuarterChange);
+  };
+}, []);
 
   const loadQuarters = async () => {
     try {
