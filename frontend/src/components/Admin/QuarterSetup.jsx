@@ -33,22 +33,6 @@ const QuarterSetup = () => {
     targetQuarterId: ""
   });
 
-  useEffect(() => {
-    loadQuarters();
-  }, []);
-  // Listen for quarter changes from sidebar
-useEffect(() => {
-  const handleQuarterChange = () => {
-    loadQuarters(); // Reload quarters when selection changes
-  };
-  
-  window.addEventListener('quarterChanged', handleQuarterChange);
-  
-  return () => {
-    window.removeEventListener('quarterChanged', handleQuarterChange);
-  };
-}, []);
-
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
@@ -59,6 +43,24 @@ useEffect(() => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadQuarters();
+  }, []);
+
+  // Listen for quarter changes from sidebar
+  useEffect(() => {
+    const handleQuarterChange = () => {
+      console.log('Quarter changed - reloading quarters');
+      loadQuarters();
+    };
+    
+    window.addEventListener('quarterChanged', handleQuarterChange);
+    
+    return () => {
+      window.removeEventListener('quarterChanged', handleQuarterChange);
+    };
+  }, []);
 
   const getQuarterDates = (quarter, year) => {
     const quarters = {
