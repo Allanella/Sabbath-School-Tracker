@@ -36,9 +36,12 @@ const QuarterSetup = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data);
+      const quartersList = Array.isArray(response.data) ? response.data : [];
+      setQuarters(quartersList);
     } catch (error) {
+      console.error('Failed to load quarters:', error);
       setMessage({ type: "error", text: "Failed to load quarters" });
+      setQuarters([]);
     } finally {
       setLoading(false);
     }

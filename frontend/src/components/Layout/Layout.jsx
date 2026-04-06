@@ -59,7 +59,7 @@ const Layout = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      const quartersList = response.data || [];
+      const quartersList = Array.isArray(response.data) ? response.data : [];
       setQuarters(quartersList);
       
       // Check if there's a saved quarter in localStorage
@@ -84,6 +84,7 @@ const Layout = () => {
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
+      setQuarters([]);
     }
   };
 
@@ -109,6 +110,11 @@ const Layout = () => {
       });
       
       console.log(`✅ ${quarter.name} ${quarter.year} set as active quarter`);
+      
+      // If on Quarter Setup page, reload it
+      if (location.pathname === '/admin/quarters') {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Failed to set active quarter:', error);
     }
