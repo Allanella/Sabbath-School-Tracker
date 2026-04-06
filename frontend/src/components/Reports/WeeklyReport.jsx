@@ -32,17 +32,20 @@ const WeeklyReport = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data);
+      const quartersList = Array.isArray(response.data) ? response.data : [];
+      setQuarters(quartersList);
       
       // Set active quarter as default
-      const activeQuarter = response.data.find(q => q.is_active);
+      const activeQuarter = quartersList.find(q => q.is_active);
       if (activeQuarter) {
         setSelectedQuarter(activeQuarter.id);
-      } else if (response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
+      console.error('Failed to load quarters:', error);
       setError('Failed to load quarters');
+      setQuarters([]);
     }
   };
 
@@ -54,6 +57,7 @@ const WeeklyReport = () => {
       const response = await reportService.getWeeklyReport(selectedQuarter, selectedWeek);
       setReportData(response.data);
     } catch (error) {
+      console.error('Failed to load weekly report:', error);
       setError('Failed to load weekly report');
       setReportData(null);
     } finally {
@@ -219,6 +223,9 @@ const WeeklyReport = () => {
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Visits</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Bible Studies</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Visitors</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Helped Others</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Studied Lesson</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Guides Distributed</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -241,13 +248,22 @@ const WeeklyReport = () => {
                           {classData.total_attendance}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
-                          {classData.member_visits}
+                          {classData.member_visits || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
-                          {classData.members_conducted_bible_studies}
+                          {classData.members_conducted_bible_studies || 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
-                          {classData.number_of_visitors}
+                          {classData.number_of_visitors || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                          {classData.members_helped_others || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                          {classData.members_studied_lesson || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-600">
+                          {classData.bible_guides_distributed || 0}
                         </td>
                       </tr>
                     ))}
@@ -263,13 +279,22 @@ const WeeklyReport = () => {
                         {reportData.summary.total_attendance}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_visits}
+                        {reportData.summary.total_visits || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_bible_studies || '-'}
+                        {reportData.summary.total_bible_studies || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
                         {reportData.summary.total_visitors}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.summary.total_helped_others || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.summary.total_studied_lesson || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
+                        {reportData.summary.total_guides_distributed || 0}
                       </td>
                     </tr>
                   </tbody>
