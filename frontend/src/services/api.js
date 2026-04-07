@@ -24,7 +24,7 @@ api.interceptors.request.use(
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => response,
+  (response) => response.data,  // ✅ CHANGED: Return response.data instead of response
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
