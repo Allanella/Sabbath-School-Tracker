@@ -1,4 +1,3 @@
-
 const supabase = require('../config/database');
 
 const quarterController = {
@@ -38,7 +37,7 @@ const quarterController = {
 
       res.json({
         success: true,
-        data
+        data: data || []
       });
     } catch (error) {
       next(error);
@@ -68,7 +67,14 @@ const quarterController = {
   // Set active quarter
   setActive: async (req, res, next) => {
     try {
-      const { id } = req.params;
+      const { quarter_id } = req.body;
+
+      if (!quarter_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'quarter_id is required'
+        });
+      }
 
       // Deactivate all quarters
       await supabase
@@ -80,7 +86,7 @@ const quarterController = {
       const { data, error } = await supabase
         .from('quarters')
         .update({ is_active: true })
-        .eq('id', id)
+        .eq('id', quarter_id)
         .select()
         .single();
 
