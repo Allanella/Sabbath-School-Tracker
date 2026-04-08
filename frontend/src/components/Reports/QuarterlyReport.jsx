@@ -40,16 +40,20 @@ const QuarterlyReport = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data);
+      const quartersList = Array.isArray(response) ? response : (response.data || []);
+      setQuarters(quartersList);
       
-      const activeQuarter = response.data.find(q => q.is_active);
+      // Set active quarter as default
+      const activeQuarter = quartersList.find(q => q.is_active);
       if (activeQuarter) {
         setSelectedQuarter(activeQuarter.id);
-      } else if (response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
+      console.error('Failed to load quarters:', error);
       setError('Failed to load quarters');
+      setQuarters([]);
     }
   };
 
@@ -68,8 +72,11 @@ const QuarterlyReport = () => {
     
     try {
       const response = await reportService.getClassQuarterlyReport(selectedClass);
-      setReportData(response.data);
+      // Handle both response formats
+      const reportInfo = response.data || response;
+      setReportData(reportInfo);
     } catch (error) {
+      console.error('Failed to load quarterly report:', error);
       setError('Failed to load quarterly report');
       setReportData(null);
     } finally {
@@ -83,8 +90,11 @@ const QuarterlyReport = () => {
     
     try {
       const response = await reportService.getChurchQuarterlyReport(selectedQuarter);
-      setReportData(response.data);
+      // Handle both response formats
+      const reportInfo = response.data || response;
+      setReportData(reportInfo);
     } catch (error) {
+      console.error('Failed to load church quarterly report:', error);
       setError('Failed to load church quarterly report');
       setReportData(null);
     } finally {

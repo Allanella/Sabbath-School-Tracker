@@ -3,6 +3,8 @@ import { DollarSign, Users, Calendar, TrendingUp, Download, ChevronDown, Chevron
 import MemberPaymentEntry from './MemberPaymentEntry';
 import memberPaymentService from '../../services/memberPaymentService';
 import api from '../../services/api';
+import classService from '../../services/classService';
+import quarterService from '../../services/quarterService';
 
 const PaymentManagement = () => {
   const [classes, setClasses] = useState([]);
@@ -23,7 +25,8 @@ const PaymentManagement = () => {
 
   // Load classes and quarters on mount
   useEffect(() => {
-    loadClassesAndQuarters();
+    loadClasses();
+    loadQuarters();
   }, []);
 
   // Load data when class/quarter/week changes
@@ -33,32 +36,39 @@ const PaymentManagement = () => {
     }
   }, [selectedClass, selectedQuarter, weekNumber]);
 
-  const loadClassesAndQuarters = async () => {
+  const loadQuarters = async () => {
     try {
-      // Load classes
-      const classesResponse = await api.get('/classes');
-      setClasses(classesResponse.data.data || []);
-
-      // Load quarters
-      const quartersResponse = await api.get('/quarters');
-      const quartersList = quartersResponse.data.data || [];
+      const response = await quarterService.getAll();
+      const quartersList = Array.isArray(response) ? response : (response.data || []);
       setQuarters(quartersList);
 
-      // Auto-select first class and most recent quarter
-      if (classesResponse.data.data?.length > 0) {
-        setSelectedClass(classesResponse.data.data[0].id);
-      }
-      if (quartersList.length > 0) {
-        // Find most recent quarter (by year and name)
+      // Auto-select most recent quarter if nothing is selected
+      if (quartersList.length > 0 && !selectedQuarter) {
         const sortedQuarters = [...quartersList].sort((a, b) => {
           if (a.year !== b.year) return b.year - a.year;
-          // Assuming quarters are named Q1, Q2, Q3, Q4
           return b.name.localeCompare(a.name);
         });
         setSelectedQuarter(sortedQuarters[0].id);
       }
     } catch (error) {
-      console.error('Failed to load classes/quarters:', error);
+      console.error('Failed to load quarters:', error);
+      setQuarters([]);
+    }
+  };
+
+  const loadClasses = async () => {
+    try {
+      const response = await classService.getAll();
+      const classList = Array.isArray(response) ? response : (response.data || []);
+      setClasses(classList);
+
+      // Auto-select first class if nothing is selected
+      if (classList.length > 0 && !selectedClass) {
+        setSelectedClass(classList[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      setClasses([]);
     }
   };
 
