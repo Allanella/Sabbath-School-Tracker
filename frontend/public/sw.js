@@ -10,6 +10,7 @@ const urlsToCache = [
 // Install Service Worker
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing...');
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -34,26 +35,33 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  return self.clients.claim();
 });
 
-// Fetch with Network First strategy (good for dynamic data)
+// Fetch with Network First strategy and scheme check
 self.addEventListener('fetch', (event) => {
+  // Only handle http and https requests to avoid chrome-extension errors
+  if (!(event.request.url.indexOf('http') === 0)) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone the response
+        // Only cache valid successful responses
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+
         const responseToCache = response.clone();
-        
         caches.open(CACHE_NAME)
           .then((cache) => {
             cache.put(event.request, responseToCache);
           });
-        
+
         return response;
       })
       .catch(() => {
-        // If network fails, try cache
         return caches.match(event.request);
       })
   );
-});// rebuild Wed, Mar 11, 2026  3:17:08 PM
+});
+// rebuild Wed, Mar 11, 2026  3:17:08 PM

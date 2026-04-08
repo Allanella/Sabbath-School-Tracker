@@ -334,4 +334,4 @@ const WeeklyReport = () => {
   );
 };
 
-export default WeeklyReport;g
+export default WeeklyReport;
