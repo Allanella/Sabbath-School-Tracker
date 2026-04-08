@@ -55,7 +55,11 @@ const WeeklyReport = () => {
     
     try {
       const response = await reportService.getWeeklyReport(selectedQuarter, selectedWeek);
-      setReportData(response.data);
+      console.log('Weekly report response:', response);
+      
+      // Handle both response formats
+      const reportInfo = response.data || response;
+      setReportData(reportInfo);
     } catch (error) {
       console.error('Failed to load weekly report:', error);
       setError('Failed to load weekly report');
@@ -330,4 +334,4 @@ const WeeklyReport = () => {
   );
 };
 
-export default WeeklyReport;
+export default WeeklyReport;g

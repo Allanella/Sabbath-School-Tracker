@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import quarterService from '../../services/quarterService';
+import classService from '../../services/classService';
 
 const ClassSetup = () => {
   const [quarters, setQuarters] = useState([]);
@@ -98,42 +99,17 @@ const ClassSetup = () => {
   const loadClasses = async () => {
     if (!selectedQuarter) return;
 
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await api.get(`/classes?quarter_id=${selectedQuarter.id}`);
-      
-      // Load members for each class
-      const classesWithMembers = await Promise.all(
-        response.data.data.map(async (cls) => {
-          try {
-            // Try the working route, fallback to empty if it fails
-            let membersResponse;
-            try {
-              membersResponse = await api.get(`/classes/${cls.id}/members`);
-            } catch (error) {
-              console.error(`Failed to load members for class ${cls.id}:`, error);
-              // Route doesn't work, return empty members
-              membersResponse = { data: { data: [] } };
-            }
-            
-            return {
-              ...cls,
-              members: membersResponse.data.data || []
-            };
-          } catch (error) {
-            console.error(`Failed to load members for class ${cls.id}:`, error);
-            return {
-              ...cls,
-              members: []
-            };
-          }
-        })
-      );
+      const response = await classService.getByQuarter(selectedQuarter);
+      console.log('Classes response:', response);
 
-      setClasses(classesWithMembers);
+      // Handle both response formats
+      const classList = Array.isArray(response) ? response : (response.data || []);
+      setClasses(classList);
     } catch (error) {
       console.error('Failed to load classes:', error);
-      setMessage({ type: 'error', text: 'Failed to load classes' });
+      setClasses([]);
     } finally {
       setLoading(false);
     }
