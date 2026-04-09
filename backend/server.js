@@ -14,7 +14,7 @@ const authRoutes = require(path.join(ROUTES_PATH, 'auth.routes'));
 const userRoutes = require(path.join(ROUTES_PATH, 'user.routes'));
 const classRoutes = require(path.join(ROUTES_PATH, 'class.routes'));
 const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
-const quarterCopyRoutes = require(path.join(ROUTES_PATH, 'quarterCopy.routes'));
+// const quarterCopyRoutes = require(path.join(ROUTES_PATH, 'quarterCopy.routes'));
 const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
 const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
 const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMemberRoutes'));
@@ -60,7 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/quarters', quarterRoutes);
-app.use('/api/quarters', quarterCopyRoutes);  // Quarter copy endpoint
+// app.use('/api/quarters', quarterCopyRoutes);  // Quarter copy endpoint
 app.use('/api/weekly-data', weeklyDataRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/class-members', classMemberRoutes);
