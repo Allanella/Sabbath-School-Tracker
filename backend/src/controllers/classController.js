@@ -119,6 +119,42 @@ const classController = {
     }
   },
 
+  // Search classes
+  search: async (req, res, next) => {
+    try {
+      const { query } = req.query;
+
+      if (!query || query.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Search query is required'
+        });
+      }
+
+      const searchTerm = query.trim();
+
+      const { data, error } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          quarter:quarters(name, year, start_date, end_date),
+          secretary:users!classes_secretary_id_fkey(full_name, email)
+        `)
+        .or(`class_name.ilike.%${searchTerm}%,teacher_name.ilike.%${searchTerm}%,secretary_name.ilike.%${searchTerm}%`)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        data: data || []
+      });
+    } catch (error) {
+      console.error('Search error:', error);
+      next(error);
+    }
+  },
+
   // Update class
   update: async (req, res, next) => {
     try {
