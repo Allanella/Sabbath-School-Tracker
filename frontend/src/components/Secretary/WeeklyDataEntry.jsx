@@ -199,23 +199,24 @@ const WeeklyDataEntry = () => {
   };
 
   const loadMembers = async () => {
-    try {
-      if (isDevelopment) console.log('Loading members for class:', selectedClass);
-      const response = await classMemberService.getByClass(selectedClass);
-      
-      const membersData = response.data?.data || response.data || [];
-      
-      if (Array.isArray(membersData)) {
-        setMembers(membersData);
-      } else {
-        console.error('Members data is not an array:', membersData);
-        setMembers([]);
-      }
-    } catch (error) {
-      console.error('Failed to load members:', error);
+  try {
+    if (isDevelopment) console.log('Loading members for class:', selectedClass);
+    const response = await classMemberService.getByClass(selectedClass);
+    
+    // Since api.js already extracts .data, response is already the data object
+    const membersData = Array.isArray(response) ? response : (response.data || []);
+    
+    if (Array.isArray(membersData)) {
+      setMembers(membersData);
+    } else {
+      console.error('Members data is not an array:', membersData);
       setMembers([]);
     }
-  };
+  } catch (error) {
+    console.error('Failed to load members:', error);
+    setMembers([]);
+  }
+};
 
   const loadMembersWithLocal = async () => {
     try {
