@@ -3,7 +3,13 @@ import api from './api';
 const classMemberService = {
   // Get all members for a class
   getByClass: (classId) => {
-    return api.get(`/class-members/class/${classId}`);
+    return api.get(`/classes/${classId}/members`);
+  },
+
+  // Get all class members (with optional class filter)
+  getAll: (classId) => {
+    const params = classId ? { class_id: classId } : {};
+    return api.get('/class-members', { params });
   },
 
   // Create new member
@@ -16,7 +22,7 @@ const classMemberService = {
     return api.put(`/class-members/${id}`, memberData);
   },
 
-  // Delete member
+  // Delete member (soft delete)
   delete: (id) => {
     return api.delete(`/class-members/${id}`);
   },

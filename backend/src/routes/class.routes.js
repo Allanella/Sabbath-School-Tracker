@@ -3,6 +3,9 @@ const router = express.Router();
 const classController = require('../controllers/classController');
 const authenticate = require('../middleware/auth');
 
+// Search classes (MUST be before /:id routes)
+router.get('/search', authenticate, classController.search);
+
 // Get all classes (with optional quarter filter)
 router.get('/', authenticate, classController.getAll);
 
@@ -19,6 +22,7 @@ router.get('/:id/members', authenticate, async (req, res) => {
       .from('class_members')
       .select('*')
       .eq('class_id', id)
+      .eq('is_active', true)
       .order('member_name');
 
     if (error) throw error;
