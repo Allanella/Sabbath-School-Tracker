@@ -3,29 +3,32 @@ import api from './api';
 const authService = {
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
-    if (response.data.success) {
+    
+    // api.js interceptor already extracts .data, so response is already the data object
+    if (response.success) {
       // Store user info
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      localStorage.setItem('user', JSON.stringify(response.data.user));
       
       // Store token if it exists in response
-      if (response.data.data.token) {
-        localStorage.setItem('token', response.data.data.token);
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
       }
     }
-    return response.data;
+    return response;
   },
 
   register: async (userData) => {
     const response = await api.post('/auth/register', userData);
-    if (response.data.success) {
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+    
+    if (response.success) {
+      localStorage.setItem('user', JSON.stringify(response.data.user));
       
       // Store token if it exists in response
-      if (response.data.data.token) {
-        localStorage.setItem('token', response.data.data.token);
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
       }
     }
-    return response.data;
+    return response;
   },
 
   logout: async () => {
@@ -50,10 +53,11 @@ const authService = {
 
   getProfile: async () => {
     const response = await api.get('/auth/profile');
-    if (response.data.success) {
-      localStorage.setItem('user', JSON.stringify(response.data.data));
+    
+    if (response.success) {
+      localStorage.setItem('user', JSON.stringify(response.data));
     }
-    return response.data;
+    return response;
   },
 
   changePassword: async (currentPassword, newPassword) => {
@@ -61,7 +65,7 @@ const authService = {
       current_password: currentPassword,
       new_password: newPassword
     });
-    return response.data;
+    return response;
   }
 };
 
