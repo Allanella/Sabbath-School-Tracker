@@ -4,8 +4,9 @@ import api from '../../services/api';
 import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import classMemberService from '../../services/classMemberService';
+import paymentService from '../../services/paymentService';
 import offlineStorage from '../../utils/offlineStorage';
-import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff, RefreshCw } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff, RefreshCw, TrendingUp } from 'lucide-react';
 
 const WeeklyDataEntry = () => {
   const navigate = useNavigate();
@@ -25,7 +26,11 @@ const WeeklyDataEntry = () => {
   const [newMemberName, setNewMemberName] = useState('');
   const [editingMember, setEditingMember] = useState(null);
 
-  // Payment tracking - stores {memberId: amount}
+  // Payment totals state - cumulative totals from database
+  const [paymentTotals, setPaymentTotals] = useState({});
+  const [loadingTotals, setLoadingTotals] = useState(false);
+
+  // Payment tracking - stores THIS WEEK's payment amounts {memberId: amount}
   const [paymentsLessonEnglish, setPaymentsLessonEnglish] = useState({});
   const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
   const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
@@ -49,7 +54,7 @@ const WeeklyDataEntry = () => {
   // Listen for quarter changes from Layout
   useEffect(() => {
     const handleQuarterChange = () => {
-      loadClasses(); // Reload classes when quarter changes
+      loadClasses();
     };
     
     window.addEventListener('quarterChanged', handleQuarterChange);
@@ -78,7 +83,6 @@ const WeeklyDataEntry = () => {
       
       setIsOnline(nowOnline);
 
-      // Auto-sync when coming back online
       if (wasOffline && nowOnline) {
         autoSyncPendingData();
       }
@@ -111,6 +115,7 @@ const WeeklyDataEntry = () => {
   useEffect(() => {
     if (selectedClass) {
       loadMembersWithLocal();
+      loadPaymentTotals();
       if (weekNumber) {
         checkExistingData();
       }
@@ -136,12 +141,10 @@ const WeeklyDataEntry = () => {
       if (localMembers.length > 0 || pendingData > 0) {
         if (isDevelopment) console.log('🔄 Auto-syncing pending data...');
         
-        // Sync members first
         if (localMembers.length > 0) {
           await syncPendingMembers(true);
         }
         
-        // Show success toast
         showToast('✅ Data synced successfully!');
       }
     } catch (error) {
@@ -199,24 +202,52 @@ const WeeklyDataEntry = () => {
   };
 
   const loadMembers = async () => {
-  try {
-    if (isDevelopment) console.log('Loading members for class:', selectedClass);
-    const response = await classMemberService.getByClass(selectedClass);
-    
-    // Since api.js already extracts .data, response is already the data object
-    const membersData = Array.isArray(response) ? response : (response.data || []);
-    
-    if (Array.isArray(membersData)) {
-      setMembers(membersData);
-    } else {
-      console.error('Members data is not an array:', membersData);
+    try {
+      if (isDevelopment) console.log('Loading members for class:', selectedClass);
+      const response = await classMemberService.getByClass(selectedClass);
+      
+      const membersData = Array.isArray(response) ? response : (response.data || []);
+      
+      if (Array.isArray(membersData)) {
+        setMembers(membersData);
+      } else {
+        console.error('Members data is not an array:', membersData);
+        setMembers([]);
+      }
+    } catch (error) {
+      console.error('Failed to load members:', error);
       setMembers([]);
     }
-  } catch (error) {
-    console.error('Failed to load members:', error);
-    setMembers([]);
-  }
-};
+  };
+
+  const loadPaymentTotals = async () => {
+    try {
+      setLoadingTotals(true);
+      const quarterId = localStorage.getItem('selectedQuarterId');
+      
+      if (!quarterId || !selectedClass) {
+        setPaymentTotals({});
+        return;
+      }
+
+      const response = await paymentService.getClassPaymentTotals(selectedClass, quarterId);
+      
+      // Convert array to object keyed by member_id for easy lookup
+      const totalsMap = {};
+      if (response.data && Array.isArray(response.data)) {
+        response.data.forEach(memberData => {
+          totalsMap[memberData.id] = memberData.totals;
+        });
+      }
+      
+      setPaymentTotals(totalsMap);
+    } catch (error) {
+      console.error('Failed to load payment totals:', error);
+      setPaymentTotals({});
+    } finally {
+      setLoadingTotals(false);
+    }
+  };
 
   const loadMembersWithLocal = async () => {
     try {
@@ -474,6 +505,21 @@ const WeeklyDataEntry = () => {
     return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
   };
 
+  // Get cumulative total for a member and payment type
+  const getCumulativeTotal = (memberId, paymentType) => {
+    const memberTotals = paymentTotals[memberId];
+    if (!memberTotals) return 0;
+    
+    const typeMap = {
+      'lesson_english': 'lesson_english',
+      'lesson_luganda': 'lesson_luganda',
+      'morning_watch_english': 'morning_watch_english',
+      'morning_watch_luganda': 'morning_watch_luganda'
+    };
+    
+    return memberTotals[typeMap[paymentType]] || 0;
+  };
+
   const formatPaymentsForSave = (payments) => {
     if (!payments || Object.keys(payments).length === 0) {
       return '';
@@ -603,12 +649,55 @@ const WeeklyDataEntry = () => {
 
       if (isDevelopment) console.log('🟢 ONLINE MODE - Submitting to server...');
 
+      // Save weekly data
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
         setMessage({ type: 'success', text: '✅ Data updated successfully! Redirecting...' });
       } else {
         await weeklyDataService.submit(dataToSubmit);
         setMessage({ type: 'success', text: '🎉 Data submitted successfully! Redirecting...' });
+      }
+
+      // Record payments to cumulative system
+      const quarterId = localStorage.getItem('selectedQuarterId');
+      const paymentDate = formData.sabbath_date;
+      
+      // Record all payments
+      const allPayments = [
+        ...Object.entries(paymentsLessonEnglish).map(([memberId, amount]) => ({
+          member_id: memberId,
+          payment_type: 'lesson_english',
+          amount
+        })),
+        ...Object.entries(paymentsLessonLuganda).map(([memberId, amount]) => ({
+          member_id: memberId,
+          payment_type: 'lesson_luganda',
+          amount
+        })),
+        ...Object.entries(paymentsMorningWatchEnglish).map(([memberId, amount]) => ({
+          member_id: memberId,
+          payment_type: 'morning_watch_english',
+          amount
+        })),
+        ...Object.entries(paymentsMorningWatchLuganda).map(([memberId, amount]) => ({
+          member_id: memberId,
+          payment_type: 'morning_watch_luganda',
+          amount
+        }))
+      ].filter(p => p.amount > 0);
+
+      // Record each payment
+      for (const payment of allPayments) {
+        try {
+          await paymentService.recordPayment({
+            ...payment,
+            quarter_id: quarterId,
+            week_number: parseInt(weekNumber),
+            payment_date: paymentDate
+          });
+        } catch (paymentError) {
+          console.error('Failed to record payment:', paymentError);
+        }
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -994,16 +1083,25 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Payment Tracking */}
+        {/* Payment Tracking with Cumulative Totals */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center space-x-2 mb-4">
             <DollarSign className="h-6 w-6 text-green-600" />
             <h2 className="text-xl font-semibold">Lesson & Morning Watch Payments</h2>
+            {loadingTotals && (
+              <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+            )}
           </div>
           
-          <div className="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+          <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded">
+            <div className="flex items-center space-x-2 mb-2">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <p className="text-sm font-bold text-blue-900">
+                Cumulative Payment System
+              </p>
+            </div>
             <p className="text-sm text-blue-800">
-              <strong>Instructions:</strong> Enter the amount each member paid this week. Leave blank (0) for members who didn't pay.
+              <strong>How it works:</strong> Each member's payment history is tracked automatically. Enter the amount paid <strong>this week only</strong>. The system will add it to their cumulative total. Current totals are shown below each member's name.
             </p>
           </div>
 
@@ -1018,27 +1116,44 @@ const WeeklyDataEntry = () => {
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
                   <span>📚 Lesson (English)</span>
                   <span className="bg-green-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                    Total: {calculateTotal(paymentsLessonEnglish).toLocaleString()} UGX
+                    This Week: {calculateTotal(paymentsLessonEnglish).toLocaleString()} UGX
                   </span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {members.map((member) => (
-                    <div key={`le-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
-                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
-                      <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          value={paymentsLessonEnglish[member.id] || ''}
-                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonEnglish)}
-                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none text-right"
-                          placeholder="0"
-                          min="0"
-                          step="100"
-                        />
-                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                  {members.map((member) => {
+                    const currentTotal = getCumulativeTotal(member.id, 'lesson_english');
+                    const thisWeekAmount = paymentsLessonEnglish[member.id] || 0;
+                    const newTotal = currentTotal + thisWeekAmount;
+                    
+                    return (
+                      <div key={`le-${member.id}`} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                            Total: {newTotal.toLocaleString()} UGX
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">Add:</span>
+                          <input
+                            type="number"
+                            value={paymentsLessonEnglish[member.id] || ''}
+                            onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonEnglish)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 outline-none text-right"
+                            placeholder="0"
+                            min="0"
+                            step="100"
+                          />
+                          <span className="text-sm text-gray-600 font-medium whitespace-nowrap">UGX</span>
+                        </div>
+                        {currentTotal > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Previous: {currentTotal.toLocaleString()} UGX
+                          </p>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1047,27 +1162,44 @@ const WeeklyDataEntry = () => {
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
                   <span>📚 Lesson (Luganda)</span>
                   <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                    Total: {calculateTotal(paymentsLessonLuganda).toLocaleString()} UGX
+                    This Week: {calculateTotal(paymentsLessonLuganda).toLocaleString()} UGX
                   </span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {members.map((member) => (
-                    <div key={`ll-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
-                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
-                      <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          value={paymentsLessonLuganda[member.id] || ''}
-                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonLuganda)}
-                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-right"
-                          placeholder="0"
-                          min="0"
-                          step="100"
-                        />
-                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                  {members.map((member) => {
+                    const currentTotal = getCumulativeTotal(member.id, 'lesson_luganda');
+                    const thisWeekAmount = paymentsLessonLuganda[member.id] || 0;
+                    const newTotal = currentTotal + thisWeekAmount;
+                    
+                    return (
+                      <div key={`ll-${member.id}`} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            Total: {newTotal.toLocaleString()} UGX
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">Add:</span>
+                          <input
+                            type="number"
+                            value={paymentsLessonLuganda[member.id] || ''}
+                            onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsLessonLuganda)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-right"
+                            placeholder="0"
+                            min="0"
+                            step="100"
+                          />
+                          <span className="text-sm text-gray-600 font-medium whitespace-nowrap">UGX</span>
+                        </div>
+                        {currentTotal > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Previous: {currentTotal.toLocaleString()} UGX
+                          </p>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1076,27 +1208,44 @@ const WeeklyDataEntry = () => {
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
                   <span>🌅 Morning Watch (English)</span>
                   <span className="bg-purple-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                    Total: {calculateTotal(paymentsMorningWatchEnglish).toLocaleString()} UGX
+                    This Week: {calculateTotal(paymentsMorningWatchEnglish).toLocaleString()} UGX
                   </span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {members.map((member) => (
-                    <div key={`mwe-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
-                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
-                      <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          value={paymentsMorningWatchEnglish[member.id] || ''}
-                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchEnglish)}
-                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none text-right"
-                          placeholder="0"
-                          min="0"
-                          step="100"
-                        />
-                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                  {members.map((member) => {
+                    const currentTotal = getCumulativeTotal(member.id, 'morning_watch_english');
+                    const thisWeekAmount = paymentsMorningWatchEnglish[member.id] || 0;
+                    const newTotal = currentTotal + thisWeekAmount;
+                    
+                    return (
+                      <div key={`mwe-${member.id}`} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                            Total: {newTotal.toLocaleString()} UGX
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">Add:</span>
+                          <input
+                            type="number"
+                            value={paymentsMorningWatchEnglish[member.id] || ''}
+                            onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchEnglish)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none text-right"
+                            placeholder="0"
+                            min="0"
+                            step="100"
+                          />
+                          <span className="text-sm text-gray-600 font-medium whitespace-nowrap">UGX</span>
+                        </div>
+                        {currentTotal > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Previous: {currentTotal.toLocaleString()} UGX
+                          </p>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1105,27 +1254,44 @@ const WeeklyDataEntry = () => {
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center justify-between">
                   <span>🌅 Morning Watch (Luganda)</span>
                   <span className="bg-orange-600 text-white px-4 py-1 rounded-full text-sm font-bold">
-                    Total: {calculateTotal(paymentsMorningWatchLuganda).toLocaleString()} UGX
+                    This Week: {calculateTotal(paymentsMorningWatchLuganda).toLocaleString()} UGX
                   </span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {members.map((member) => (
-                    <div key={`mwl-${member.id}`} className="flex items-center space-x-3 bg-white p-3 rounded-lg">
-                      <span className="text-sm font-medium text-gray-800 flex-1">{member.member_name}</span>
-                      <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          value={paymentsMorningWatchLuganda[member.id] || ''}
-                          onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchLuganda)}
-                          className="w-28 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none text-right"
-                          placeholder="0"
-                          min="0"
-                          step="100"
-                        />
-                        <span className="text-sm text-gray-600 font-medium">UGX</span>
+                  {members.map((member) => {
+                    const currentTotal = getCumulativeTotal(member.id, 'morning_watch_luganda');
+                    const thisWeekAmount = paymentsMorningWatchLuganda[member.id] || 0;
+                    const newTotal = currentTotal + thisWeekAmount;
+                    
+                    return (
+                      <div key={`mwl-${member.id}`} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-800">{member.member_name}</span>
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                            Total: {newTotal.toLocaleString()} UGX
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500 whitespace-nowrap">Add:</span>
+                          <input
+                            type="number"
+                            value={paymentsMorningWatchLuganda[member.id] || ''}
+                            onChange={(e) => handlePaymentChange(member.id, e.target.value, setPaymentsMorningWatchLuganda)}
+                            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none text-right"
+                            placeholder="0"
+                            min="0"
+                            step="100"
+                          />
+                          <span className="text-sm text-gray-600 font-medium whitespace-nowrap">UGX</span>
+                        </div>
+                        {currentTotal > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Previous: {currentTotal.toLocaleString()} UGX
+                          </p>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1305,5 +1471,3 @@ const WeeklyDataEntry = () => {
 };
 
 export default WeeklyDataEntry;
-  
-
