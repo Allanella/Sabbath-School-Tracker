@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Users, Calendar, TrendingUp, Download, ChevronDown, ChevronUp, Filter } from 'lucide-react';
-import MemberPaymentEntry from './MemberPaymentEntry';
-import memberPaymentService from '../../services/memberPaymentService';
-import api from '../../services/api';
+import { DollarSign, Users, Calendar, TrendingUp, Download, Filter, AlertCircle } from 'lucide-react';
+import paymentService from '../../services/paymentService';
+import classMemberService from '../../services/classMemberService';
 import classService from '../../services/classService';
 import quarterService from '../../services/quarterService';
 
@@ -11,17 +10,12 @@ const PaymentManagement = () => {
   const [quarters, setQuarters] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedQuarter, setSelectedQuarter] = useState('');
-  const [weekNumber, setWeekNumber] = useState(1);
+  const [selectedWeek, setSelectedWeek] = useState('all');
+  const [paymentType, setPaymentType] = useState('all');
   const [members, setMembers] = useState([]);
-  const [payments, setPayments] = useState({});
-  const [totals, setTotals] = useState([]);
+  const [paymentTotals, setPaymentTotals] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [expandedMember, setExpandedMember] = useState(null);
-  const [summary, setSummary] = useState({
-    totalCollected: 0,
-    membersPaid: 0,
-    totalMembers: 0
-  });
+  const [error, setError] = useState('');
 
   // Load classes and quarters on mount
   useEffect(() => {
@@ -29,12 +23,12 @@ const PaymentManagement = () => {
     loadQuarters();
   }, []);
 
-  // Load data when class/quarter/week changes
+  // Load data when class/quarter changes
   useEffect(() => {
     if (selectedClass && selectedQuarter) {
-      loadData();
+      loadPaymentData();
     }
-  }, [selectedClass, selectedQuarter, weekNumber]);
+  }, [selectedClass, selectedQuarter, selectedWeek, paymentType]);
 
   const loadQuarters = async () => {
     try {
@@ -42,13 +36,12 @@ const PaymentManagement = () => {
       const quartersList = Array.isArray(response) ? response : (response.data || []);
       setQuarters(quartersList);
 
-      // Auto-select most recent quarter if nothing is selected
-      if (quartersList.length > 0 && !selectedQuarter) {
-        const sortedQuarters = [...quartersList].sort((a, b) => {
-          if (a.year !== b.year) return b.year - a.year;
-          return b.name.localeCompare(a.name);
-        });
-        setSelectedQuarter(sortedQuarters[0].id);
+      // Auto-select active quarter
+      const activeQuarter = quartersList.find(q => q.is_active);
+      if (activeQuarter) {
+        setSelectedQuarter(activeQuarter.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
@@ -58,11 +51,12 @@ const PaymentManagement = () => {
 
   const loadClasses = async () => {
     try {
-      const response = await classService.getAll();
+      const quarterId = localStorage.getItem('selectedQuarterId');
+      const response = await classService.getAll(quarterId);
       const classList = Array.isArray(response) ? response : (response.data || []);
       setClasses(classList);
 
-      // Auto-select first class if nothing is selected
+      // Auto-select first class
       if (classList.length > 0 && !selectedClass) {
         setSelectedClass(classList[0].id);
       }
@@ -72,66 +66,97 @@ const PaymentManagement = () => {
     }
   };
 
-  const loadData = async () => {
+  const loadPaymentData = async () => {
     try {
       setLoading(true);
+      setError('');
 
       // Load class members
-      const membersResponse = await api.get(`/class-members?class_id=${selectedClass}`);
-      setMembers(membersResponse.data.data || []);
+      const membersResponse = await classMemberService.getByClass(selectedClass);
+      const membersList = Array.isArray(membersResponse) ? membersResponse : (membersResponse.data || []);
+      setMembers(membersList);
 
-      // Load payment totals for all members
-      const totalsResponse = await memberPaymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
-      setTotals(totalsResponse.data || []);
-
-      // Load payments for current week
-      const paymentsResponse = await memberPaymentService.getQuarterPayments(selectedQuarter, weekNumber);
-      const paymentsMap = {};
+      // Load payment totals
+      const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
+      const totalsData = Array.isArray(totalsResponse) ? totalsResponse : (totalsResponse.data || []);
       
-      if (paymentsResponse.data) {
-        paymentsResponse.data.forEach(payment => {
-          paymentsMap[payment.member_id] = payment;
-        });
-      }
-      
-      setPayments(paymentsMap);
-
-      // Calculate summary
-      const totalCollected = totalsResponse.data?.reduce((sum, member) => 
-        sum + (member.totals?.quarter_grand_total || 0), 0
-      ) || 0;
-      
-      const membersPaid = Object.keys(paymentsMap).length;
-
-      setSummary({
-        totalCollected,
-        membersPaid,
-        totalMembers: membersResponse.data.data?.length || 0
-      });
+      setPaymentTotals(totalsData);
 
     } catch (error) {
       console.error('Failed to load payment data:', error);
+      setError('Failed to load payment data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleMember = (memberId) => {
-    setExpandedMember(expandedMember === memberId ? null : memberId);
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-UG', {
+      style: 'currency',
+      currency: 'UGX',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount || 0);
   };
 
-  const handlePaymentSaved = () => {
-    loadData(); // Reload all data after payment is saved
+  // Calculate summary statistics
+  const calculateSummary = () => {
+    let totalAmount = 0;
+    let uniqueMembers = 0;
+    let totalPayments = 0;
+
+    paymentTotals.forEach(memberData => {
+      const totals = memberData.totals || {};
+      
+      // Sum all payment types based on filter
+      if (paymentType === 'all' || paymentType === 'lesson_english') {
+        totalAmount += totals.lesson_english || 0;
+      }
+      if (paymentType === 'all' || paymentType === 'lesson_luganda') {
+        totalAmount += totals.lesson_luganda || 0;
+      }
+      if (paymentType === 'all' || paymentType === 'morning_watch_english') {
+        totalAmount += totals.morning_watch_english || 0;
+      }
+      if (paymentType === 'all' || paymentType === 'morning_watch_luganda') {
+        totalAmount += totals.morning_watch_luganda || 0;
+      }
+
+      // Count members who have paid
+      if (totals.quarter_grand_total > 0) {
+        uniqueMembers++;
+      }
+
+      totalPayments += totals.weeks_paid || 0;
+    });
+
+    return {
+      totalAmount,
+      uniqueMembers,
+      totalMembers: members.length,
+      avgPerMember: uniqueMembers > 0 ? totalAmount / uniqueMembers : 0,
+      totalPayments
+    };
   };
+
+  const summary = calculateSummary();
 
   const exportToCSV = () => {
-    const headers = ['Member Name', 'Quarter Total', 'Year Total', 'Weeks Paid'];
-    const rows = totals.map(member => [
-      member.member_name,
-      member.totals?.quarter_grand_total || 0,
-      member.totals?.year_grand_total || 0,
-      member.totals?.weeks_paid || 0
-    ]);
+    const headers = ['Member Name', 'Lesson (English)', 'Lesson (Luganda)', 'MW (English)', 'MW (Luganda)', 'Quarter Total', 'Year Total', 'Weeks Paid'];
+    
+    const rows = paymentTotals.map(memberData => {
+      const totals = memberData.totals || {};
+      return [
+        memberData.member_name,
+        totals.lesson_english || 0,
+        totals.lesson_luganda || 0,
+        totals.morning_watch_english || 0,
+        totals.morning_watch_luganda || 0,
+        totals.quarter_grand_total || 0,
+        totals.year_grand_total || 0,
+        totals.weeks_paid || 0
+      ];
+    });
 
     const csv = [
       headers.join(','),
@@ -142,7 +167,11 @@ const PaymentManagement = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `payment-report-week-${weekNumber}.csv`;
+    
+    const selectedClassName = classes.find(c => c.id === selectedClass)?.class_name || 'class';
+    const selectedQuarterName = quarters.find(q => q.id === selectedQuarter)?.name || 'quarter';
+    
+    a.download = `payments-${selectedClassName}-${selectedQuarterName}.csv`;
     a.click();
   };
 
@@ -156,7 +185,7 @@ const PaymentManagement = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Filter className="inline h-4 w-4 mr-1" />
@@ -170,7 +199,7 @@ const PaymentManagement = () => {
               <option value="">Select Class</option>
               {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.class_name} - {cls.teacher_name}
+                  {cls.class_name}
                 </option>
               ))}
             </select>
@@ -199,63 +228,100 @@ const PaymentManagement = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Week Number
             </label>
-            <input
-              type="number"
-              min="1"
-              max="13"
-              value={weekNumber}
-              onChange={(e) => setWeekNumber(parseInt(e.target.value) || 1)}
+            <select
+              value={selectedWeek}
+              onChange={(e) => setSelectedWeek(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            >
+              <option value="all">All Weeks</option>
+              {[...Array(13)].map((_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Week {i + 1}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Type
+            </label>
+            <select
+              value={paymentType}
+              onChange={(e) => setPaymentType(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Types</option>
+              <option value="lesson_english">Lesson (English)</option>
+              <option value="lesson_luganda">Lesson (Luganda)</option>
+              <option value="morning_watch_english">Morning Watch (English)</option>
+              <option value="morning_watch_luganda">Morning Watch (Luganda)</option>
+            </select>
           </div>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+          <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
 
       {!selectedClass || !selectedQuarter ? (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <Filter className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Select Class and Quarter</h3>
-          <p className="text-gray-600">Choose a class and quarter above to manage payments</p>
+          <p className="text-gray-600">Choose a class and quarter above to view payments</p>
         </div>
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
               <div className="flex items-center justify-between mb-2">
                 <DollarSign className="h-8 w-8 opacity-80" />
-                <TrendingUp className="h-6 w-6 opacity-60" />
               </div>
-              <p className="text-blue-100 text-sm font-medium mb-1">Total Collected (Quarter)</p>
+              <p className="text-green-100 text-sm font-medium mb-1">Total Amount</p>
               <p className="text-3xl font-bold">
-                {memberPaymentService.formatCurrency(summary.totalCollected)}
+                {summary.totalAmount.toLocaleString()} UGX
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
               <div className="flex items-center justify-between mb-2">
                 <Users className="h-8 w-8 opacity-80" />
-                <Calendar className="h-6 w-6 opacity-60" />
               </div>
-              <p className="text-green-100 text-sm font-medium mb-1">Members Paid This Week</p>
+              <p className="text-blue-100 text-sm font-medium mb-1">Unique Members</p>
               <p className="text-3xl font-bold">
-                {summary.membersPaid} / {summary.totalMembers}
+                {summary.uniqueMembers}
               </p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
               <div className="flex items-center justify-between mb-2">
+                <TrendingUp className="h-8 w-8 opacity-80" />
+              </div>
+              <p className="text-purple-100 text-sm font-medium mb-1">Avg per Payment</p>
+              <p className="text-3xl font-bold">
+                {Math.round(summary.avgPerMember).toLocaleString()} UGX
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
+              <div className="flex items-center justify-between mb-2">
                 <Calendar className="h-8 w-8 opacity-80" />
                 <button
                   onClick={exportToCSV}
-                  className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition flex items-center gap-1"
+                  disabled={paymentTotals.length === 0}
+                  className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition flex items-center gap-1 disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" />
                   Export
                 </button>
               </div>
-              <p className="text-purple-100 text-sm font-medium mb-1">Current Week</p>
-              <p className="text-3xl font-bold">Week {weekNumber}</p>
+              <p className="text-orange-100 text-sm font-medium mb-1">Total Payments</p>
+              <p className="text-3xl font-bold">{summary.totalPayments}</p>
             </div>
           </div>
 
@@ -265,81 +331,98 @@ const PaymentManagement = () => {
             </div>
           ) : (
             <>
-              {/* Payment Entry for Each Member */}
-              <div className="space-y-4">
-                {members.map((member) => {
-                  const memberTotal = totals.find(t => t.id === member.id);
-                  const existingPayment = payments[member.id];
-                  const isExpanded = expandedMember === member.id;
-                  const hasPaid = !!existingPayment;
-
-                  return (
-                    <div key={member.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                      {/* Member Header - Clickable */}
-                      <button
-                        onClick={() => toggleMember(member.id)}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            hasPaid ? 'bg-green-100' : 'bg-gray-100'
-                          }`}>
-                            <Users className={`h-5 w-5 ${hasPaid ? 'text-green-600' : 'text-gray-400'}`} />
-                          </div>
-                          <div className="text-left">
-                            <h3 className="font-semibold text-gray-900">{member.member_name}</h3>
-                            <p className="text-sm text-gray-600">
-                              {hasPaid ? '✓ Paid this week' : 'Not paid yet'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <p className="text-sm text-gray-600">Quarter Total</p>
-                            <p className="font-bold text-blue-600">
-                              {memberPaymentService.formatCurrency(memberTotal?.totals?.quarter_grand_total || 0)}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-600">Year Total</p>
-                            <p className="font-bold text-purple-600">
-                              {memberPaymentService.formatCurrency(memberTotal?.totals?.year_grand_total || 0)}
-                            </p>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="h-6 w-6 text-gray-400" />
-                          ) : (
-                            <ChevronDown className="h-6 w-6 text-gray-400" />
-                          )}
-                        </div>
-                      </button>
-
-                      {/* Expandable Payment Entry */}
-                      {isExpanded && (
-                        <div className="border-t px-6 py-6 bg-gray-50">
-                          <MemberPaymentEntry
-                            member={member}
-                            quarterId={selectedQuarter}
-                            weekNumber={weekNumber}
-                            existingPayment={existingPayment}
-                            onPaymentSaved={handlePaymentSaved}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* No Members Message */}
-              {members.length === 0 && (
-                <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                  <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No Members Found</h3>
-                  <p className="text-gray-600">Add members to this class to start tracking payments.</p>
+              {/* Payment Details Table */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-gray-900">Payment Details</h2>
+                  <span className="text-sm text-gray-600">
+                    {paymentTotals.length} member{paymentTotals.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
-              )}
+
+                {paymentTotals.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <DollarSign className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Payment Data</h3>
+                    <p className="text-gray-600">No payments have been recorded yet for this class and quarter.</p>
+                    <p className="text-sm text-gray-500 mt-2">Payments are recorded when you enter weekly data.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Name</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (EN)</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (LG)</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (EN)</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (LG)</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quarter Total</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {paymentTotals.map((memberData, index) => {
+                          const totals = memberData.totals || {};
+                          return (
+                            <tr key={memberData.id || index} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                    <Users className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-900">{memberData.member_name}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                                {(totals.lesson_english || 0).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                                {(totals.lesson_luganda || 0).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                                {(totals.morning_watch_english || 0).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                                {(totals.morning_watch_luganda || 0).toLocaleString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-green-600">
+                                {(totals.quarter_grand_total || 0).toLocaleString()} UGX
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                                  {totals.weeks_paid || 0}/13
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-gray-50 font-semibold">
+                        <tr>
+                          <td className="px-6 py-4 text-sm text-gray-900">TOTAL</td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-900">
+                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.lesson_english || 0), 0).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-900">
+                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.lesson_luganda || 0), 0).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-900">
+                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_english || 0), 0).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm text-gray-900">
+                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_luganda || 0), 0).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-bold text-green-600">
+                            {summary.totalAmount.toLocaleString()} UGX
+                          </td>
+                          <td className="px-6 py-4"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </>
