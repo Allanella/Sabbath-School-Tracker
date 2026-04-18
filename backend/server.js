@@ -67,7 +67,6 @@ app.use('/api/class-members', classMemberRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/member-payments', memberPaymentRoutes);
 
-
 // -------------------- ROOT --------------------
 app.get('/', (req, res) => {
   res.json({ message: 'Sabbath School Tracker API' });
@@ -81,6 +80,44 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
   });
+});
+
+// -------------------- MIGRATION ENDPOINT --------------------
+const authenticate = require('./src/middleware/auth');
+
+app.post('/api/admin/migrate-payments', authenticate, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Admin access required' 
+      });
+    }
+
+    console.log('🚀 Starting payment migration via API...');
+    console.log('👤 Requested by:', req.user.email);
+    
+    // Ensure the filename matches your script: migratePaymentData.js
+    const { migratePaymentData } = require('./src/scripts/migratePaymentData');
+    
+    // Run migration
+    await migratePaymentData();
+    
+    console.log('✅ Migration completed successfully');
+    
+    res.json({ 
+      success: true, 
+      message: 'Payment migration completed successfully! Check Render logs for details.' 
+    });
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Migration failed', 
+      error: error.message 
+    });
+  }
 });
 
 // -------------------- ERROR HANDLING --------------------
