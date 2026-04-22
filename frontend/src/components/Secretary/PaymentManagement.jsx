@@ -36,7 +36,6 @@ const PaymentManagement = () => {
       const quartersList = Array.isArray(response) ? response : (response.data || []);
       setQuarters(quartersList);
 
-      // Auto-select active quarter
       const activeQuarter = quartersList.find(q => q.is_active);
       if (activeQuarter) {
         setSelectedQuarter(activeQuarter.id);
@@ -56,7 +55,6 @@ const PaymentManagement = () => {
       const classList = Array.isArray(response) ? response : (response.data || []);
       setClasses(classList);
 
-      // Auto-select first class
       if (classList.length > 0 && !selectedClass) {
         setSelectedClass(classList[0].id);
       }
@@ -71,12 +69,10 @@ const PaymentManagement = () => {
       setLoading(true);
       setError('');
 
-      // Load class members
       const membersResponse = await classMemberService.getByClass(selectedClass);
       const membersList = Array.isArray(membersResponse) ? membersResponse : (membersResponse.data || []);
       setMembers(membersList);
 
-      // Load payment totals
       const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
       const totalsData = Array.isArray(totalsResponse) ? totalsResponse : (totalsResponse.data || []);
       
@@ -90,16 +86,7 @@ const PaymentManagement = () => {
     }
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-UG', {
-      style: 'currency',
-      currency: 'UGX',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount || 0);
-  };
-
-  // Calculate summary statistics
+  // Updated Summary Calculation
   const calculateSummary = () => {
     let totalAmount = 0;
     let uniqueMembers = 0;
@@ -108,7 +95,6 @@ const PaymentManagement = () => {
     paymentTotals.forEach(memberData => {
       const totals = memberData.totals || {};
       
-      // Sum all payment types based on filter
       if (paymentType === 'all' || paymentType === 'lesson_english') {
         totalAmount += totals.lesson_english || 0;
       }
@@ -121,8 +107,11 @@ const PaymentManagement = () => {
       if (paymentType === 'all' || paymentType === 'morning_watch_luganda') {
         totalAmount += totals.morning_watch_luganda || 0;
       }
+      // Single offering calculation
+      if (paymentType === 'all' || paymentType === 'offering') {
+        totalAmount += totals.offering || 0;
+      }
 
-      // Count members who have paid
       if (totals.quarter_grand_total > 0) {
         uniqueMembers++;
       }
@@ -142,7 +131,7 @@ const PaymentManagement = () => {
   const summary = calculateSummary();
 
   const exportToCSV = () => {
-    const headers = ['Member Name', 'Lesson (English)', 'Lesson (Luganda)', 'MW (English)', 'MW (Luganda)', 'Quarter Total', 'Year Total', 'Weeks Paid'];
+    const headers = ['Member Name', 'Lesson (English)', 'Lesson (Luganda)', 'MW (English)', 'MW (Luganda)', 'Offering', 'Quarter Total', 'Year Total', 'Weeks Paid'];
     
     const rows = paymentTotals.map(memberData => {
       const totals = memberData.totals || {};
@@ -152,6 +141,7 @@ const PaymentManagement = () => {
         totals.lesson_luganda || 0,
         totals.morning_watch_english || 0,
         totals.morning_watch_luganda || 0,
+        totals.offering || 0,
         totals.quarter_grand_total || 0,
         totals.year_grand_total || 0,
         totals.weeks_paid || 0
@@ -177,13 +167,11 @@ const PaymentManagement = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Management</h1>
         <p className="text-gray-600">Track and manage member payments</p>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -194,13 +182,11 @@ const PaymentManagement = () => {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Class</option>
               {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.class_name}
-                </option>
+                <option key={cls.id} value={cls.id}>{cls.class_name}</option>
               ))}
             </select>
           </div>
@@ -213,7 +199,7 @@ const PaymentManagement = () => {
             <select
               value={selectedQuarter}
               onChange={(e) => setSelectedQuarter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Quarter</option>
               {quarters.map((quarter) => (
@@ -231,13 +217,11 @@ const PaymentManagement = () => {
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Weeks</option>
               {[...Array(13)].map((_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  Week {i + 1}
-                </option>
+                <option key={i + 1} value={i + 1}>Week {i + 1}</option>
               ))}
             </select>
           </div>
@@ -249,13 +233,15 @@ const PaymentManagement = () => {
             <select
               value={paymentType}
               onChange={(e) => setPaymentType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Types</option>
               <option value="lesson_english">Lesson (English)</option>
               <option value="lesson_luganda">Lesson (Luganda)</option>
               <option value="morning_watch_english">Morning Watch (English)</option>
               <option value="morning_watch_luganda">Morning Watch (Luganda)</option>
+              {/* Added Offering Filter */}
+              <option value="offering">Offering</option>
             </select>
           </div>
         </div>
@@ -276,48 +262,34 @@ const PaymentManagement = () => {
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <DollarSign className="h-8 w-8 opacity-80" />
-              </div>
+              <DollarSign className="h-8 w-8 opacity-80 mb-2" />
               <p className="text-green-100 text-sm font-medium mb-1">Total Amount</p>
-              <p className="text-3xl font-bold">
-                {summary.totalAmount.toLocaleString()} UGX
-              </p>
+              <p className="text-3xl font-bold">{summary.totalAmount.toLocaleString()} UGX</p>
             </div>
 
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <Users className="h-8 w-8 opacity-80" />
-              </div>
+              <Users className="h-8 w-8 opacity-80 mb-2" />
               <p className="text-blue-100 text-sm font-medium mb-1">Unique Members</p>
-              <p className="text-3xl font-bold">
-                {summary.uniqueMembers}
-              </p>
+              <p className="text-3xl font-bold">{summary.uniqueMembers}</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="h-8 w-8 opacity-80" />
-              </div>
-              <p className="text-purple-100 text-sm font-medium mb-1">Avg per Payment</p>
-              <p className="text-3xl font-bold">
-                {Math.round(summary.avgPerMember).toLocaleString()} UGX
-              </p>
+              <TrendingUp className="h-8 w-8 opacity-80 mb-2" />
+              <p className="text-purple-100 text-sm font-medium mb-1">Avg per Member</p>
+              <p className="text-3xl font-bold">{Math.round(summary.avgPerMember).toLocaleString()} UGX</p>
             </div>
 
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <Calendar className="h-8 w-8 opacity-80" />
                 <button
                   onClick={exportToCSV}
                   disabled={paymentTotals.length === 0}
-                  className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition flex items-center gap-1 disabled:opacity-50"
+                  className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition flex items-center gap-1"
                 >
-                  <Download className="h-4 w-4" />
-                  Export
+                  <Download className="h-4 w-4" /> Export
                 </button>
               </div>
               <p className="text-orange-100 text-sm font-medium mb-1">Total Payments</p>
@@ -330,100 +302,83 @@ const PaymentManagement = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
           ) : (
-            <>
-              {/* Payment Details Table */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">Payment Details</h2>
-                  <span className="text-sm text-gray-600">
-                    {paymentTotals.length} member{paymentTotals.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-
-                {paymentTotals.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <DollarSign className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Payment Data</h3>
-                    <p className="text-gray-600">No payments have been recorded yet for this class and quarter.</p>
-                    <p className="text-sm text-gray-500 mt-2">Payments are recorded when you enter weekly data.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Name</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (EN)</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (LG)</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (EN)</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (LG)</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quarter Total</th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {paymentTotals.map((memberData, index) => {
-                          const totals = memberData.totals || {};
-                          return (
-                            <tr key={memberData.id || index} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                                    <Users className="h-4 w-4 text-blue-600" />
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-900">{memberData.member_name}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                                {(totals.lesson_english || 0).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                                {(totals.lesson_luganda || 0).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                                {(totals.morning_watch_english || 0).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                                {(totals.morning_watch_luganda || 0).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-green-600">
-                                {(totals.quarter_grand_total || 0).toLocaleString()} UGX
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                                  {totals.weeks_paid || 0}/13
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot className="bg-gray-50 font-semibold">
-                        <tr>
-                          <td className="px-6 py-4 text-sm text-gray-900">TOTAL</td>
-                          <td className="px-6 py-4 text-right text-sm text-gray-900">
-                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.lesson_english || 0), 0).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-right text-sm text-gray-900">
-                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.lesson_luganda || 0), 0).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-right text-sm text-gray-900">
-                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_english || 0), 0).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-right text-sm text-gray-900">
-                            {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_luganda || 0), 0).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-right text-sm font-bold text-green-600">
-                            {summary.totalAmount.toLocaleString()} UGX
-                          </td>
-                          <td className="px-6 py-4"></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Payment Details</h2>
+                <span className="text-sm text-gray-600">{paymentTotals.length} members</span>
               </div>
-            </>
+
+              {paymentTotals.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">No payment data recorded.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Name</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (EN)</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (LG)</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (EN)</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (LG)</th>
+                        {/* New Offering Header */}
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offering</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quarter Total</th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {paymentTotals.map((memberData, index) => {
+                        const totals = memberData.totals || {};
+                        return (
+                          <tr key={memberData.id || index} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap font-medium">{memberData.member_name}</td>
+                            <td className="px-6 py-4 text-right">{(totals.lesson_english || 0).toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right">{(totals.lesson_luganda || 0).toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right">{(totals.morning_watch_english || 0).toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right">{(totals.morning_watch_luganda || 0).toLocaleString()}</td>
+                            {/* New Offering Row Data */}
+                            <td className="px-6 py-4 text-right">{(totals.offering || 0).toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right font-semibold text-green-600">
+                              {(totals.quarter_grand_total || 0).toLocaleString()} UGX
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                                {totals.weeks_paid || 0}/13
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="bg-gray-50 font-semibold">
+                      <tr>
+                        <td className="px-6 py-4">TOTAL</td>
+                        <td className="px-6 py-4 text-right">
+                          {paymentTotals.reduce((sum, m) => sum + (m.totals?.lesson_english || 0), 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {paymentTotals.reduce((sum, m) => sum + (m.totals?.lesson_luganda || 0), 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_english || 0), 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_luganda || 0), 0).toLocaleString()}
+                        </td>
+                        {/* Offering Total Footer */}
+                        <td className="px-6 py-4 text-right">
+                          {paymentTotals.reduce((sum, m) => sum + (m.totals?.offering || 0), 0).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-green-600">
+                          {summary.totalAmount.toLocaleString()} UGX
+                        </td>
+                        <td className="px-6 py-4"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
