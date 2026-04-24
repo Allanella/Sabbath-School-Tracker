@@ -797,9 +797,151 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
       </div>
-      {/* ... rest of your JSX form ... */}
+
+      {message.text && !showSuccessToast && (
+        <div
+          className={`mb-6 p-4 rounded-lg flex items-start animate-fade-in ${
+            message.type === 'success'
+              ? 'bg-green-50 border border-green-200'
+              : message.type === 'error'
+              ? 'bg-red-50 border border-red-200'
+              : message.type === 'warning'
+              ? 'bg-orange-50 border border-orange-200'
+              : 'bg-blue-50 border border-blue-200'
+          }`}
+        >
+          {message.type === 'success' ? (
+            <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
+          ) : message.type === 'warning' ? (
+            <WifiOff className="h-5 w-5 text-orange-600 mr-2 mt-0.5" />
+          ) : (
+            <AlertCircle
+              className={`h-5 w-5 mr-2 mt-0.5 ${
+                message.type === 'error' ? 'text-red-600' : 'text-blue-600'
+              }`}
+            />
+          )}
+          <p
+            className={`text-sm font-medium ${
+              message.type === 'success'
+                ? 'text-green-800'
+                : message.type === 'error'
+                ? 'text-red-800'
+                : message.type === 'warning'
+                ? 'text-orange-800'
+                : 'text-blue-800'
+            }`}
+          >
+            {message.text}
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Class and Week Selection */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Class Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select Class</label>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
+                required
+              >
+                <option value="">Choose a class</option>
+                {classes.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.class_name} - {cls.teacher_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Week Number</label>
+              <select
+                value={weekNumber}
+                onChange={(e) => setWeekNumber(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
+                required
+              >
+                {[...Array(13)].map((_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    Week {i + 1}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Sabbath Date</label>
+              <input
+                type="date"
+                name="sabbath_date"
+                value={formData.sabbath_date}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Submit Button */}
+        <div className="flex justify-end space-x-4">
+          <button 
+            type="button" 
+            onClick={() => navigate('/secretary')} 
+            className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          >
+            <Save className="h-5 w-5" />
+            <span>{loading ? 'Saving...' : formData.id ? 'Update Data' : 'Submit Data'}</span>
+          </button>
+        </div>
+      </form>
+
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(100%);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        .animate-slide-in {
+          animation: slideIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
 
-export default WeeklyDataEntry;git 
+export default WeeklyDataEntry;
