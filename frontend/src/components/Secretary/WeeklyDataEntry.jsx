@@ -232,7 +232,6 @@ const WeeklyDataEntry = () => {
 
       const response = await paymentService.getClassPaymentTotals(selectedClass, quarterId);
       
-      // Convert array to object keyed by member_id for easy lookup
       const totalsMap = {};
       if (response.data && Array.isArray(response.data)) {
         response.data.forEach(memberData => {
@@ -275,16 +274,7 @@ const WeeklyDataEntry = () => {
 
     const isActuallyOnline = navigator.onLine && !manualOffline;
 
-    if (isDevelopment) {
-      console.log('=== ADD MEMBER DEBUG ===');
-      console.log('Is Online:', isActuallyOnline);
-      console.log('Member Name:', newMemberName);
-      console.log('Selected Class:', selectedClass);
-    }
-
     if (!isActuallyOnline) {
-      if (isDevelopment) console.log('🔴 OFFLINE MODE - Adding member locally');
-      
       try {
         const tempId = `temp-${Date.now()}`;
         const newMember = {
@@ -306,9 +296,6 @@ const WeeklyDataEntry = () => {
           timestamp: Date.now()
         });
         localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-        
-        if (isDevelopment) console.log('✅ Saved to localStorage');
-        
         checkPendingMembers();
 
         setMessage({ 
@@ -318,24 +305,15 @@ const WeeklyDataEntry = () => {
 
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
         return;
-
       } catch (offlineError) {
-        console.error('❌ OFFLINE SAVE ERROR:', offlineError);
-        setMessage({ 
-          type: 'error', 
-          text: `Offline save failed: ${offlineError.message}` 
-        });
+        setMessage({ type: 'error', text: `Offline save failed: ${offlineError.message}` });
         return;
       }
     }
 
-    if (isDevelopment) console.log('🟢 ONLINE MODE - Saving to server');
-    
     try {
       if (editingMember) {
-        await classMemberService.update(editingMember.id, {
-          member_name: newMemberName,
-        });
+        await classMemberService.update(editingMember.id, { member_name: newMemberName });
         setMessage({ type: 'success', text: 'Member updated successfully!' });
       } else {
         await classMemberService.create({
@@ -349,16 +327,9 @@ const WeeklyDataEntry = () => {
       setEditingMember(null);
       setShowMemberModal(false);
       loadMembers();
-      
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      console.error('❌ ONLINE SAVE ERROR:', error);
-      
-      const errorMessage = error.response?.data?.message 
-        || error.response?.data?.error
-        || `Failed to save member: ${error.message}`;
-      
-      setMessage({ type: 'error', text: errorMessage });
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save member' });
     }
   };
 
@@ -373,79 +344,38 @@ const WeeklyDataEntry = () => {
 
     const isActuallyOnline = navigator.onLine && !manualOffline;
 
-    if (isDevelopment) {
-      console.log('=== DELETE MEMBER DEBUG ===');
-      console.log('Is Online:', isActuallyOnline);
-      console.log('Member ID:', memberId);
-    }
-
     if (!isActuallyOnline) {
-      if (isDevelopment) console.log('🔴 OFFLINE MODE - Removing member locally');
-      
-      try {
-        setMembers(members.filter(m => m.id !== memberId));
-
-        const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-        localMembers.push({
-          action: 'delete',
-          memberId: memberId,
-          timestamp: Date.now()
-        });
-        localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-        
-        if (isDevelopment) console.log('✅ Saved delete to localStorage');
-        
-        checkPendingMembers();
-
-        setMessage({ 
-          type: 'warning', 
-          text: '📴 Offline: Member removed locally. Will sync when online.' 
-        });
-
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-        return;
-
-      } catch (offlineError) {
-        console.error('❌ OFFLINE DELETE ERROR:', offlineError);
-        setMessage({ 
-          type: 'error', 
-          text: `Offline delete failed: ${offlineError.message}` 
-        });
-        return;
-      }
+      setMembers(members.filter(m => m.id !== memberId));
+      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
+      localMembers.push({
+        action: 'delete',
+        memberId: memberId,
+        timestamp: Date.now()
+      });
+      localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
+      checkPendingMembers();
+      setMessage({ type: 'warning', text: '📴 Offline: Member removed locally.' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      return;
     }
 
-    if (isDevelopment) console.log('🟢 ONLINE MODE - Deleting from server');
-    
     try {
       await classMemberService.delete(memberId);
       setMessage({ type: 'success', text: 'Member removed successfully!' });
       loadMembers();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      console.error('❌ ONLINE DELETE ERROR:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to remove member.';
-      setMessage({ type: 'error', text: errorMessage });
+      setMessage({ type: 'error', text: 'Failed to remove member.' });
     }
   };
 
   const syncPendingMembers = async (isAutoSync = false) => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      
-      if (localMembers.length === 0) {
-        if (!isAutoSync) {
-          setMessage({ type: 'info', text: 'No pending members to sync.' });
-          setTimeout(() => setMessage({ type: '', text: '' }), 2000);
-        }
-        return;
-      }
+      if (localMembers.length === 0) return;
 
       setLoading(true);
-      if (isDevelopment) console.log('Syncing pending members:', localMembers);
-
       let syncedCount = 0;
-      let failedCount = 0;
 
       for (const item of localMembers) {
         try {
@@ -454,40 +384,23 @@ const WeeklyDataEntry = () => {
               class_id: item.data.class_id,
               member_name: item.data.member_name
             });
-            if (isDevelopment) console.log('✅ Synced member:', item.data.member_name);
             syncedCount++;
-          } else if (item.action === 'delete') {
-            if (!item.memberId.startsWith('temp-')) {
-              await classMemberService.delete(item.memberId);
-              if (isDevelopment) console.log('✅ Synced delete:', item.memberId);
-              syncedCount++;
-            } else {
-              if (isDevelopment) console.log('⏭️ Skipped temp member delete:', item.memberId);
-            }
+          } else if (item.action === 'delete' && !item.memberId.startsWith('temp-')) {
+            await classMemberService.delete(item.memberId);
+            syncedCount++;
           }
         } catch (error) {
           console.error('Failed to sync member:', item, error);
-          failedCount++;
         }
       }
 
       localStorage.removeItem('pendingMembers');
       checkPendingMembers();
-      
       await loadMembers();
       
       if (!isAutoSync) {
-        setMessage({ 
-          type: 'success', 
-          text: `✅ Synced ${syncedCount} member(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}!` 
-        });
+        setMessage({ type: 'success', text: `✅ Synced ${syncedCount} members!` });
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-      }
-      
-    } catch (error) {
-      console.error('Sync error:', error);
-      if (!isAutoSync) {
-        setMessage({ type: 'error', text: 'Failed to sync members.' });
       }
     } finally {
       setLoading(false);
@@ -505,26 +418,14 @@ const WeeklyDataEntry = () => {
     return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
   };
 
-  // Get cumulative total for a member and payment type
   const getCumulativeTotal = (memberId, paymentType) => {
     const memberTotals = paymentTotals[memberId];
     if (!memberTotals) return 0;
-    
-    const typeMap = {
-      'lesson_english': 'lesson_english',
-      'lesson_luganda': 'lesson_luganda',
-      'morning_watch_english': 'morning_watch_english',
-      'morning_watch_luganda': 'morning_watch_luganda'
-    };
-    
-    return memberTotals[typeMap[paymentType]] || 0;
+    return memberTotals[paymentType] || 0;
   };
 
   const formatPaymentsForSave = (payments) => {
-    if (!payments || Object.keys(payments).length === 0) {
-      return '';
-    }
-    
+    if (!payments || Object.keys(payments).length === 0) return '';
     const entries = Object.entries(payments)
       .filter(([id, amount]) => amount && amount > 0)
       .map(([id, amount]) => {
@@ -532,24 +433,18 @@ const WeeklyDataEntry = () => {
         return member ? `${member.member_name}: ${amount}` : null;
       })
       .filter(Boolean);
-    
     return entries.length > 0 ? entries.join(', ') : '';
   };
 
   const parsePaymentsFromSaved = (paymentString) => {
     if (!paymentString || paymentString.trim() === '') return {};
-    
     const payments = {};
     const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    
     entries.forEach(entry => {
       const [name, amount] = entry.split(':').map(s => s.trim());
       const member = members.find(m => m.member_name === name);
-      if (member && amount) {
-        payments[member.id] = parseFloat(amount);
-      }
+      if (member && amount) payments[member.id] = parseFloat(amount);
     });
-    
     return payments;
   };
 
@@ -559,33 +454,21 @@ const WeeklyDataEntry = () => {
       if (response.data) {
         const data = response.data;
         setFormData(data);
-        
         setPaymentsLessonEnglish(parsePaymentsFromSaved(data.members_paid_lesson_english));
         setPaymentsLessonLuganda(parsePaymentsFromSaved(data.members_paid_lesson_luganda));
         setPaymentsMorningWatchEnglish(parsePaymentsFromSaved(data.members_paid_morning_watch_english));
         setPaymentsMorningWatchLuganda(parsePaymentsFromSaved(data.members_paid_morning_watch_luganda));
-        
-        setMessage({
-          type: 'info',
-          text: 'Editing existing data for this week. Click Update to save changes.',
-        });
+        setMessage({ type: 'info', text: 'Editing existing data for this week.' });
       } else {
         setFormData({
-          sabbath_date: '',
-          total_attendance: 0,
-          member_visits: 0,
-          members_conducted_bible_studies: 0,
-          members_helped_others: 0,
-          members_studied_lesson: 0,
-          number_of_visitors: 0,
-          bible_study_guides_distributed: 0,
-          offering_global_mission: 0,
+          sabbath_date: '', total_attendance: 0, member_visits: 0,
+          members_conducted_bible_studies: 0, members_helped_others: 0,
+          members_studied_lesson: 0, number_of_visitors: 0,
+          bible_study_guides_distributed: 0, offering_global_mission: 0,
           members_summary: '',
         });
-        setPaymentsLessonEnglish({});
-        setPaymentsLessonLuganda({});
-        setPaymentsMorningWatchEnglish({});
-        setPaymentsMorningWatchLuganda({});
+        setPaymentsLessonEnglish({}); setPaymentsLessonLuganda({});
+        setPaymentsMorningWatchEnglish({}); setPaymentsMorningWatchLuganda({});
         setMessage({ type: '', text: '' });
       }
     } catch (error) {
@@ -617,329 +500,236 @@ const WeeklyDataEntry = () => {
     };
 
     const isActuallyOnline = navigator.onLine && !manualOffline;
-    
-    if (isDevelopment) {
-      console.log('=== SUBMIT DEBUG ===');
-      console.log('Is Actually Online:', isActuallyOnline);
-      console.log('Data to submit:', dataToSubmit);
-    }
 
     try {
       if (!isActuallyOnline) {
-        if (isDevelopment) console.log('🔴 OFFLINE MODE - Saving to IndexedDB...');
-        
         await offlineStorage.savePendingData({ data: dataToSubmit });
-        
-        if (isDevelopment) console.log('✅ Saved offline successfully');
-        
-        setMessage({ 
-          type: 'warning', 
-          text: '📴 You\'re offline! Data saved locally and will sync when you\'re back online.' 
-        });
-        
+        setMessage({ type: 'warning', text: '📴 Offline! Data saved locally and will sync later.' });
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        setTimeout(() => {
-          navigate('/secretary');
-        }, 3000);
-        
+        setTimeout(() => navigate('/secretary'), 3000);
         setLoading(false);
         return;
       }
 
-      if (isDevelopment) console.log('🟢 ONLINE MODE - Submitting to server...');
-
-      // Save weekly data
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
-        setMessage({ type: 'success', text: '✅ Data updated successfully! Redirecting...' });
+        setMessage({ type: 'success', text: '✅ Data updated successfully!' });
       } else {
         await weeklyDataService.submit(dataToSubmit);
-        setMessage({ type: 'success', text: '🎉 Data submitted successfully! Redirecting...' });
+        setMessage({ type: 'success', text: '🎉 Data submitted successfully!' });
       }
 
-      // Record payments to cumulative system
       const quarterId = localStorage.getItem('selectedQuarterId');
-      const paymentDate = formData.sabbath_date;
-      
-      // Record all payments
       const allPayments = [
-        ...Object.entries(paymentsLessonEnglish).map(([memberId, amount]) => ({
-          member_id: memberId,
-          payment_type: 'lesson_english',
-          amount
-        })),
-        ...Object.entries(paymentsLessonLuganda).map(([memberId, amount]) => ({
-          member_id: memberId,
-          payment_type: 'lesson_luganda',
-          amount
-        })),
-        ...Object.entries(paymentsMorningWatchEnglish).map(([memberId, amount]) => ({
-          member_id: memberId,
-          payment_type: 'morning_watch_english',
-          amount
-        })),
-        ...Object.entries(paymentsMorningWatchLuganda).map(([memberId, amount]) => ({
-          member_id: memberId,
-          payment_type: 'morning_watch_luganda',
-          amount
-        }))
+        ...Object.entries(paymentsLessonEnglish).map(([id, amount]) => ({ member_id: id, payment_type: 'lesson_english', amount })),
+        ...Object.entries(paymentsLessonLuganda).map(([id, amount]) => ({ member_id: id, payment_type: 'lesson_luganda', amount })),
+        ...Object.entries(paymentsMorningWatchEnglish).map(([id, amount]) => ({ member_id: id, payment_type: 'morning_watch_english', amount })),
+        ...Object.entries(paymentsMorningWatchLuganda).map(([id, amount]) => ({ member_id: id, payment_type: 'morning_watch_luganda', amount }))
       ].filter(p => p.amount > 0);
 
-      // Record each payment
       for (const payment of allPayments) {
-        try {
-          await paymentService.recordPayment({
-            ...payment,
-            quarter_id: quarterId,
-            week_number: parseInt(weekNumber),
-            payment_date: paymentDate
-          });
-        } catch (paymentError) {
-          console.error('Failed to record payment:', paymentError);
-        }
+        await paymentService.recordPayment({
+          ...payment, quarter_id: quarterId, week_number: parseInt(weekNumber), payment_date: formData.sabbath_date
+        });
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      setTimeout(() => {
-        navigate('/secretary');
-      }, 2000);
+      setTimeout(() => navigate('/secretary'), 2000);
     } catch (error) {
-      console.error('❌ Submit error:', error);
-      
-      try {
-        await offlineStorage.savePendingData({ data: dataToSubmit });
-        setMessage({ 
-          type: 'warning', 
-          text: '⚠️ Could not reach server. Data saved offline and will sync later.' 
-        });
-        
-        setTimeout(() => {
-          navigate('/secretary');
-        }, 3000);
-      } catch (offlineError) {
-        console.error('Offline save failed:', offlineError);
-        setMessage({
-          type: 'error',
-          text: 'Failed to save data. Please try again.'
-        });
-      }
-      
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      await offlineStorage.savePendingData({ data: dataToSubmit });
+      setMessage({ type: 'warning', text: '⚠️ Could not reach server. Data saved offline.' });
+      setTimeout(() => navigate('/secretary'), 3000);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {/* Success Toast */}
+    <div className="max-w-6xl mx-auto p-4">
+      {/* Toast and Offline Banner */}
       {showSuccessToast && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className="bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-2">
-            <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">{message.text}</span>
-          </div>
+        <div className="fixed top-4 right-4 z-50 animate-slide-in bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-2">
+          <CheckCircle className="h-5 w-5" />
+          <span className="font-medium">{message.text}</span>
         </div>
       )}
 
-      {/* Persistent Offline Banner */}
       {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 bg-orange-600 text-white py-2 px-4 text-center text-sm font-medium z-40 shadow-lg">
+        <div className="fixed top-0 left-0 right-0 bg-orange-600 text-white py-2 px-4 text-center text-sm font-medium z-40">
           <div className="flex items-center justify-center space-x-2">
             <WifiOff className="h-4 w-4" />
-            <span>You're offline - Data will be saved locally and synced when you're back online</span>
+            <span>You're offline - Data will sync when you're back online</span>
           </div>
         </div>
       )}
 
       <div className={`flex items-center justify-between mb-8 ${!isOnline ? 'mt-12' : ''}`}>
         <h1 className="text-3xl font-bold text-gray-900">Weekly Data Entry</h1>
-        
-        {/* Enhanced Status Controls */}
         <div className="flex items-center space-x-3">
-          {/* Sync Pending Members Button */}
           {pendingMembersCount > 0 && (
-            <button
-              type="button"
-              onClick={() => syncPendingMembers(false)}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center space-x-2 disabled:opacity-50 shadow-md hover:shadow-lg transition"
-            >
+            <button onClick={() => syncPendingMembers(false)} className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center space-x-2 shadow-md">
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Sync {pendingMembersCount} Member{pendingMembersCount > 1 ? 's' : ''}</span>
+              <span>Sync {pendingMembersCount} Members</span>
             </button>
           )}
-
-          {/* Manual Offline Toggle - Only in Development */}
-          {isDevelopment && (
-            <button
-              type="button"
-              onClick={() => setManualOffline(!manualOffline)}
-              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all text-sm ${
-                manualOffline 
-                  ? 'bg-orange-100 border-orange-500 text-orange-800 hover:bg-orange-200' 
-                  : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {manualOffline ? '🔴 Test Offline' : '🟢 Test Online'}
-            </button>
-          )}
-
-          {/* Status Indicator */}
-          <div className={`px-4 py-2 rounded-lg border-2 ${
-            isOnline && !manualOffline 
-              ? 'bg-green-100 border-green-500 text-green-800' 
-              : 'bg-orange-100 border-orange-500 text-orange-800'
-          }`}>
+          <div className={`px-4 py-2 rounded-lg border-2 ${isOnline && !manualOffline ? 'bg-green-100 border-green-500 text-green-800' : 'bg-orange-100 border-orange-500 text-orange-800'}`}>
             {isOnline && !manualOffline ? 'Online' : 'Offline'}
           </div>
         </div>
       </div>
 
       {message.text && !showSuccessToast && (
-        <div
-          className={`mb-6 p-4 rounded-lg flex items-start animate-fade-in ${
-            message.type === 'success'
-              ? 'bg-green-50 border border-green-200'
-              : message.type === 'error'
-              ? 'bg-red-50 border border-red-200'
-              : message.type === 'warning'
-              ? 'bg-orange-50 border border-orange-200'
-              : 'bg-blue-50 border border-blue-200'
-          }`}
-        >
-          {message.type === 'success' ? (
-            <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
-          ) : message.type === 'warning' ? (
-            <WifiOff className="h-5 w-5 text-orange-600 mr-2 mt-0.5" />
-          ) : (
-            <AlertCircle
-              className={`h-5 w-5 mr-2 mt-0.5 ${
-                message.type === 'error' ? 'text-red-600' : 'text-blue-600'
-              }`}
-            />
-          )}
-          <p
-            className={`text-sm font-medium ${
-              message.type === 'success'
-                ? 'text-green-800'
-                : message.type === 'error'
-                ? 'text-red-800'
-                : message.type === 'warning'
-                ? 'text-orange-800'
-                : 'text-blue-800'
-            }`}
-          >
-            {message.text}
-          </p>
+        <div className={`mb-6 p-4 rounded-lg flex items-center space-x-3 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+          {message.type === 'error' ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
+          <p>{message.text}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Class and Week Selection */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Class Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Select Class</label>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
-                required
-              >
-                <option value="">Choose a class</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.class_name} - {cls.teacher_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Week Number</label>
-              <select
-                value={weekNumber}
-                onChange={(e) => setWeekNumber(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white"
-                required
-              >
-                {[...Array(13)].map((_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    Week {i + 1}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Sabbath Date</label>
-              <input
-                type="date"
-                name="sabbath_date"
-                value={formData.sabbath_date}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
-                required
-              />
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Class</label>
+            <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required>
+              {classes.map((c) => (<option key={c.id} value={c.id}>{c.class_name}</option>))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Week Number</label>
+            <input type="number" min="1" max="13" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Sabbath Date</label>
+            <input type="date" name="sabbath_date" value={formData.sabbath_date} onChange={handleChange} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required />
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div className="flex justify-end space-x-4">
-          <button 
-            type="button" 
-            onClick={() => navigate('/secretary')} 
-            className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
-          >
-            Cancel
+        {/* Member Management Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center space-x-2">
+              <Users className="h-6 w-6 text-indigo-600" />
+              <h2 className="text-xl font-bold text-gray-800">Class Members</h2>
+            </div>
+            <button type="button" onClick={() => { setEditingMember(null); setNewMemberName(''); setShowMemberModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center space-x-2 hover:bg-indigo-700 transition">
+              <Plus className="h-4 w-4" />
+              <span>Add Member</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {members.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 group">
+                <span className="font-medium text-gray-700">{member.member_name}</span>
+                <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button type="button" onClick={() => handleEditMember(member)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md"><Edit2 className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => handleDeleteMember(member.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Lesson & Morning Watch Payment Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {[
+            { title: 'Lesson Study Guides', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
+            { title: 'Morning Watch', eng: paymentsMorningWatchEnglish, lug: paymentsMorningWatchLuganda, setEng: setPaymentsMorningWatchEnglish, setLug: setPaymentsMorningWatchLuganda, typeEng: 'morning_watch_english', typeLug: 'morning_watch_luganda' }
+          ].map((section, idx) => (
+            <div key={idx} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-indigo-900">{section.title}</h2>
+                <DollarSign className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div className="p-6 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 border-b">
+                      <th className="text-left py-2 font-semibold">Member</th>
+                      <th className="text-right py-2 font-semibold">English</th>
+                      <th className="text-right py-2 font-semibold">Luganda</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {members.map(m => (
+                      <tr key={m.id}>
+                        <td className="py-3">
+                          <div className="font-medium text-gray-800">{m.member_name}</div>
+                          <div className="text-xs text-gray-400">Total: {getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)}</div>
+                        </td>
+                        <td className="py-3"><input type="number" step="100" value={section.eng[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" /></td>
+                        <td className="py-3"><input type="number" step="100" value={section.lug[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50 font-bold">
+                      <td className="py-2 px-2 text-indigo-700">Subtotals</td>
+                      <td className="py-2 text-right px-2 text-indigo-700">{calculateTotal(section.eng).toLocaleString()}</td>
+                      <td className="py-2 text-right px-2 text-indigo-700">{calculateTotal(section.lug).toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Statistical Data Grid */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center space-x-2 mb-6"><TrendingUp className="h-6 w-6 text-indigo-600" /><h2 className="text-xl font-bold text-gray-800">Weekly Statistics</h2></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { label: 'Attendance', name: 'total_attendance' },
+              { label: 'Member Visits', name: 'member_visits' },
+              { label: 'Bible Studies', name: 'members_conducted_bible_studies' },
+              { label: 'Helped Others', name: 'members_helped_others' },
+              { label: 'Studied Lesson', name: 'members_studied_lesson' },
+              { label: 'Visitors', name: 'number_of_visitors' },
+              { label: 'Guides Shared', name: 'bible_study_guides_distributed' },
+              { label: 'Global Mission', name: 'offering_global_mission' }
+            ].map(stat => (
+              <div key={stat.name}>
+                <label className="block text-sm font-medium text-gray-600 mb-1">{stat.label}</label>
+                <input type="number" name={stat.name} value={formData[stat.name]} onChange={handleChange} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500" min="0" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary Notes */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <label className="block text-sm font-bold text-gray-700 mb-2">Weekly Summary / Testimony</label>
+          <textarea name="members_summary" value={formData.members_summary} onChange={handleChange} rows="3" className="w-full rounded-xl border-gray-300 focus:ring-indigo-500" placeholder="Enter any notes, testimonies, or special events for the week..."></textarea>
+        </div>
+
+        {/* Submit Section */}
+        <div className="flex flex-col md:flex-row items-center gap-4 py-8">
+          <button type="submit" disabled={loading} className="w-full md:w-auto px-12 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 shadow-xl">
+            {loading ? <RefreshCw className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+            <span>{formData.id ? 'Update Weekly Data' : 'Submit Weekly Data'}</span>
           </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            <Save className="h-5 w-5" />
-            <span>{loading ? 'Saving...' : formData.id ? 'Update Data' : 'Submit Data'}</span>
-          </button>
+          <button type="button" onClick={() => navigate('/secretary')} className="w-full md:w-auto px-8 py-4 bg-white text-gray-700 border-2 border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition">Cancel</button>
         </div>
       </form>
 
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease-out;
-        }
-
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(100%);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        
-        .animate-slide-in {
-          animation: slideIn 0.3s ease-out;
-        }
-      `}</style>
+      {/* Member Modal */}
+      {showMemberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-indigo-600 flex justify-between items-center text-white">
+              <h3 className="text-xl font-bold">{editingMember ? 'Edit Member' : 'Add New Member'}</h3>
+              <button onClick={() => setShowMemberModal(false)}><X className="h-6 w-6" /></button>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Member Name</label>
+              <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} className="w-full rounded-xl border-gray-300 focus:ring-indigo-500 mb-6 text-lg py-3" placeholder="Enter full name" autoFocus />
+              <div className="flex space-x-3">
+                <button type="button" onClick={handleAddMember} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Save Member</button>
+                <button type="button" onClick={() => setShowMemberModal(false)} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
