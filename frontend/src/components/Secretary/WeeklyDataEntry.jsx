@@ -19,7 +19,7 @@ const WeeklyDataEntry = () => {
   const [manualOffline, setManualOffline] = useState(false);
   const [pendingMembersCount, setPendingMembersCount] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-
+  
   // Members management state
   const [members, setMembers] = useState([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
@@ -56,9 +56,9 @@ const WeeklyDataEntry = () => {
     const handleQuarterChange = () => {
       loadClasses();
     };
-
+    
     window.addEventListener('quarterChanged', handleQuarterChange);
-
+    
     return () => {
       window.removeEventListener('quarterChanged', handleQuarterChange);
     };
@@ -75,12 +75,12 @@ const WeeklyDataEntry = () => {
       const actualStatus = navigator.onLine;
       const wasOffline = !isOnline;
       const nowOnline = actualStatus && !manualOffline;
-
+      
       if (isDevelopment) {
         console.log('Browser reports online:', actualStatus);
         console.log('Manual offline mode:', manualOffline);
       }
-
+      
       setIsOnline(nowOnline);
 
       if (wasOffline && nowOnline) {
@@ -94,7 +94,7 @@ const WeeklyDataEntry = () => {
       if (isDevelopment) console.log('🟢 ONLINE event fired');
       updateOnlineStatus();
     };
-
+    
     const handleOffline = () => {
       if (isDevelopment) console.log('🔴 OFFLINE event fired');
       updateOnlineStatus();
@@ -137,14 +137,14 @@ const WeeklyDataEntry = () => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       const pendingData = await offlineStorage.getPendingCount();
-
+      
       if (localMembers.length > 0 || pendingData > 0) {
         if (isDevelopment) console.log('🔄 Auto-syncing pending data...');
-
+        
         if (localMembers.length > 0) {
           await syncPendingMembers(true);
         }
-
+        
         showToast('✅ Data synced successfully!');
       }
     } catch (error) {
@@ -164,34 +164,34 @@ const WeeklyDataEntry = () => {
   const loadClasses = async () => {
     try {
       const quarterId = localStorage.getItem('selectedQuarterId');
-
+      
       if (!quarterId) {
         setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar' });
         setClasses([]);
         return;
       }
-
+      
       if (isDevelopment) console.log('Loading classes for quarter:', quarterId);
       const response = await api.get(`/classes?quarter_id=${quarterId}`);
-
+      
       const classesData = response.data?.data || response.data || [];
-
+      
       if (Array.isArray(classesData)) {
         setClasses(classesData);
         if (classesData.length > 0) {
           setSelectedClass(classesData[0].id);
         } else {
-          setMessage({
-            type: 'error',
-            text: 'No classes available for this quarter. Please create classes first.'
+          setMessage({ 
+            type: 'error', 
+            text: 'No classes available for this quarter. Please create classes first.' 
           });
         }
       } else {
         console.error('Classes data is not an array:', classesData);
         setClasses([]);
-        setMessage({
-          type: 'error',
-          text: 'Invalid data format received for classes.'
+        setMessage({ 
+          type: 'error', 
+          text: 'Invalid data format received for classes.' 
         });
       }
     } catch (error) {
@@ -205,9 +205,9 @@ const WeeklyDataEntry = () => {
     try {
       if (isDevelopment) console.log('Loading members for class:', selectedClass);
       const response = await classMemberService.getByClass(selectedClass);
-
+      
       const membersData = Array.isArray(response) ? response : (response.data || []);
-
+      
       if (Array.isArray(membersData)) {
         setMembers(membersData);
       } else {
@@ -224,14 +224,14 @@ const WeeklyDataEntry = () => {
     try {
       setLoadingTotals(true);
       const quarterId = localStorage.getItem('selectedQuarterId');
-
+      
       if (!quarterId || !selectedClass) {
         setPaymentTotals({});
         return;
       }
 
       const response = await paymentService.getClassPaymentTotals(selectedClass, quarterId);
-
+      
       // Convert array to object keyed by member_id for easy lookup
       const totalsMap = {};
       if (response.data && Array.isArray(response.data)) {
@@ -239,7 +239,7 @@ const WeeklyDataEntry = () => {
           totalsMap[memberData.id] = memberData.totals;
         });
       }
-
+      
       setPaymentTotals(totalsMap);
     } catch (error) {
       console.error('Failed to load payment totals:', error);
@@ -252,14 +252,14 @@ const WeeklyDataEntry = () => {
   const loadMembersWithLocal = async () => {
     try {
       await loadMembers();
-
+      
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data.class_id === selectedClass);
-
+      
       if (pendingAdds.length > 0) {
         const tempMembers = pendingAdds.map(item => item.data);
         setMembers(prev => [...prev, ...tempMembers]);
-
+        
         if (isDevelopment) console.log('Loaded pending local members:', tempMembers);
       }
     } catch (error) {
@@ -284,7 +284,7 @@ const WeeklyDataEntry = () => {
 
     if (!isActuallyOnline) {
       if (isDevelopment) console.log('🔴 OFFLINE MODE - Adding member locally');
-
+      
       try {
         const tempId = `temp-${Date.now()}`;
         const newMember = {
@@ -306,14 +306,14 @@ const WeeklyDataEntry = () => {
           timestamp: Date.now()
         });
         localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-
+        
         if (isDevelopment) console.log('✅ Saved to localStorage');
-
+        
         checkPendingMembers();
 
-        setMessage({
-          type: 'warning',
-          text: '📴 Offline: Member added locally. Will sync when online.'
+        setMessage({ 
+          type: 'warning', 
+          text: '📴 Offline: Member added locally. Will sync when online.' 
         });
 
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -321,16 +321,16 @@ const WeeklyDataEntry = () => {
 
       } catch (offlineError) {
         console.error('❌ OFFLINE SAVE ERROR:', offlineError);
-        setMessage({
-          type: 'error',
-          text: `Offline save failed: ${offlineError.message}`
+        setMessage({ 
+          type: 'error', 
+          text: `Offline save failed: ${offlineError.message}` 
         });
         return;
       }
     }
 
     if (isDevelopment) console.log('🟢 ONLINE MODE - Saving to server');
-
+    
     try {
       if (editingMember) {
         await classMemberService.update(editingMember.id, {
@@ -344,20 +344,20 @@ const WeeklyDataEntry = () => {
         });
         setMessage({ type: 'success', text: 'Member added successfully!' });
       }
-
+      
       setNewMemberName('');
       setEditingMember(null);
       setShowMemberModal(false);
       loadMembers();
-
+      
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       console.error('❌ ONLINE SAVE ERROR:', error);
-
-      const errorMessage = error.response?.data?.message
+      
+      const errorMessage = error.response?.data?.message 
         || error.response?.data?.error
         || `Failed to save member: ${error.message}`;
-
+      
       setMessage({ type: 'error', text: errorMessage });
     }
   };
@@ -381,7 +381,7 @@ const WeeklyDataEntry = () => {
 
     if (!isActuallyOnline) {
       if (isDevelopment) console.log('🔴 OFFLINE MODE - Removing member locally');
-
+      
       try {
         setMembers(members.filter(m => m.id !== memberId));
 
@@ -392,14 +392,14 @@ const WeeklyDataEntry = () => {
           timestamp: Date.now()
         });
         localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-
+        
         if (isDevelopment) console.log('✅ Saved delete to localStorage');
-
+        
         checkPendingMembers();
 
-        setMessage({
-          type: 'warning',
-          text: '📴 Offline: Member removed locally. Will sync when online.'
+        setMessage({ 
+          type: 'warning', 
+          text: '📴 Offline: Member removed locally. Will sync when online.' 
         });
 
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -407,16 +407,16 @@ const WeeklyDataEntry = () => {
 
       } catch (offlineError) {
         console.error('❌ OFFLINE DELETE ERROR:', offlineError);
-        setMessage({
-          type: 'error',
-          text: `Offline delete failed: ${offlineError.message}`
+        setMessage({ 
+          type: 'error', 
+          text: `Offline delete failed: ${offlineError.message}` 
         });
         return;
       }
     }
 
     if (isDevelopment) console.log('🟢 ONLINE MODE - Deleting from server');
-
+    
     try {
       await classMemberService.delete(memberId);
       setMessage({ type: 'success', text: 'Member removed successfully!' });
@@ -432,7 +432,7 @@ const WeeklyDataEntry = () => {
   const syncPendingMembers = async (isAutoSync = false) => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-
+      
       if (localMembers.length === 0) {
         if (!isAutoSync) {
           setMessage({ type: 'info', text: 'No pending members to sync.' });
@@ -473,17 +473,17 @@ const WeeklyDataEntry = () => {
 
       localStorage.removeItem('pendingMembers');
       checkPendingMembers();
-
+      
       await loadMembers();
-
+      
       if (!isAutoSync) {
-        setMessage({
-          type: 'success',
-          text: `✅ Synced ${syncedCount} member(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}!`
+        setMessage({ 
+          type: 'success', 
+          text: `✅ Synced ${syncedCount} member(s)${failedCount > 0 ? `, ${failedCount} failed` : ''}!` 
         });
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       }
-
+      
     } catch (error) {
       console.error('Sync error:', error);
       if (!isAutoSync) {
@@ -509,14 +509,14 @@ const WeeklyDataEntry = () => {
   const getCumulativeTotal = (memberId, paymentType) => {
     const memberTotals = paymentTotals[memberId];
     if (!memberTotals) return 0;
-
+    
     const typeMap = {
       'lesson_english': 'lesson_english',
       'lesson_luganda': 'lesson_luganda',
       'morning_watch_english': 'morning_watch_english',
       'morning_watch_luganda': 'morning_watch_luganda'
     };
-
+    
     return memberTotals[typeMap[paymentType]] || 0;
   };
 
@@ -524,7 +524,7 @@ const WeeklyDataEntry = () => {
     if (!payments || Object.keys(payments).length === 0) {
       return '';
     }
-
+    
     const entries = Object.entries(payments)
       .filter(([id, amount]) => amount && amount > 0)
       .map(([id, amount]) => {
@@ -532,16 +532,16 @@ const WeeklyDataEntry = () => {
         return member ? `${member.member_name}: ${amount}` : null;
       })
       .filter(Boolean);
-
+    
     return entries.length > 0 ? entries.join(', ') : '';
   };
 
   const parsePaymentsFromSaved = (paymentString) => {
     if (!paymentString || paymentString.trim() === '') return {};
-
+    
     const payments = {};
     const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-
+    
     entries.forEach(entry => {
       const [name, amount] = entry.split(':').map(s => s.trim());
       const member = members.find(m => m.member_name === name);
@@ -549,7 +549,7 @@ const WeeklyDataEntry = () => {
         payments[member.id] = parseFloat(amount);
       }
     });
-
+    
     return payments;
   };
 
@@ -559,12 +559,12 @@ const WeeklyDataEntry = () => {
       if (response.data) {
         const data = response.data;
         setFormData(data);
-
+        
         setPaymentsLessonEnglish(parsePaymentsFromSaved(data.members_paid_lesson_english));
         setPaymentsLessonLuganda(parsePaymentsFromSaved(data.members_paid_lesson_luganda));
         setPaymentsMorningWatchEnglish(parsePaymentsFromSaved(data.members_paid_morning_watch_english));
         setPaymentsMorningWatchLuganda(parsePaymentsFromSaved(data.members_paid_morning_watch_luganda));
-
+        
         setMessage({
           type: 'info',
           text: 'Editing existing data for this week. Click Update to save changes.',
@@ -601,38 +601,11 @@ const WeeklyDataEntry = () => {
     }));
   };
 
-  const resetForm = () => {
-    setFormData({
-      sabbath_date: '',
-      total_attendance: 0,
-      member_visits: 0,
-      members_conducted_bible_studies: 0,
-      members_helped_others: 0,
-      members_studied_lesson: 0,
-      number_of_visitors: 0,
-      bible_study_guides_distributed: 0,
-      offering_global_mission: 0,
-      members_summary: '',
-    });
-    setPaymentsLessonEnglish({});
-    setPaymentsLessonLuganda({});
-    setPaymentsMorningWatchEnglish({});
-    setPaymentsMorningWatchLuganda({});
-  };
-
-  // Add this helper to show after successful save
-  const clearFormAfterSave = () => {
-    resetForm();
-    setMessage({
-      type: 'success',
-      text: '✅ Ready to enter data for another week!'
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: '', text: '' });
+
     const dataToSubmit = {
       class_id: selectedClass,
       week_number: parseInt(weekNumber),
@@ -642,39 +615,53 @@ const WeeklyDataEntry = () => {
       members_paid_morning_watch_english: formatPaymentsForSave(paymentsMorningWatchEnglish),
       members_paid_morning_watch_luganda: formatPaymentsForSave(paymentsMorningWatchLuganda),
     };
+
     const isActuallyOnline = navigator.onLine && !manualOffline;
+    
     if (isDevelopment) {
       console.log('=== SUBMIT DEBUG ===');
       console.log('Is Actually Online:', isActuallyOnline);
       console.log('Data to submit:', dataToSubmit);
     }
+
     try {
       if (!isActuallyOnline) {
         if (isDevelopment) console.log('🔴 OFFLINE MODE - Saving to IndexedDB...');
+        
         await offlineStorage.savePendingData({ data: dataToSubmit });
+        
         if (isDevelopment) console.log('✅ Saved offline successfully');
-        setMessage({
-          type: 'warning',
-          text: '📴 You\'re offline! Data saved locally and will sync when you\'re back online.'
+        
+        setMessage({ 
+          type: 'warning', 
+          text: '📴 You\'re offline! Data saved locally and will sync when you\'re back online.' 
         });
+        
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        setTimeout(() => {
+          navigate('/secretary');
+        }, 3000);
+        
         setLoading(false);
         return;
       }
+
       if (isDevelopment) console.log('🟢 ONLINE MODE - Submitting to server...');
+
       // Save weekly data
-      let savedData;
       if (formData.id) {
-        savedData = await weeklyDataService.update(formData.id, dataToSubmit);
-        showToast('✅ Data updated successfully!');
+        await weeklyDataService.update(formData.id, dataToSubmit);
+        setMessage({ type: 'success', text: '✅ Data updated successfully! Redirecting...' });
       } else {
-        savedData = await weeklyDataService.submit(dataToSubmit);
-        showToast('🎉 Data submitted successfully!');
+        await weeklyDataService.submit(dataToSubmit);
+        setMessage({ type: 'success', text: '🎉 Data submitted successfully! Redirecting...' });
       }
+
       // Record payments to cumulative system
       const quarterId = localStorage.getItem('selectedQuarterId');
       const paymentDate = formData.sabbath_date;
-
+      
       // Record all payments
       const allPayments = [
         ...Object.entries(paymentsLessonEnglish).map(([memberId, amount]) => ({
@@ -698,6 +685,7 @@ const WeeklyDataEntry = () => {
           amount
         }))
       ].filter(p => p.amount > 0);
+
       // Record each payment
       for (const payment of allPayments) {
         try {
@@ -711,21 +699,25 @@ const WeeklyDataEntry = () => {
           console.error('Failed to record payment:', paymentError);
         }
       }
-      // Update formData with the saved data ID if it's a new entry
-      if (savedData && savedData.data && !formData.id) {
-        setFormData(prev => ({ ...prev, id: savedData.data.id }));
-      }
-      // Reload payment totals to show updated cumulative amounts
-      await loadPaymentTotals();
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      setTimeout(() => {
+        navigate('/secretary');
+      }, 2000);
     } catch (error) {
       console.error('❌ Submit error:', error);
+      
       try {
         await offlineStorage.savePendingData({ data: dataToSubmit });
-        setMessage({
-          type: 'warning',
-          text: '⚠️ Could not reach server. Data saved offline and will sync later.'
+        setMessage({ 
+          type: 'warning', 
+          text: '⚠️ Could not reach server. Data saved offline and will sync later.' 
         });
+        
+        setTimeout(() => {
+          navigate('/secretary');
+        }, 3000);
       } catch (offlineError) {
         console.error('Offline save failed:', offlineError);
         setMessage({
@@ -733,6 +725,7 @@ const WeeklyDataEntry = () => {
           text: 'Failed to save data. Please try again.'
         });
       }
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
@@ -763,8 +756,10 @@ const WeeklyDataEntry = () => {
 
       <div className={`flex items-center justify-between mb-8 ${!isOnline ? 'mt-12' : ''}`}>
         <h1 className="text-3xl font-bold text-gray-900">Weekly Data Entry</h1>
-
+        
+        {/* Enhanced Status Controls */}
         <div className="flex items-center space-x-3">
+          {/* Sync Pending Members Button */}
           {pendingMembersCount > 0 && (
             <button
               type="button"
@@ -777,69 +772,34 @@ const WeeklyDataEntry = () => {
             </button>
           )}
 
+          {/* Manual Offline Toggle - Only in Development */}
           {isDevelopment && (
             <button
               type="button"
               onClick={() => setManualOffline(!manualOffline)}
-              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all text-sm ${manualOffline
-                ? 'bg-orange-100 border-orange-500 text-orange-800 hover:bg-orange-200'
-                : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all text-sm ${
+                manualOffline 
+                  ? 'bg-orange-100 border-orange-500 text-orange-800 hover:bg-orange-200' 
+                  : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
+              }`}
             >
               {manualOffline ? '🔴 Test Offline' : '🟢 Test Online'}
             </button>
           )}
 
-          <div className={`px-4 py-2 rounded-lg border-2 ${isOnline && !manualOffline
-            ? 'bg-green-50 border-green-500'
-            : 'bg-red-50 border-red-500'
-            }`}>
-            <div className="flex items-center space-x-2">
-              <div className={`h-2.5 w-2.5 rounded-full ${isOnline && !manualOffline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className={`text-sm font-bold ${isOnline && !manualOffline ? 'text-green-700' : 'text-red-700'}`}>
-                {isOnline && !manualOffline ? 'ONLINE' : 'OFFLINE'}
-              </span>
-            </div>
+          {/* Status Indicator */}
+          <div className={`px-4 py-2 rounded-lg border-2 ${
+            isOnline && !manualOffline 
+              ? 'bg-green-100 border-green-500 text-green-800' 
+              : 'bg-orange-100 border-orange-500 text-orange-800'
+          }`}>
+            {isOnline && !manualOffline ? 'Online' : 'Offline'}
           </div>
         </div>
       </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6 pb-20">
-        {/* Form fields would go here... (omitted for brevity based on your request) */}
-
-        {/* Submit Button Section */}
-        <div className="flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={() => navigate('/secretary')}
-            className="px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all"
-          >
-            Back to Dashboard
-          </button>
-
-          {formData.id && (
-            <button
-              type="button"
-              onClick={clearFormAfterSave}
-              className="px-4 py-2 border-2 border-blue-600 text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-all"
-            >
-              Clear Form
-            </button>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            <Save className="h-5 w-5" />
-            <span>{loading ? 'Saving...' : formData.id ? 'Update Data' : 'Submit Data'}</span>
-          </button>
-        </div>
-      </form>
+      {/* ... rest of your JSX form ... */}
     </div>
   );
 };
 
-export default WeeklyDataEntry;
-// Force update 2026-04-24
+export default WeeklyDataEntry;git 
