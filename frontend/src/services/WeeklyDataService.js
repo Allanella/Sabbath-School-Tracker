@@ -12,8 +12,41 @@ const weeklyDataService = {
   },
 
   getByWeek: async (classId, weekNumber) => {
-    const response = await api.get(`/weekly-data/class/${classId}/week/${weekNumber}`);
-    return response.data;
+    try {
+      // Try the direct endpoint first
+      const response = await api.get(`/weekly-data/class/${classId}/week/${weekNumber}`);
+      
+      // If we get data, return it
+      if (response.data) {
+        return response;
+      }
+      
+      // Otherwise, try fetching all class data and filter
+      const allDataResponse = await api.get(`/weekly-data/class/${classId}`);
+      
+      if (allDataResponse.data && Array.isArray(allDataResponse.data)) {
+        const weekData = allDataResponse.data.find(d => d.week_number === parseInt(weekNumber));
+        return { data: weekData || null };
+      }
+      
+      return { data: null };
+    } catch (error) {
+      console.error('Error fetching week data:', error);
+      
+      // Fallback: try getting all class data
+      try {
+        const allDataResponse = await api.get(`/weekly-data/class/${classId}`);
+        
+        if (allDataResponse.data && Array.isArray(allDataResponse.data)) {
+          const weekData = allDataResponse.data.find(d => d.week_number === parseInt(weekNumber));
+          return { data: weekData || null };
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+      
+      return { data: null };
+    }
   },
 
   update: async (id, data) => {
