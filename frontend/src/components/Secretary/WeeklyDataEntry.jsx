@@ -513,10 +513,8 @@ const WeeklyDataEntry = () => {
 
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
-        setMessage({ type: 'success', text: '✅ Data updated successfully!' });
       } else {
         await weeklyDataService.submit(dataToSubmit);
-        setMessage({ type: 'success', text: '🎉 Data submitted successfully!' });
       }
 
       const quarterId = localStorage.getItem('selectedQuarterId');
@@ -533,8 +531,15 @@ const WeeklyDataEntry = () => {
         });
       }
 
+      // Reload the data to show updated values
+      await checkExistingData();
+      await loadPaymentTotals();
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setTimeout(() => navigate('/secretary'), 2000);
+
+      // Show success message and stay on page
+      showToast(formData.id ? '✅ Data updated successfully!' : '🎉 Data submitted successfully!');
+
+      // Don't redirect - stay on the page for continued editing
     } catch (error) {
       console.error('❌ Submit error:', error);
       
@@ -549,7 +554,6 @@ const WeeklyDataEntry = () => {
       });
       
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      // Don't redirect on error - stay on page
     } finally {
       setLoading(false);
     }
