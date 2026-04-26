@@ -536,9 +536,20 @@ const WeeklyDataEntry = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setTimeout(() => navigate('/secretary'), 2000);
     } catch (error) {
-      await offlineStorage.savePendingData({ data: dataToSubmit });
-      setMessage({ type: 'warning', text: '⚠️ Could not reach server. Data saved offline.' });
-      setTimeout(() => navigate('/secretary'), 3000);
+      console.error('❌ Submit error:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          'Failed to save data';
+                          
+      setMessage({
+        type: 'error',
+        text: `❌ Error: ${errorMessage}. Please check your data and try again.`
+      });
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Don't redirect on error - stay on page
     } finally {
       setLoading(false);
     }
