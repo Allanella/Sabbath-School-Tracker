@@ -9,15 +9,18 @@ const searchMembers = async (req, res) => {
     if (!query || query.trim() === '') {
       return res.status(400).json({
         success: false,
-        message: 'Search query is required'
+        message: 'Search query is required',
       });
     }
 
-    const searchTerm = `%${query.trim()}%`;
+    // If query is just %, match all members (fetch all)
+    const trimmedQuery = query.trim();
+    const searchTerm = trimmedQuery === '%' ? '%' : `%${trimmedQuery}%`;
 
     const { data, error } = await supabase
       .from('class_members')
-      .select(`
+      .select(
+        `
         id,
         member_name,
         classes!inner (
@@ -29,7 +32,8 @@ const searchMembers = async (req, res) => {
             year
           )
         )
-      `)
+      `
+      )
       .ilike('member_name', searchTerm)
       .order('member_name');
 
@@ -39,14 +43,14 @@ const searchMembers = async (req, res) => {
     }
 
     // Transform the data to flatten the structure
-    const results = data.map(member => ({
+    const results = data.map((member) => ({
       member_id: member.id,
       member_name: member.member_name,
       class_id: member.classes.id,
       class_name: member.classes.class_name,
       teacher_name: member.classes.teacher_name,
       quarter_name: member.classes.quarters?.name || null,
-      quarter_year: member.classes.quarters?.year || null
+      quarter_year: member.classes.quarters?.year || null,
     }));
 
     console.log('Search results:', results.length, 'members found');
@@ -54,18 +58,18 @@ const searchMembers = async (req, res) => {
     res.json({
       success: true,
       data: results,
-      count: results.length
+      count: results.length,
     });
   } catch (error) {
     console.error('Member search error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to search members',
-      error: error.message
+      error: error.message,
     });
   }
 };
 
 module.exports = {
-  searchMembers
+  searchMembers,
 };
