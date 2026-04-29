@@ -54,15 +54,10 @@ const PaymentHistory = () => {
     try {
       setLoadingMembers(true);
 
-      // Try to get all members by searching with empty query first
-      let response = await api.get('/members/search?query=');
+      // Use wildcard pattern to get all members (%% matches any string in SQL LIKE)
+      let response = await api.get('/members/search?query=%');
 
-      // If that doesn't work, try with a space to get all members
-      if (!response.data.success || response.data.data.length === 0) {
-        response = await api.get('/members/search?query= ');
-      }
-
-      // If still no results, try with a common letter
+      // If that doesn't work, try with a common letter
       if (!response.data.success || response.data.data.length === 0) {
         response = await api.get('/members/search?query=a');
       }
