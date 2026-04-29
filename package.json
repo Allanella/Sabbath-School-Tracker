@@ -1,0 +1,53 @@
+{
+  "name": "sabbath-school-tracker",
+  "version": "1.0.0",
+  "description": "A modern Progressive Web App for tracking Sabbath School attendance, activities, and financial contributions for Seventh-day Adventist churches",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "npm run start:backend",
+    "start:backend": "cd backend && npm start",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:backend": "cd backend && echo 'No linting configured for backend'",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "npm run clean:frontend && npm run clean:backend",
+    "clean:frontend": "cd frontend && rm -rf node_modules dist",
+    "clean:backend": "cd backend && rm -rf node_modules",
+    "setup": "npm run install:all && npm run setup:env",
+    "setup:env": "cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env"
+  },
+  "keywords": [
+    "sabbath-school",
+    "sda-church",
+    "attendance-tracking",
+    "react",
+    "nodejs",
+    "supabase",
+    "pwa"
+  ],
+  "author": "Baliddawa Allan",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "8.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Allanella/sabbath-school-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Allanella/sabbath-school-tracker/issues"
+  },
+  "homepage": "https://github.com/Allanella/sabbath-school-tracker#readme"
+}

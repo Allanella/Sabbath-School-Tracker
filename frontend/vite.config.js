@@ -11,11 +11,17 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-        }
-      }
-    }
+        },
+      },
+    },
   },
   server: {
-    port: 5173
-  }
+    port: 5173,
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    css: true,
+  },
 });

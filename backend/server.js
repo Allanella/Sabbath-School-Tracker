@@ -4,6 +4,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const errorHandler = require('./src/middleware/errorHandler');
+const { staticCache, apiCache, conditionalRequest } = require('./src/middleware/cache');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -14,12 +15,12 @@ const authRoutes = require(path.join(ROUTES_PATH, 'auth.routes'));
 const userRoutes = require(path.join(ROUTES_PATH, 'user.routes'));
 const classRoutes = require(path.join(ROUTES_PATH, 'class.routes'));
 const quarterRoutes = require(path.join(ROUTES_PATH, 'quarter.routes'));
-// const quarterCopyRoutes = require(path.join(ROUTES_PATH, 'quarterCopy.routes'));
-const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weeklyData.routes'));
+// const quarterCopyRoutes = require(path.join(ROUTES_PATH, 'quarter-copy.routes'));
+const weeklyDataRoutes = require(path.join(ROUTES_PATH, 'weekly-data.routes'));
 const reportRoutes = require(path.join(ROUTES_PATH, 'report.routes'));
-const classMemberRoutes = require(path.join(ROUTES_PATH, 'classMemberRoutes'));
-const memberRoutes = require(path.join(ROUTES_PATH, 'memberRoutes'));
-const memberPaymentRoutes = require(path.join(ROUTES_PATH, 'memberPayment.routes'));
+const classMemberRoutes = require(path.join(ROUTES_PATH, 'class-member.routes'));
+const memberRoutes = require(path.join(ROUTES_PATH, 'member.routes'));
+const memberPaymentRoutes = require(path.join(ROUTES_PATH, 'member-payment.routes'));
 
 // -------------------- MIDDLEWARE --------------------
 const allowedOrigins = [
@@ -55,6 +56,10 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
+// -------------------- CACHING MIDDLEWARE --------------------
+app.use(staticCache()); // Cache static resources
+app.use(conditionalRequest()); // Add ETag support
+
 // -------------------- API ROUTES --------------------
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -62,7 +67,7 @@ app.use('/api/classes', classRoutes);
 app.use('/api/quarters', quarterRoutes);
 // app.use('/api/quarters', quarterCopyRoutes);  // Quarter copy endpoint
 app.use('/api/weekly-data', weeklyDataRoutes);
-app.use('/api/reports', reportRoutes);
+app.use('/api/reports', apiCache(600000), reportRoutes); // Cache reports for 10 minutes
 app.use('/api/class-members', classMemberRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/member-payments', memberPaymentRoutes);
@@ -89,33 +94,33 @@ app.post('/api/admin/migrate-payments', authenticate, async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Admin access required' 
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required',
       });
     }
 
     console.log('🚀 Starting payment migration via API...');
     console.log('👤 Requested by:', req.user.email);
-    
+
     // Ensure the filename matches your script: migratePaymentData.js
     const { migratePaymentData } = require('./src/scripts/migratePaymentData');
-    
+
     // Run migration
     await migratePaymentData();
-    
+
     console.log('✅ Migration completed successfully');
-    
-    res.json({ 
-      success: true, 
-      message: 'Payment migration completed successfully! Check Render logs for details.' 
+
+    res.json({
+      success: true,
+      message: 'Payment migration completed successfully! Check Render logs for details.',
     });
   } catch (error) {
     console.error('❌ Migration error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Migration failed', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message,
     });
   }
 });

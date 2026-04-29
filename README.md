@@ -30,18 +30,21 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 ## ✨ Features
 
 ### 👥 User Management
+
 - **Role-based access control** (Admin, Secretary, Viewer)
 - Secure authentication with JWT
 - User activation/deactivation
 - Password management
 
 ### 📅 Quarter & Class Management
+
 - Create and manage quarterly periods (Q1-Q4)
 - Set active quarters
 - Manage multiple Sabbath School classes
 - Assign teachers and secretaries to classes
 
 ### 📊 Weekly Data Entry
+
 - Track weekly attendance (13 weeks per quarter)
 - Record member visits and Bible studies
 - Monitor participation in lesson study
@@ -52,6 +55,7 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
   - Morning Watch payments
 
 ### 📈 Comprehensive Reports
+
 - **Weekly Reports**: Class-by-class breakdown for each Sabbath
 - **Quarterly Reports**: Complete 13-week summaries with charts
 - **Financial Reports**: Offering tracking and analysis
@@ -59,6 +63,7 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 - Printable PDF exports
 
 ### 🎨 Modern UI/UX
+
 - Beautiful, responsive design with Tailwind CSS
 - Mobile-first approach
 - Progressive Web App (PWA) - installable on any device
@@ -72,15 +77,19 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 <div align="center">
 
 ### Login Page
+
 ![Login](screenshots/login.png)
 
 ### Admin Dashboard
+
 ![Dashboard](screenshots/dashboard.png)
 
 ### Weekly Data Entry
+
 ![Data Entry](screenshots/data-entry.png)
 
 ### Reports
+
 ![Reports](screenshots/reports.png)
 
 </div>
@@ -90,6 +99,7 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 ## 🚀 Tech Stack
 
 ### Frontend
+
 - **React 18** - UI library
 - **React Router** - Navigation
 - **Tailwind CSS** - Styling
@@ -99,6 +109,7 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 - **PWA** - Progressive Web App capabilities
 
 ### Backend
+
 - **Node.js** - Runtime environment
 - **Express.js** - Web framework
 - **Supabase** - PostgreSQL database & authentication
@@ -106,6 +117,7 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 - **bcryptjs** - Password hashing
 
 ### DevOps
+
 - **Vercel** - Frontend hosting
 - **Render** - Backend hosting
 - **Supabase** - Database hosting
@@ -118,15 +130,18 @@ The Sabbath School Tracker is designed specifically for Seventh-day Adventist ch
 ### Prerequisites
 
 Before you begin, ensure you have:
+
 - **Node.js** (v18 or higher) - [Download](https://nodejs.org/)
 - **npm** or **yarn**
 - **Git** - [Download](https://git-scm.com/)
 - **Supabase account** (free) - [Sign up](https://supabase.com/)
 
 ### 1️⃣ Clone the Repository
+
 ```bash
 git clone https://github.com/yourusername/sabbath-school-tracker.git
 cd sabbath-school-tracker
+npm run setup
 ```
 
 ### 2️⃣ Setup Database (Supabase)
@@ -139,6 +154,7 @@ cd sabbath-school-tracker
    - service_role key
 
 ### 3️⃣ Setup Backend
+
 ```bash
 cd backend
 npm install
@@ -148,6 +164,7 @@ cp .env.example .env
 ```
 
 Edit `backend/.env` with your credentials:
+
 ```env
 PORT=5000
 NODE_ENV=development
@@ -164,6 +181,7 @@ FRONTEND_URL=http://localhost:5173
 ```
 
 ### 4️⃣ Setup Frontend
+
 ```bash
 cd ../frontend
 npm install
@@ -173,6 +191,7 @@ cp .env.example .env
 ```
 
 Edit `frontend/.env`:
+
 ```env
 VITE_API_URL=http://localhost:5000/api
 VITE_APP_NAME=Sabbath School Tracker
@@ -184,6 +203,7 @@ VITE_CHURCH_NAME=Your Church Name
 Generate password hash at [bcrypt-generator.com](https://bcrypt-generator.com/) (rounds: 10)
 
 Then run in Supabase SQL Editor:
+
 ```sql
 INSERT INTO users (email, password_hash, full_name, role, is_active)
 VALUES (
@@ -197,13 +217,29 @@ VALUES (
 
 ### 6️⃣ Run the Application
 
+**Option 1 - Using root scripts (Recommended):**
+
+```bash
+# Run both frontend and backend
+npm run dev
+
+# Run tests
+npm run test
+
+# Build for production
+npm run build
+```
+
+**Option 2 - Manual:**
 **Terminal 1 - Backend:**
+
 ```bash
 cd backend
 npm run dev
 ```
 
 **Terminal 2 - Frontend:**
+
 ```bash
 cd frontend
 npm run dev
@@ -212,8 +248,29 @@ npm run dev
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 **Default Login:**
+
 - Email: `admin@yourchurch.org`
 - Password: The password you used for hashing
+
+### 7️⃣ Testing
+
+**Frontend Tests:**
+
+```bash
+cd frontend
+npm run test              # Run unit tests
+npm run test:coverage     # Run with coverage
+npm run test:e2e          # Run E2E tests with Cypress
+```
+
+**Backend Tests:**
+
+```bash
+cd backend
+npm run test              # Run unit tests
+npm run test:coverage     # Run with coverage
+npm run test:watch        # Run in watch mode
+```
 
 ---
 
@@ -256,6 +313,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ---
 
 ## 📊 Database Schema
+
 ```
 users
 ├── id (UUID)
@@ -302,6 +360,7 @@ weekly_data
 ### Deploy to Production
 
 1. **Frontend (Vercel)**
+
 ```bash
    cd frontend
    vercel --prod
@@ -342,6 +401,7 @@ Contributions are welcome! Please follow these steps:
 ## 🐛 Bug Reports
 
 Found a bug? Please open an issue with:
+
 - Description of the bug
 - Steps to reproduce
 - Expected behavior
