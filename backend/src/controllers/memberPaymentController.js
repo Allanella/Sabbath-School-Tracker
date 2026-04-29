@@ -4,7 +4,7 @@ const supabase = require('../config/database');
 const recordPayment = async (req, res) => {
   try {
     const paymentData = req.body;
-    
+
     const { data, error } = await supabase
       .from('member_payment_history')
       .insert(paymentData)
@@ -16,14 +16,14 @@ const recordPayment = async (req, res) => {
     res.json({
       success: true,
       data,
-      message: 'Payment recorded successfully'
+      message: 'Payment recorded successfully',
     });
   } catch (error) {
     console.error('Error recording payment:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to record payment',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -36,11 +36,13 @@ const getMemberPaymentHistory = async (req, res) => {
 
     let query = supabase
       .from('member_payment_history')
-      .select(`
+      .select(
+        `
         *,
         class_members!inner(member_name, class_id),
         quarters(name, year)
-      `)
+      `
+      )
       .eq('member_id', memberId)
       .order('payment_date', { ascending: false });
 
@@ -55,14 +57,14 @@ const getMemberPaymentHistory = async (req, res) => {
     res.json({
       success: true,
       data: data || [],
-      count: data?.length || 0
+      count: data?.length || 0,
     });
   } catch (error) {
     console.error('Error fetching payment history:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch payment history',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -76,7 +78,9 @@ const getMemberTotals = async (req, res) => {
     let query = supabase
       .from('member_payment_totals')
       .select('*')
-      .eq('member_id', memberId);
+      .eq('member_id', memberId)
+      .order('created_at', { ascending: false })
+      .limit(1); // Get the most recent record
 
     if (quarter_id) {
       query = query.eq('quarter_id', quarter_id);
@@ -86,17 +90,20 @@ const getMemberTotals = async (req, res) => {
 
     if (error) throw error;
 
+    // Return single object instead of array
+    const totalsData = data && data.length > 0 ? data[0] : null;
+
     res.json({
       success: true,
-      data: data || [],
-      count: data?.length || 0
+      data: totalsData,
+      count: totalsData ? 1 : 0,
     });
   } catch (error) {
     console.error('Error fetching member totals:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch member totals',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -109,10 +116,12 @@ const getQuarterPayments = async (req, res) => {
 
     let query = supabase
       .from('member_payment_history')
-      .select(`
+      .select(
+        `
         *,
         class_members!inner(member_name, class_id)
-      `)
+      `
+      )
       .eq('quarter_id', quarterId)
       .order('week_number', { ascending: true });
 
@@ -127,14 +136,14 @@ const getQuarterPayments = async (req, res) => {
     res.json({
       success: true,
       data: data || [],
-      count: data?.length || 0
+      count: data?.length || 0,
     });
   } catch (error) {
     console.error('Error fetching quarter payments:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch quarter payments',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -148,7 +157,7 @@ const getClassPaymentTotals = async (req, res) => {
     if (!quarter_id) {
       return res.status(400).json({
         success: false,
-        message: 'quarter_id is required'
+        message: 'quarter_id is required',
       });
     }
 
@@ -161,8 +170,8 @@ const getClassPaymentTotals = async (req, res) => {
     if (membersError) throw membersError;
 
     // Get payment totals for these members
-    const memberIds = members.map(m => m.id);
-    
+    const memberIds = members.map((m) => m.id);
+
     const { data: totals, error: totalsError } = await supabase
       .from('member_payment_totals')
       .select('*')
@@ -172,47 +181,49 @@ const getClassPaymentTotals = async (req, res) => {
     if (totalsError) throw totalsError;
 
     // Map totals to members with correct field names
-    const result = members.map(member => {
-      const memberTotal = totals.find(t => t.member_id === member.id);
+    const result = members.map((member) => {
+      const memberTotal = totals.find((t) => t.member_id === member.id);
       return {
         ...member,
-        totals: memberTotal ? {
-          lesson_english: memberTotal.quarter_lesson_english_total || 0,
-          lesson_luganda: memberTotal.quarter_lesson_luganda_total || 0,
-          morning_watch_english: memberTotal.quarter_morning_watch_english_total || 0,
-          morning_watch_luganda: memberTotal.quarter_morning_watch_luganda_total || 0,
-          offering: memberTotal.quarter_offering_total || 0,
-          adult_lesson_english: memberTotal.quarter_adult_lesson_english_total || 0,
-          adult_lesson_luganda: memberTotal.quarter_adult_lesson_luganda_total || 0,
-          quarter_grand_total: memberTotal.quarter_grand_total || 0,
-          year_grand_total: memberTotal.year_grand_total || 0,
-          weeks_paid: memberTotal.weeks_paid || 0
-        } : {
-          lesson_english: 0,
-          lesson_luganda: 0,
-          morning_watch_english: 0,
-          morning_watch_luganda: 0,
-          offering: 0,
-          adult_lesson_english: 0,
-          adult_lesson_luganda: 0,
-          quarter_grand_total: 0,
-          year_grand_total: 0,
-          weeks_paid: 0
-        }
+        totals: memberTotal
+          ? {
+              lesson_english: memberTotal.quarter_lesson_english_total || 0,
+              lesson_luganda: memberTotal.quarter_lesson_luganda_total || 0,
+              morning_watch_english: memberTotal.quarter_morning_watch_english_total || 0,
+              morning_watch_luganda: memberTotal.quarter_morning_watch_luganda_total || 0,
+              offering: memberTotal.quarter_offering_total || 0,
+              adult_lesson_english: memberTotal.quarter_adult_lesson_english_total || 0,
+              adult_lesson_luganda: memberTotal.quarter_adult_lesson_luganda_total || 0,
+              quarter_grand_total: memberTotal.quarter_grand_total || 0,
+              year_grand_total: memberTotal.year_grand_total || 0,
+              weeks_paid: memberTotal.weeks_paid || 0,
+            }
+          : {
+              lesson_english: 0,
+              lesson_luganda: 0,
+              morning_watch_english: 0,
+              morning_watch_luganda: 0,
+              offering: 0,
+              adult_lesson_english: 0,
+              adult_lesson_luganda: 0,
+              quarter_grand_total: 0,
+              year_grand_total: 0,
+              weeks_paid: 0,
+            },
       };
     });
 
     res.json({
       success: true,
       data: result,
-      count: result.length
+      count: result.length,
     });
   } catch (error) {
     console.error('Error fetching class payment totals:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch class payment totals',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -222,23 +233,20 @@ const deletePayment = async (req, res) => {
   try {
     const { paymentId } = req.params;
 
-    const { error } = await supabase
-      .from('member_payment_history')
-      .delete()
-      .eq('id', paymentId);
+    const { error } = await supabase.from('member_payment_history').delete().eq('id', paymentId);
 
     if (error) throw error;
 
     res.json({
       success: true,
-      message: 'Payment deleted successfully'
+      message: 'Payment deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting payment:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete payment',
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -249,5 +257,5 @@ module.exports = {
   getMemberTotals,
   getQuarterPayments,
   getClassPaymentTotals,
-  deletePayment
+  deletePayment,
 };

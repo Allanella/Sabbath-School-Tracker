@@ -14,6 +14,8 @@ const PaymentHistory = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const [error, setError] = useState(null);
+  const [memberError, setMemberError] = useState(null);
 
   useEffect(() => {
     loadQuarters();
@@ -32,7 +34,7 @@ const PaymentHistory = () => {
       setFilteredMembers(allMembers);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = allMembers.filter(member =>
+      const filtered = allMembers.filter((member) =>
         member.member_name.toLowerCase().includes(query)
       );
       setFilteredMembers(filtered);
@@ -51,33 +53,42 @@ const PaymentHistory = () => {
   const loadAllMembers = async () => {
     try {
       setLoadingMembers(true);
-      
-      // Use member search with empty query to get all members
-      // Search for common letters to get most members
-      const searchQueries = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
-      
-      // Just search for 'a' since it returns 379 members - likely all or most
-      const response = await api.get('/members/search?query=a');
-      
-      console.log('Members loaded:', response.data.count);
-      
+
+      // Try to get all members by searching with empty query first
+      let response = await api.get('/members/search?query=');
+
+      // If that doesn't work, try with a space to get all members
+      if (!response.data.success || response.data.data.length === 0) {
+        response = await api.get('/members/search?query= ');
+      }
+
+      // If still no results, try with a common letter
+      if (!response.data.success || response.data.data.length === 0) {
+        response = await api.get('/members/search?query=a');
+      }
+
       if (response.data.success && response.data.data) {
-        const membersList = response.data.data.map(member => ({
+        const membersList = response.data.data.map((member) => ({
           id: member.member_id,
           member_name: member.member_name,
           class_id: member.class_id,
           class_name: member.class_name,
           teacher_name: member.teacher_name,
           quarter_name: member.quarter_name,
-          quarter_year: member.quarter_year
+          quarter_year: member.quarter_year,
         }));
-        
+
         setAllMembers(membersList);
         setFilteredMembers(membersList);
+        console.log(`Loaded ${membersList.length} members`);
+      } else {
+        throw new Error('No members found');
       }
-      
     } catch (error) {
       console.error('Failed to load members:', error);
+      // Set empty state to show error
+      setAllMembers([]);
+      setFilteredMembers([]);
     } finally {
       setLoadingMembers(false);
     }
@@ -86,7 +97,8 @@ const PaymentHistory = () => {
   const loadMemberData = async () => {
     try {
       setLoading(true);
-      
+      setMemberError(null);
+
       const quarterId = selectedQuarter !== 'all' ? selectedQuarter : null;
 
       // Load payment history
@@ -101,10 +113,13 @@ const PaymentHistory = () => {
         selectedMember.id,
         quarterId
       );
+      // Backend now returns a single object or null
       setMemberTotals(totalsResponse.data);
-
     } catch (error) {
       console.error('Failed to load member data:', error);
+      setMemberError('Failed to load payment data. Please try again.');
+      setPaymentHistory([]);
+      setMemberTotals(null);
     } finally {
       setLoading(false);
     }
@@ -125,10 +140,10 @@ const PaymentHistory = () => {
       'Morning Watch English',
       'Morning Watch Luganda',
       'Week Total',
-      'Notes'
+      'Notes',
     ];
 
-    const rows = paymentHistory.map(payment => [
+    const rows = paymentHistory.map((payment) => [
       payment.payment_date,
       payment.week_number,
       payment.lesson_english || 0,
@@ -140,13 +155,10 @@ const PaymentHistory = () => {
       payment.morning_watch_english || 0,
       payment.morning_watch_luganda || 0,
       payment.week_total || 0,
-      payment.notes || ''
+      payment.notes || '',
     ]);
 
-    const csv = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -231,7 +243,9 @@ const PaymentHistory = () => {
             <div className="bg-white rounded-lg shadow-md p-12 text-center">
               <DollarSign className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Member</h3>
-              <p className="text-gray-600">Choose a member from the list to view their payment history</p>
+              <p className="text-gray-600">
+                Choose a member from the list to view their payment history
+              </p>
             </div>
           ) : (
             <>
@@ -239,8 +253,20 @@ const PaymentHistory = () => {
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{selectedMember.member_name}</h2>
-                    <p className="text-gray-600">{selectedMember.class_name}</p>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      {selectedMember.member_name}
+                    </h2>
+                    <div className="text-gray-600 space-y-1">
+                      <p>{selectedMember.class_name}</p>
+                      {selectedMember.teacher_name && (
+                        <p className="text-sm">Teacher: {selectedMember.teacher_name}</p>
+                      )}
+                      {selectedMember.quarter_name && (
+                        <p className="text-sm">
+                          Quarter: {selectedMember.quarter_name} {selectedMember.quarter_year}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <select
@@ -290,10 +316,9 @@ const PaymentHistory = () => {
                     <div className="bg-orange-50 rounded-lg p-4">
                       <p className="text-sm text-orange-600 font-medium mb-1">Last Payment</p>
                       <p className="text-lg font-bold text-orange-700">
-                        {memberTotals.last_payment_date 
+                        {memberTotals.last_payment_date
                           ? new Date(memberTotals.last_payment_date).toLocaleDateString()
-                          : 'N/A'
-                        }
+                          : 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -310,6 +335,20 @@ const PaymentHistory = () => {
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                   </div>
+                ) : memberError ? (
+                  <div className="p-12 text-center">
+                    <div className="h-16 w-16 text-red-300 mx-auto mb-4 flex items-center justify-center">
+                      <span className="text-4xl">⚠️</span>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h3>
+                    <p className="text-gray-600 mb-4">{memberError}</p>
+                    <button
+                      onClick={() => loadMemberData()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                      Try Again
+                    </button>
+                  </div>
                 ) : paymentHistory.length === 0 ? (
                   <div className="p-12 text-center">
                     <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -321,24 +360,39 @@ const PaymentHistory = () => {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Week</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Lessons</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Adult Lessons</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Morning Watch</th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Week
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Lessons
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Adult Lessons
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Morning Watch
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Total
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {paymentHistory.map((payment) => {
-                          const lessonTotal = (payment.lesson_english || 0) + (payment.lesson_luganda || 0);
-                          const adultTotal = 
+                          const lessonTotal =
+                            (payment.lesson_english || 0) + (payment.lesson_luganda || 0);
+                          const adultTotal =
                             (payment.adult_lesson_english_10k ? 10000 : 0) +
                             (payment.adult_lesson_english_20k ? 20000 : 0) +
                             (payment.adult_lesson_luganda_10k ? 10000 : 0) +
                             (payment.adult_lesson_luganda_20k ? 20000 : 0);
-                          const morningWatchTotal = (payment.morning_watch_english || 0) + (payment.morning_watch_luganda || 0);
-                          
+                          const morningWatchTotal =
+                            (payment.morning_watch_english || 0) +
+                            (payment.morning_watch_luganda || 0);
+
                           return (
                             <tr key={payment.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -365,7 +419,10 @@ const PaymentHistory = () => {
                       </tbody>
                       <tfoot className="bg-gray-50 border-t-2">
                         <tr>
-                          <td colSpan="5" className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                          <td
+                            colSpan="5"
+                            className="px-6 py-4 text-right text-sm font-semibold text-gray-900"
+                          >
                             Grand Total:
                           </td>
                           <td className="px-6 py-4 text-right text-lg font-bold text-blue-600">
