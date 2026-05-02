@@ -54,23 +54,18 @@ const PaymentHistory = () => {
     try {
       setLoadingMembers(true);
 
-      // Use wildcard pattern to get all members (%% matches any string in SQL LIKE)
-      let response = await api.get('/members/search?query=%');
-
-      // If that doesn't work, try with a common letter
-      if (!response.data.success || response.data.data.length === 0) {
-        response = await api.get('/members/search?query=a');
-      }
+      // Use class-members endpoint to get all active members
+      const response = await api.get('/class-members');
 
       if (response.data.success && response.data.data) {
         const membersList = response.data.data.map((member) => ({
-          id: member.member_id,
+          id: member.id,
           member_name: member.member_name,
           class_id: member.class_id,
-          class_name: member.class_name,
-          teacher_name: member.teacher_name,
-          quarter_name: member.quarter_name,
-          quarter_year: member.quarter_year,
+          class_name: member.class_name || 'Unknown Class',
+          teacher_name: member.teacher_name || 'Unknown Teacher',
+          quarter_name: member.quarter_name || null,
+          quarter_year: member.quarter_year || null,
         }));
 
         setAllMembers(membersList);
