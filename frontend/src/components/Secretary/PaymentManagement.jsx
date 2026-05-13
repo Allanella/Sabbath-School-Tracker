@@ -69,15 +69,21 @@ const PaymentManagement = () => {
       setLoading(true);
       setError('');
 
+      // Load members
       const membersResponse = await classMemberService.getByClass(selectedClass);
-      const membersList = Array.isArray(membersResponse) ? membersResponse : (membersResponse.data || []);
+      const membersList = Array.isArray(membersResponse)
+        ? membersResponse
+        : (membersResponse.data || []);
       setMembers(membersList);
 
+      // Load payment totals — paymentService now returns response.data
+      // which is { success: true, data: [...], count: N }
       const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
-      const totalsData = Array.isArray(totalsResponse) ? totalsResponse : (totalsResponse.data || []);
-      
-      setPaymentTotals(totalsData);
+      const totalsData = Array.isArray(totalsResponse)
+        ? totalsResponse
+        : (totalsResponse.data || []);
 
+      setPaymentTotals(totalsData);
     } catch (error) {
       console.error('Failed to load payment data:', error);
       setError('Failed to load payment data. Please try again.');
@@ -86,7 +92,7 @@ const PaymentManagement = () => {
     }
   };
 
-  // Updated Summary Calculation
+  // Summary Calculation
   const calculateSummary = () => {
     let totalAmount = 0;
     let uniqueMembers = 0;
@@ -94,7 +100,7 @@ const PaymentManagement = () => {
 
     paymentTotals.forEach(memberData => {
       const totals = memberData.totals || {};
-      
+
       if (paymentType === 'all' || paymentType === 'lesson_english') {
         totalAmount += totals.lesson_english || 0;
       }
@@ -107,7 +113,6 @@ const PaymentManagement = () => {
       if (paymentType === 'all' || paymentType === 'morning_watch_luganda') {
         totalAmount += totals.morning_watch_luganda || 0;
       }
-      // Single offering calculation
       if (paymentType === 'all' || paymentType === 'offering') {
         totalAmount += totals.offering || 0;
       }
@@ -124,15 +129,25 @@ const PaymentManagement = () => {
       uniqueMembers,
       totalMembers: members.length,
       avgPerMember: uniqueMembers > 0 ? totalAmount / uniqueMembers : 0,
-      totalPayments
+      totalPayments,
     };
   };
 
   const summary = calculateSummary();
 
   const exportToCSV = () => {
-    const headers = ['Member Name', 'Lesson (English)', 'Lesson (Luganda)', 'MW (English)', 'MW (Luganda)', 'Offering', 'Quarter Total', 'Year Total', 'Weeks Paid'];
-    
+    const headers = [
+      'Member Name',
+      'Lesson (English)',
+      'Lesson (Luganda)',
+      'MW (English)',
+      'MW (Luganda)',
+      'Offering',
+      'Quarter Total',
+      'Year Total',
+      'Weeks Paid',
+    ];
+
     const rows = paymentTotals.map(memberData => {
       const totals = memberData.totals || {};
       return [
@@ -144,23 +159,20 @@ const PaymentManagement = () => {
         totals.offering || 0,
         totals.quarter_grand_total || 0,
         totals.year_grand_total || 0,
-        totals.weeks_paid || 0
+        totals.weeks_paid || 0,
       ];
     });
 
-    const csv = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
+
     const selectedClassName = classes.find(c => c.id === selectedClass)?.class_name || 'class';
     const selectedQuarterName = quarters.find(q => q.id === selectedQuarter)?.name || 'quarter';
-    
+
     a.download = `payments-${selectedClassName}-${selectedQuarterName}.csv`;
     a.click();
   };
@@ -172,6 +184,7 @@ const PaymentManagement = () => {
         <p className="text-gray-600">Track and manage member payments</p>
       </div>
 
+      {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -240,13 +253,13 @@ const PaymentManagement = () => {
               <option value="lesson_luganda">Lesson (Luganda)</option>
               <option value="morning_watch_english">Morning Watch (English)</option>
               <option value="morning_watch_luganda">Morning Watch (Luganda)</option>
-              {/* Added Offering Filter */}
               <option value="offering">Offering</option>
             </select>
           </div>
         </div>
       </div>
 
+      {/* Error */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
           <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
@@ -262,6 +275,7 @@ const PaymentManagement = () => {
         </div>
       ) : (
         <>
+          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
               <DollarSign className="h-8 w-8 opacity-80 mb-2" />
@@ -297,6 +311,7 @@ const PaymentManagement = () => {
             </div>
           </div>
 
+          {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -320,7 +335,6 @@ const PaymentManagement = () => {
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (LG)</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (EN)</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (LG)</th>
-                        {/* New Offering Header */}
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offering</th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quarter Total</th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
@@ -336,7 +350,6 @@ const PaymentManagement = () => {
                             <td className="px-6 py-4 text-right">{(totals.lesson_luganda || 0).toLocaleString()}</td>
                             <td className="px-6 py-4 text-right">{(totals.morning_watch_english || 0).toLocaleString()}</td>
                             <td className="px-6 py-4 text-right">{(totals.morning_watch_luganda || 0).toLocaleString()}</td>
-                            {/* New Offering Row Data */}
                             <td className="px-6 py-4 text-right">{(totals.offering || 0).toLocaleString()}</td>
                             <td className="px-6 py-4 text-right font-semibold text-green-600">
                               {(totals.quarter_grand_total || 0).toLocaleString()} UGX
@@ -365,7 +378,6 @@ const PaymentManagement = () => {
                         <td className="px-6 py-4 text-right">
                           {paymentTotals.reduce((sum, m) => sum + (m.totals?.morning_watch_luganda || 0), 0).toLocaleString()}
                         </td>
-                        {/* Offering Total Footer */}
                         <td className="px-6 py-4 text-right">
                           {paymentTotals.reduce((sum, m) => sum + (m.totals?.offering || 0), 0).toLocaleString()}
                         </td>
