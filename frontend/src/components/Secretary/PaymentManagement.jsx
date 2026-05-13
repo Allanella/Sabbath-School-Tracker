@@ -48,10 +48,10 @@ const PaymentManagement = () => {
     }
   };
 
+  // Load all classes without quarter filter
   const loadClasses = async () => {
     try {
-      const quarterId = localStorage.getItem('selectedQuarterId');
-      const response = await classService.getAll(quarterId);
+      const response = await classService.getAll();
       const classList = Array.isArray(response) ? response : (response.data || []);
       setClasses(classList);
 
@@ -76,8 +76,7 @@ const PaymentManagement = () => {
         : (membersResponse.data || []);
       setMembers(membersList);
 
-      // Load payment totals — paymentService now returns response.data
-      // which is { success: true, data: [...], count: N }
+      // Load payment totals
       const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
       const totalsData = Array.isArray(totalsResponse)
         ? totalsResponse
@@ -164,7 +163,6 @@ const PaymentManagement = () => {
     });
 
     const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
