@@ -17,13 +17,11 @@ const PaymentManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Load classes and quarters on mount
   useEffect(() => {
     loadClasses();
     loadQuarters();
   }, []);
 
-  // Load data when class/quarter changes
   useEffect(() => {
     if (selectedClass && selectedQuarter) {
       loadPaymentData();
@@ -48,7 +46,6 @@ const PaymentManagement = () => {
     }
   };
 
-  // Load all classes without quarter filter
   const loadClasses = async () => {
     try {
       const response = await classService.getAll();
@@ -69,29 +66,32 @@ const PaymentManagement = () => {
       setLoading(true);
       setError('');
 
-      // Load members
+      console.log('CLASS:', selectedClass);
+      console.log('QUARTER:', selectedQuarter);
+
       const membersResponse = await classMemberService.getByClass(selectedClass);
+      console.log('MEMBERS:', JSON.stringify(membersResponse));
       const membersList = Array.isArray(membersResponse)
         ? membersResponse
         : (membersResponse.data || []);
       setMembers(membersList);
 
-      // Load payment totals
       const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
+      console.log('TOTALS:', JSON.stringify(totalsResponse));
       const totalsData = Array.isArray(totalsResponse)
         ? totalsResponse
         : (totalsResponse.data || []);
+      console.log('TOTALS DATA:', JSON.stringify(totalsData));
 
       setPaymentTotals(totalsData);
     } catch (error) {
-      console.error('Failed to load payment data:', error);
+      console.error('ERROR:', error.message, error.response?.data);
       setError('Failed to load payment data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Summary Calculation
   const calculateSummary = () => {
     let totalAmount = 0;
     let uniqueMembers = 0;
@@ -136,15 +136,9 @@ const PaymentManagement = () => {
 
   const exportToCSV = () => {
     const headers = [
-      'Member Name',
-      'Lesson (English)',
-      'Lesson (Luganda)',
-      'MW (English)',
-      'MW (Luganda)',
-      'Offering',
-      'Quarter Total',
-      'Year Total',
-      'Weeks Paid',
+      'Member Name', 'Lesson (English)', 'Lesson (Luganda)',
+      'MW (English)', 'MW (Luganda)', 'Offering',
+      'Quarter Total', 'Year Total', 'Weeks Paid',
     ];
 
     const rows = paymentTotals.map(memberData => {
@@ -182,7 +176,6 @@ const PaymentManagement = () => {
         <p className="text-gray-600">Track and manage member payments</p>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -257,7 +250,6 @@ const PaymentManagement = () => {
         </div>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
           <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
@@ -273,7 +265,6 @@ const PaymentManagement = () => {
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
               <DollarSign className="h-8 w-8 opacity-80 mb-2" />
@@ -309,7 +300,6 @@ const PaymentManagement = () => {
             </div>
           </div>
 
-          {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
