@@ -2,29 +2,34 @@ import api from './api';
 
 const classMemberService = {
   // Get all members for a class
-  getByClass: (classId) => {
-    return api.get(`/classes/${classId}/members`);
+  getByClass: async (classId) => {
+    const response = await api.get(`/classes/${classId}/members`);
+    return response.data;
   },
 
   // Get all class members (with optional class filter)
-  getAll: (classId) => {
+  getAll: async (classId) => {
     const params = classId ? { class_id: classId } : {};
-    return api.get('/class-members', { params });
+    const response = await api.get('/class-members', { params });
+    return response.data;
   },
 
   // Create new member
-  create: (memberData) => {
-    return api.post('/class-members', memberData);
+  create: async (memberData) => {
+    const response = await api.post('/class-members', memberData);
+    return response.data;
   },
 
   // Update member
-  update: (id, memberData) => {
-    return api.put(`/class-members/${id}`, memberData);
+  update: async (id, memberData) => {
+    const response = await api.put(`/class-members/${id}`, memberData);
+    return response.data;
   },
 
   // Delete member (soft delete)
-  delete: (id) => {
-    return api.delete(`/class-members/${id}`);
+  delete: async (id) => {
+    const response = await api.delete(`/class-members/${id}`);
+    return response.data;
   },
 };
 

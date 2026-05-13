@@ -15,37 +15,36 @@ const weeklyDataService = {
     try {
       // Try the direct endpoint first
       const response = await api.get(`/weekly-data/class/${classId}/week/${weekNumber}`);
-      
-      // If we get data, return it
+
       if (response.data) {
-        return response;
+        return response.data;
       }
-      
-      // Otherwise, try fetching all class data and filter
+
+      // Fallback: fetch all class data and filter
       const allDataResponse = await api.get(`/weekly-data/class/${classId}`);
-      
-      if (allDataResponse.data && Array.isArray(allDataResponse.data)) {
-        const weekData = allDataResponse.data.find(d => d.week_number === parseInt(weekNumber));
-        return { data: weekData || null };
+      const allData = allDataResponse.data;
+
+      if (allData && Array.isArray(allData)) {
+        return allData.find(d => d.week_number === parseInt(weekNumber)) || null;
       }
-      
-      return { data: null };
+
+      return null;
     } catch (error) {
       console.error('Error fetching week data:', error);
-      
+
       // Fallback: try getting all class data
       try {
         const allDataResponse = await api.get(`/weekly-data/class/${classId}`);
-        
-        if (allDataResponse.data && Array.isArray(allDataResponse.data)) {
-          const weekData = allDataResponse.data.find(d => d.week_number === parseInt(weekNumber));
-          return { data: weekData || null };
+        const allData = allDataResponse.data;
+
+        if (allData && Array.isArray(allData)) {
+          return allData.find(d => d.week_number === parseInt(weekNumber)) || null;
         }
       } catch (fallbackError) {
         console.error('Fallback also failed:', fallbackError);
       }
-      
-      return { data: null };
+
+      return null;
     }
   },
 
@@ -57,7 +56,7 @@ const weeklyDataService = {
   delete: async (id) => {
     const response = await api.delete(`/weekly-data/${id}`);
     return response.data;
-  }
+  },
 };
 
 export default weeklyDataService;

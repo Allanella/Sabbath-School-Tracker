@@ -3,36 +3,44 @@ import api from './api';
 const classService = {
   getAll: async (quarterId) => {
     const params = quarterId ? { quarter_id: quarterId } : {};
-    return await api.get('/classes', { params });
+    const response = await api.get('/classes', { params });
+    return response.data;
   },
 
   getByQuarter: async (quarterId) => {
-    return await api.get(`/classes?quarter_id=${quarterId}`);
+    const response = await api.get(`/classes?quarter_id=${quarterId}`);
+    return response.data;
   },
 
   getById: async (id) => {
-    return await api.get(`/classes/${id}`);
+    const response = await api.get(`/classes/${id}`);
+    return response.data;
   },
 
   search: async (query) => {
-    return await api.get(`/classes/search?query=${query}`);
+    const response = await api.get(`/classes/search?query=${query}`);
+    return response.data;
   },
 
   getMyClasses: async () => {
-    return await api.get('/classes/my-classes');
+    const response = await api.get('/classes/my-classes');
+    return response.data;
   },
 
   create: async (classData) => {
-    return await api.post('/classes', classData);
+    const response = await api.post('/classes', classData);
+    return response.data;
   },
 
   update: async (id, classData) => {
-    return await api.put(`/classes/${id}`, classData);
+    const response = await api.put(`/classes/${id}`, classData);
+    return response.data;
   },
 
   delete: async (id) => {
-    return await api.delete(`/classes/${id}`);
-  }
+    const response = await api.delete(`/classes/${id}`);
+    return response.data;
+  },
 };
 
 export default classService;
