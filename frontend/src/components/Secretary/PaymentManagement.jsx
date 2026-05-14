@@ -17,11 +17,19 @@ const PaymentManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Load quarters on mount
   useEffect(() => {
-    loadClasses();
     loadQuarters();
   }, []);
 
+  // When quarter changes, reload classes for that quarter
+  useEffect(() => {
+    if (selectedQuarter) {
+      loadClasses(selectedQuarter);
+    }
+  }, [selectedQuarter]);
+
+  // Load payment data when class or quarter changes
   useEffect(() => {
     if (selectedClass && selectedQuarter) {
       loadPaymentData();
@@ -31,7 +39,12 @@ const PaymentManagement = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      const quartersList = Array.isArray(response) ? response : (response.data || []);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+
+      // Only show Q1 and Q2 of 2026
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
       setQuarters(quartersList);
 
       const activeQuarter = quartersList.find(q => q.is_active);
@@ -46,13 +59,14 @@ const PaymentManagement = () => {
     }
   };
 
-  const loadClasses = async () => {
+  const loadClasses = async (quarterId) => {
     try {
-      const response = await classService.getAll();
+      setSelectedClass(''); // reset class when quarter changes
+      const response = await classService.getAll(quarterId);
       const classList = Array.isArray(response) ? response : (response.data || []);
       setClasses(classList);
 
-      if (classList.length > 0 && !selectedClass) {
+      if (classList.length > 0) {
         setSelectedClass(classList[0].id);
       }
     } catch (error) {
@@ -66,26 +80,20 @@ const PaymentManagement = () => {
       setLoading(true);
       setError('');
 
-      console.log('CLASS:', selectedClass);
-      console.log('QUARTER:', selectedQuarter);
-
       const membersResponse = await classMemberService.getByClass(selectedClass);
-      console.log('MEMBERS:', JSON.stringify(membersResponse));
       const membersList = Array.isArray(membersResponse)
         ? membersResponse
         : (membersResponse.data || []);
       setMembers(membersList);
 
       const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
-      console.log('TOTALS:', JSON.stringify(totalsResponse));
       const totalsData = Array.isArray(totalsResponse)
         ? totalsResponse
         : (totalsResponse.data || []);
-      console.log('TOTALS DATA:', JSON.stringify(totalsData));
 
       setPaymentTotals(totalsData);
     } catch (error) {
-      console.error('ERROR:', error.message, error.response?.data);
+      console.error('Failed to load payment data:', error);
       setError('Failed to load payment data. Please try again.');
     } finally {
       setLoading(false);
@@ -176,25 +184,9 @@ const PaymentManagement = () => {
         <p className="text-gray-600">Track and manage member payments</p>
       </div>
 
+      {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Filter className="inline h-4 w-4 mr-1" />
-              Class
-            </label>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select Class</option>
-              {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>{cls.class_name}</option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Calendar className="inline h-4 w-4 mr-1" />
@@ -210,6 +202,23 @@ const PaymentManagement = () => {
                 <option key={quarter.id} value={quarter.id}>
                   {quarter.name} {quarter.year}
                 </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Filter className="inline h-4 w-4 mr-1" />
+              Class
+            </label>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select Class</option>
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>{cls.class_name}</option>
               ))}
             </select>
           </div>
@@ -250,6 +259,7 @@ const PaymentManagement = () => {
         </div>
       </div>
 
+      {/* Error */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
           <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
@@ -260,11 +270,12 @@ const PaymentManagement = () => {
       {!selectedClass || !selectedQuarter ? (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <Filter className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Select Class and Quarter</h3>
-          <p className="text-gray-600">Choose a class and quarter above to view payments</p>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Select Quarter and Class</h3>
+          <p className="text-gray-600">Choose a quarter and class above to view payments</p>
         </div>
       ) : (
         <>
+          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
               <DollarSign className="h-8 w-8 opacity-80 mb-2" />
@@ -300,6 +311,7 @@ const PaymentManagement = () => {
             </div>
           </div>
 
+          {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
