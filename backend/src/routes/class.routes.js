@@ -6,6 +6,9 @@ const authenticate = require('../middleware/auth');
 // Search classes (MUST be before /:id routes)
 router.get('/search', authenticate, classController.search);
 
+// Get all soft-deleted classes (admin recovery)
+router.get('/deleted', authenticate, classController.getDeleted);
+
 // Get all classes (with optional quarter filter)
 router.get('/', authenticate, classController.getAll);
 
@@ -17,7 +20,7 @@ router.get('/:id/members', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const supabase = require('../config/database');
-    
+
     const { data, error } = await supabase
       .from('class_members')
       .select('*')
@@ -47,7 +50,10 @@ router.post('/', authenticate, classController.create);
 // Update class
 router.put('/:id', authenticate, classController.update);
 
-// Delete class
+// Restore a soft-deleted class
+router.put('/:id/restore', authenticate, classController.restore);
+
+// Soft delete class (preserves all data)
 router.delete('/:id', authenticate, classController.delete);
 
 module.exports = router;

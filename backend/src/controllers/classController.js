@@ -13,6 +13,22 @@ const classController = {
         church_name 
       } = req.body;
 
+      // Check for duplicate class name in same quarter
+      const { data: existing } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('quarter_id', quarter_id)
+        .eq('class_name', class_name)
+        .is('deleted_at', null)
+        .single();
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: `Class "${class_name}" already exists in this quarter`
+        });
+      }
+
       const { data, error } = await supabase
         .from('classes')
         .insert([{ 
@@ -38,7 +54,7 @@ const classController = {
     }
   },
 
-  // Get all classes
+  // Get all classes (excludes soft-deleted)
   getAll: async (req, res, next) => {
     try {
       const { quarter_id } = req.query;
@@ -49,7 +65,8 @@ const classController = {
           *,
           quarter:quarters(name, year, start_date, end_date),
           secretary:users!classes_secretary_id_fkey(full_name, email)
-        `);
+        `)
+        .is('deleted_at', null);
 
       if (quarter_id) {
         query = query.eq('quarter_id', quarter_id);
@@ -81,6 +98,7 @@ const classController = {
           secretary:users!classes_secretary_id_fkey(full_name, email)
         `)
         .eq('id', id)
+        .is('deleted_at', null)
         .single();
 
       if (error) throw error;
@@ -106,6 +124,7 @@ const classController = {
           quarter:quarters(*)
         `)
         .eq('secretary_id', userId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -141,7 +160,8 @@ const classController = {
           secretary:users!classes_secretary_id_fkey(full_name, email)
         `)
         .or(`class_name.ilike.%${searchTerm}%,teacher_name.ilike.%${searchTerm}%,secretary_name.ilike.%${searchTerm}%`)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .is('deleted_at', null);
 
       if (error) throw error;
 
@@ -180,21 +200,91 @@ const classController = {
     }
   },
 
-  // Delete class
+  // Soft delete class (marks as deleted, never removes data)
   delete: async (req, res, next) => {
     try {
       const { id } = req.params;
 
-      const { error } = await supabase
+      // First check if class has any weekly data or payments
+      const { data: weeklyData } = await supabase
+        .from('weekly_data')
+        .select('id')
+        .eq('class_id', id)
+        .limit(1);
+
+      const { data: members } = await supabase
+        .from('class_members')
+        .select('id')
+        .eq('class_id', id)
+        .limit(1);
+
+      // Warn if data exists but still allow soft delete
+      const hasData = (weeklyData && weeklyData.length > 0) || (members && members.length > 0);
+
+      // Soft delete — set deleted_at timestamp instead of removing
+      const { data, error } = await supabase
         .from('classes')
-        .delete()
-        .eq('id', id);
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) throw error;
 
       res.json({
         success: true,
-        message: 'Class deleted successfully'
+        message: hasData 
+          ? 'Class hidden successfully. Data preserved and can be restored.'
+          : 'Class deleted successfully.',
+        data,
+        hasData
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Restore a soft-deleted class
+  restore: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+
+      const { data, error } = await supabase
+        .from('classes')
+        .update({ deleted_at: null })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        message: 'Class restored successfully',
+        data
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Get all soft-deleted classes (admin only)
+  getDeleted: async (req, res, next) => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          quarter:quarters(name, year)
+        `)
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        data: data || []
       });
     } catch (error) {
       next(error);
