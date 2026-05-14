@@ -59,12 +59,18 @@ const Layout = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      const quartersList = Array.isArray(response.data) ? response.data : [];
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+
+      // Only show Q1 and Q2 of 2026
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+
       setQuarters(quartersList);
-      
+
       // Check if there's a saved quarter in localStorage
       const savedQuarterId = localStorage.getItem('selectedQuarterId');
-      
+
       if (savedQuarterId) {
         const savedQuarter = quartersList.find(q => q.id === savedQuarterId);
         if (savedQuarter) {
@@ -72,7 +78,7 @@ const Layout = () => {
           return;
         }
       }
-      
+
       // Auto-select active quarter
       const active = quartersList.find(q => q.is_active);
       if (active) {
@@ -92,25 +98,25 @@ const Layout = () => {
     const quarter = quarters.find(q => q.id === quarterId);
     setSelectedQuarter(quarter);
     localStorage.setItem('selectedQuarterId', quarterId);
-    
+
     // Auto-set as active quarter in database
     try {
       await quarterService.setActive(quarterId);
-      
+
       // Update local state to reflect the change
       setQuarters(quarters.map(q => ({
         ...q,
         is_active: q.id === quarterId
       })));
-      
+
       // Update selectedQuarter to reflect active status
       setSelectedQuarter({
         ...quarter,
         is_active: true
       });
-      
+
       console.log(`✅ ${quarter.name} ${quarter.year} set as active quarter`);
-      
+
       // If on Quarter Setup page, reload it
       if (location.pathname === '/admin/quarters') {
         window.location.reload();
@@ -118,10 +124,10 @@ const Layout = () => {
     } catch (error) {
       console.error('Failed to set active quarter:', error);
     }
-    
+
     // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('quarterChanged', { 
-      detail: { quarterId, quarter } 
+    window.dispatchEvent(new CustomEvent('quarterChanged', {
+      detail: { quarterId, quarter }
     }));
   };
 
@@ -150,19 +156,15 @@ const Layout = () => {
     admin: [
       { name: "Dashboard", href: "/admin", icon: Home },
       { name: "Users", href: "/admin/users", icon: Users },
-
       { name: "Enter Data", href: "/secretary/entry", icon: FileText },
       { name: "Payment Management", href: "/secretary/payments", icon: DollarSign },
-
       { name: "Member Search", href: "/reports/member-search", icon: Search },
       { name: "Class Search", href: "/reports/class-search", icon: BookOpen },
       { name: "Performance Comparison", href: "/reports/performance", icon: TrendingUp },
       { name: "Class Rankings", href: "/reports/rankings", icon: Trophy },
       { name: "Overall Champion", href: "/reports/champion", icon: Crown },
-
       { name: "Payment Report", href: "/reports/payments", icon: Receipt },
       { name: "Payment History", href: "/reports/payment-history", icon: History },
-
       { name: "Weekly Reports", href: "/reports/weekly", icon: FileText },
       { name: "Quarterly Reports", href: "/reports/quarterly", icon: BarChart3 },
       { name: "Financial Reports", href: "/reports/financial", icon: DollarSign },
@@ -172,16 +174,13 @@ const Layout = () => {
       { name: "Dashboard", href: "/secretary", icon: Home },
       { name: "Enter Data", href: "/secretary/entry", icon: FileText },
       { name: "Payment Management", href: "/secretary/payments", icon: DollarSign },
-
       { name: "Member Search", href: "/reports/member-search", icon: Search },
       { name: "Class Search", href: "/reports/class-search", icon: BookOpen },
       { name: "Performance Comparison", href: "/reports/performance", icon: TrendingUp },
       { name: "Class Rankings", href: "/reports/rankings", icon: Trophy },
       { name: "Overall Champion", href: "/reports/champion", icon: Crown },
-
       { name: "Payment Report", href: "/reports/payments", icon: Receipt },
       { name: "Payment History", href: "/reports/payment-history", icon: History },
-
       { name: "Weekly Reports", href: "/reports/weekly", icon: FileText },
       { name: "Quarterly Reports", href: "/reports/quarterly", icon: BarChart3 },
     ],
@@ -192,10 +191,8 @@ const Layout = () => {
       { name: "Performance Comparison", href: "/reports/performance", icon: TrendingUp },
       { name: "Class Rankings", href: "/reports/rankings", icon: Trophy },
       { name: "Overall Champion", href: "/reports/champion", icon: Crown },
-
       { name: "Payment Report", href: "/reports/payments", icon: Receipt },
       { name: "Payment History", href: "/reports/payment-history", icon: History },
-
       { name: "Weekly Reports", href: "/reports/weekly", icon: FileText },
       { name: "Quarterly Reports", href: "/reports/quarterly", icon: BarChart3 },
       { name: "Financial Reports", href: "/reports/financial", icon: DollarSign },
@@ -216,7 +213,6 @@ const Layout = () => {
       >
         <div className="flex items-center justify-between p-4 border-b border-indigo-700">
           <h1 className="text-xl font-bold">SS Tracker</h1>
-
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
             <X className="h-6 w-6" />
           </button>
@@ -338,7 +334,9 @@ const Layout = () => {
               {selectedQuarter && (
                 <p className="text-sm text-gray-600 mt-1">
                   📅 {selectedQuarter.name} {selectedQuarter.year}
-                  {selectedQuarter.is_active && <span className="ml-2 text-green-600 font-medium">● Active</span>}
+                  {selectedQuarter.is_active && (
+                    <span className="ml-2 text-green-600 font-medium">● Active</span>
+                  )}
                 </p>
               )}
             </div>
@@ -364,14 +362,11 @@ const Layout = () => {
         <footer className="bg-white border-t py-4">
           <div className="flex items-center justify-between text-sm text-gray-600 px-6">
             <p>© {new Date().getFullYear()} Kanyanya SDA Church</p>
-
             <div className="flex items-center space-x-1">
               <span>Developed with</span>
               <Heart className="h-4 w-4 text-red-500 fill-current animate-pulse" />
               <span>by</span>
-              <span className="font-semibold text-indigo-600">
-                Baliddawa Allan
-              </span>
+              <span className="font-semibold text-indigo-600">Baliddawa Allan</span>
             </div>
           </div>
         </footer>
