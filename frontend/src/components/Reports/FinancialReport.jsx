@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import quarterService from '../../services/quarterService';
-import weeklyDataService from '../../services/WeeklyDataService';
 import classService from '../../services/classService';
 import { DollarSign, TrendingUp, Users, FileText, Download } from 'lucide-react';
 
@@ -14,121 +13,168 @@ const FinancialReport = () => {
 
   useEffect(() => {
     loadQuarters();
-    loadClasses();
   }, []);
 
   useEffect(() => {
     if (selectedQuarter) {
-      generateReport();
+      loadClasses(selectedQuarter);
+      generateReport(selectedQuarter, selectedClass);
     }
-  }, [selectedQuarter, selectedClass]);
+  }, [selectedQuarter]);
+
+  useEffect(() => {
+    if (selectedQuarter) {
+      generateReport(selectedQuarter, selectedClass);
+    }
+  }, [selectedClass]);
 
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+
+      // Only show Q1 and Q2 of 2026
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+      setQuarters(quartersList);
+
+      const activeQuarter = quartersList.find(q => q.is_active);
+      if (activeQuarter) {
+        setSelectedQuarter(activeQuarter.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
     }
   };
 
-  const loadClasses = async () => {
+  const loadClasses = async (quarterId) => {
     try {
-      const response = await classService.getAll();
-      setClasses(response.data || []);
+      const response = await classService.getAll(quarterId);
+      const classList = Array.isArray(response) ? response : (response.data || []);
+      setClasses(classList);
+      setSelectedClass('');
     } catch (error) {
       console.error('Failed to load classes:', error);
+      setClasses([]);
     }
   };
 
-  const parsePaymentAmount = (paymentString, memberName = null) => {
-    if (!paymentString || paymentString.trim() === '') return 0;
-    
-    let total = 0;
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      if (amount) {
-        const numAmount = parseFloat(amount);
-        if (!isNaN(numAmount)) {
-          if (memberName) {
-            // If looking for specific member
-            if (name === memberName) {
-              total += numAmount;
-            }
-          } else {
-            // Sum all payments
-            total += numAmount;
-          }
-        }
+  const generateReport = async (quarterId, classId) => {
+    if (!quarterId) return;
+    setLoading(true);
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const token = localStorage.getItem('token');
+
+      // Build URL
+      let url = `${supabaseUrl}/member-payments/class-summary?quarter_id=${quarterId}`;
+      if (classId) url += `&class_id=${classId}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setReportData(data.data);
+      } else {
+        // Fallback: calculate from member_payment_totals via existing API
+        await generateFromPaymentTotals(quarterId, classId);
       }
-    });
-    
-    return total;
+    } catch (error) {
+      console.error('Error generating report:', error);
+      await generateFromPaymentTotals(quarterId, classId);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const generateReport = async () => {
-    if (!selectedQuarter) return;
-
-    setLoading(true);
+  const generateFromPaymentTotals = async (quarterId, classId) => {
     try {
-      // Filter classes by quarter and optionally by selected class
-      const filteredClasses = classes.filter(cls => {
-        const matchesQuarter = cls.quarter_id === selectedQuarter;
-        const matchesClass = !selectedClass || cls.id === selectedClass;
-        return matchesQuarter && matchesClass;
-      });
+      const token = localStorage.getItem('token');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+      // Get all classes for this quarter
+      const classRes = await fetch(
+        `${apiUrl}/classes?quarter_id=${quarterId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const classData = await classRes.json();
+      const allClasses = classData.data || [];
+      const filteredClasses = classId
+        ? allClasses.filter(c => c.id === classId)
+        : allClasses;
 
       let totalOfferings = 0;
       let totalLessonEnglish = 0;
       let totalLessonLuganda = 0;
       let totalMorningWatchEnglish = 0;
       let totalMorningWatchLuganda = 0;
-      let memberPayments = {};
-
       const classBreakdown = [];
 
       for (const cls of filteredClasses) {
-        const weeklyDataResponse = await weeklyDataService.getByClass(cls.id);
-        const weeklyData = weeklyDataResponse.data || [];
+        // Get payment totals for this class
+        const totalsRes = await fetch(
+          `${apiUrl}/member-payments/class/${cls.id}/totals?quarter_id=${quarterId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const totalsData = await totalsRes.json();
+        const members = totalsData.data || [];
 
-        let classOfferings = 0;
         let classLessonEnglish = 0;
         let classLessonLuganda = 0;
         let classMorningWatchEnglish = 0;
         let classMorningWatchLuganda = 0;
+        let classOffering = 0;
 
-        weeklyData.forEach(week => {
-          // Sum offerings (numeric field)
-          classOfferings += parseFloat(week.offering_global_mission) || 0;
-
-          // Parse payment strings
-          classLessonEnglish += parsePaymentAmount(week.members_paid_lesson_english);
-          classLessonLuganda += parsePaymentAmount(week.members_paid_lesson_luganda);
-          classMorningWatchEnglish += parsePaymentAmount(week.members_paid_morning_watch_english);
-          classMorningWatchLuganda += parsePaymentAmount(week.members_paid_morning_watch_luganda);
+        members.forEach(member => {
+          const t = member.totals || {};
+          classLessonEnglish += t.lesson_english || 0;
+          classLessonLuganda += t.lesson_luganda || 0;
+          classMorningWatchEnglish += t.morning_watch_english || 0;
+          classMorningWatchLuganda += t.morning_watch_luganda || 0;
+          classOffering += t.offering || 0;
         });
 
-        totalOfferings += classOfferings;
+        // Get offerings from weekly data
+        const weeklyRes = await fetch(
+          `${apiUrl}/weekly-data/class/${cls.id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const weeklyData = await weeklyRes.json();
+        const weeks = weeklyData.data || [];
+        let weeklyOfferings = 0;
+        weeks.forEach(w => {
+          weeklyOfferings += parseFloat(w.offering_global_mission || 0);
+        });
+
+        // Use the higher of the two offering sources
+        const finalOffering = Math.max(classOffering, weeklyOfferings);
+
         totalLessonEnglish += classLessonEnglish;
         totalLessonLuganda += classLessonLuganda;
         totalMorningWatchEnglish += classMorningWatchEnglish;
         totalMorningWatchLuganda += classMorningWatchLuganda;
+        totalOfferings += finalOffering;
 
-        classBreakdown.push({
-          className: cls.class_name,
-          offerings: classOfferings,
-          lessonEnglish: classLessonEnglish,
-          lessonLuganda: classLessonLuganda,
-          morningWatchEnglish: classMorningWatchEnglish,
-          morningWatchLuganda: classMorningWatchLuganda,
-          total: classOfferings + classLessonEnglish + classLessonLuganda + 
-                 classMorningWatchEnglish + classMorningWatchLuganda
-        });
+        const classTotal = finalOffering + classLessonEnglish + classLessonLuganda +
+          classMorningWatchEnglish + classMorningWatchLuganda;
+
+        if (classTotal > 0 || members.length > 0) {
+          classBreakdown.push({
+            className: cls.class_name,
+            offerings: finalOffering,
+            lessonEnglish: classLessonEnglish,
+            lessonLuganda: classLessonLuganda,
+            morningWatchEnglish: classMorningWatchEnglish,
+            morningWatchLuganda: classMorningWatchLuganda,
+            total: classTotal,
+          });
+        }
       }
 
       const totalLessonPayments = totalLessonEnglish + totalLessonLuganda;
@@ -144,12 +190,10 @@ const FinancialReport = () => {
         totalLessonPayments,
         totalMorningWatchPayments,
         grandTotal,
-        classBreakdown
+        classBreakdown,
       });
     } catch (error) {
-      console.error('Error generating report:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error generating from payment totals:', error);
     }
   };
 
@@ -159,9 +203,7 @@ const FinancialReport = () => {
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
           <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()} UGX</p>
-          {subtitle && (
-            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
         </div>
         <div className="p-3 rounded-full" style={{ backgroundColor: `${color}20` }}>
           <Icon className="h-6 w-6" style={{ color }} />
@@ -210,11 +252,12 @@ const FinancialReport = () => {
             <select
               value={selectedQuarter}
               onChange={(e) => setSelectedQuarter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
+              <option value="">Choose Quarter</option>
               {quarters.map((quarter) => (
                 <option key={quarter.id} value={quarter.id}>
-                  {quarter.name} {quarter.year}
+                  {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
                 </option>
               ))}
             </select>
@@ -227,25 +270,30 @@ const FinancialReport = () => {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
               <option value="">All Classes</option>
-              {classes
-                .filter(cls => cls.quarter_id === selectedQuarter)
-                .map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.class_name}
-                  </option>
-                ))}
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.class_name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </div>
 
-      {reportData && (
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          <span className="ml-3 text-gray-600">Calculating...</span>
+        </div>
+      )}
+
+      {reportData && !loading && (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard
               icon={DollarSign}
               title="Total Collected"
@@ -264,14 +312,14 @@ const FinancialReport = () => {
               icon={Users}
               title="Lesson Payments"
               value={reportData.totalLessonPayments}
-              subtitle="Members"
+              subtitle="English + Luganda"
               color="#f59e0b"
             />
             <StatCard
               icon={FileText}
               title="Morning Watch"
               value={reportData.totalMorningWatchPayments}
-              subtitle="Members"
+              subtitle="English + Luganda"
               color="#8b5cf6"
             />
           </div>
@@ -280,49 +328,33 @@ const FinancialReport = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Contribution Breakdown</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Global Mission Offerings</span>
-                  <span className="text-lg font-bold text-blue-700">
-                    {reportData.totalOfferings.toLocaleString()} UGX
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Lesson (English)</span>
-                  <span className="text-lg font-bold text-green-700">
-                    {reportData.totalLessonEnglish.toLocaleString()} UGX
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Lesson (Luganda)</span>
-                  <span className="text-lg font-bold text-blue-700">
-                    {reportData.totalLessonLuganda.toLocaleString()} UGX
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Morning Watch (English)</span>
-                  <span className="text-lg font-bold text-purple-700">
-                    {reportData.totalMorningWatchEnglish.toLocaleString()} UGX
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Morning Watch (Luganda)</span>
-                  <span className="text-lg font-bold text-orange-700">
-                    {reportData.totalMorningWatchLuganda.toLocaleString()} UGX
-                  </span>
-                </div>
+              <div className="space-y-3">
+                {[
+                  { label: 'Global Mission Offerings', value: reportData.totalOfferings, color: 'blue' },
+                  { label: 'Lesson (English)', value: reportData.totalLessonEnglish, color: 'green' },
+                  { label: 'Lesson (Luganda)', value: reportData.totalLessonLuganda, color: 'blue' },
+                  { label: 'Morning Watch (English)', value: reportData.totalMorningWatchEnglish, color: 'purple' },
+                  { label: 'Morning Watch (Luganda)', value: reportData.totalMorningWatchLuganda, color: 'orange' },
+                ].map((item, i) => (
+                  <div key={i} className={`flex items-center justify-between p-3 bg-${item.color}-50 rounded-lg`}>
+                    <span className="text-sm font-medium text-gray-700">{item.label}</span>
+                    <span className={`text-base font-bold text-${item.color}-700`}>
+                      {item.value.toLocaleString()} UGX
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Summary</h3>
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
+                <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Global Mission Offerings</span>
                     <span className="font-semibold">{reportData.totalOfferings.toLocaleString()} UGX</span>
                   </div>
-                  <div className="flex justify-between items-center mb-2">
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Lesson Payments</span>
                     <span className="font-semibold">{reportData.totalLessonPayments.toLocaleString()} UGX</span>
                   </div>
@@ -349,51 +381,25 @@ const FinancialReport = () => {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Class
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Offerings
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Lesson (Eng)
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Lesson (Lug)
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        MW (Eng)
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        MW (Lug)
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total
-                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offerings</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (EN)</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (LG)</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (EN)</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (LG)</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {reportData.classBreakdown.map((cls, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {cls.className}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {cls.offerings.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {cls.lessonEnglish.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {cls.lessonLuganda.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {cls.morningWatchEnglish.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                          {cls.morningWatchLuganda.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cls.className}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{cls.offerings.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{cls.lessonEnglish.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{cls.lessonLuganda.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{cls.morningWatchEnglish.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{cls.morningWatchLuganda.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-green-700">
                           {cls.total.toLocaleString()} UGX
                         </td>
                       </tr>
@@ -402,21 +408,11 @@ const FinancialReport = () => {
                   <tfoot className="bg-gray-50 font-bold">
                     <tr>
                       <td className="px-6 py-4 text-sm text-gray-700">TOTAL</td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900">
-                        {reportData.totalOfferings.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900">
-                        {reportData.totalLessonEnglish.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900">
-                        {reportData.totalLessonLuganda.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900">
-                        {reportData.totalMorningWatchEnglish.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900">
-                        {reportData.totalMorningWatchLuganda.toLocaleString()}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-right">{reportData.totalOfferings.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-right">{reportData.totalLessonEnglish.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-right">{reportData.totalLessonLuganda.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-right">{reportData.totalMorningWatchEnglish.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-right">{reportData.totalMorningWatchLuganda.toLocaleString()}</td>
                       <td className="px-6 py-4 text-sm text-right text-green-700 text-lg">
                         {reportData.grandTotal.toLocaleString()} UGX
                       </td>
@@ -424,6 +420,12 @@ const FinancialReport = () => {
                   </tfoot>
                 </table>
               </div>
+            </div>
+          )}
+
+          {reportData.classBreakdown.length === 0 && (
+            <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+              No financial data found for the selected quarter.
             </div>
           )}
         </>
