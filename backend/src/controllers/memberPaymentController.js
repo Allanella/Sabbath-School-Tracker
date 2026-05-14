@@ -77,7 +77,7 @@ const getClassPaymentTotals = async (req, res) => {
   }
 };
 
-export default {
+module.exports = {
   getClassPaymentTotals,
    recordPayment,
   getMemberPaymentHistory,
