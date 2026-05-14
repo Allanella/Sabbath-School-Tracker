@@ -32,7 +32,13 @@ const WeeklyReport = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      const quartersList = Array.isArray(response) ? response : (response.data || []);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+
+      // Only show Q1 and Q2 of 2026
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+
       setQuarters(quartersList);
 
       const activeQuarter = quartersList.find(q => q.is_active);
@@ -136,7 +142,7 @@ const WeeklyReport = () => {
         </div>
       )}
 
-      {/* Summary Cards - always show when quarter selected */}
+      {/* Summary Cards */}
       {selectedQuarter && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="card">
@@ -327,7 +333,7 @@ const WeeklyReport = () => {
         </>
       )}
 
-      {/* Show empty state when no report data and not loading */}
+      {/* Empty state */}
       {!reportData && !loading && selectedQuarter && (
         <div className="card">
           <h2 className="text-xl font-semibold mb-6">Class Details</h2>
