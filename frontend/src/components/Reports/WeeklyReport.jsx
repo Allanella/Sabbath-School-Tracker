@@ -32,10 +32,9 @@ const WeeklyReport = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      const quartersList = Array.isArray(response.data) ? response.data : [];
+      const quartersList = Array.isArray(response) ? response : (response.data || []);
       setQuarters(quartersList);
-      
-      // Set active quarter as default
+
       const activeQuarter = quartersList.find(q => q.is_active);
       if (activeQuarter) {
         setSelectedQuarter(activeQuarter.id);
@@ -52,13 +51,10 @@ const WeeklyReport = () => {
   const loadReport = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const response = await reportService.getWeeklyReport(selectedQuarter, selectedWeek);
-      console.log('Weekly report response:', response);
-      
-      // Handle both response formats
-      const reportInfo = response.data || response;
+      const reportInfo = Array.isArray(response) ? response : (response.data || response);
       setReportData(reportInfo);
     } catch (error) {
       console.error('Failed to load weekly report:', error);
@@ -140,59 +136,61 @@ const WeeklyReport = () => {
         </div>
       )}
 
-      {reportData && (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Classes Reported</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {reportData.summary.classes_count}
-                  </p>
-                </div>
-                <FileText className="h-8 w-8 text-blue-600" />
+      {/* Summary Cards - always show when quarter selected */}
+      {selectedQuarter && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Classes Reported</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {reportData?.summary?.classes_count || 0}
+                </p>
               </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Attendance</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {reportData.summary.total_attendance}
-                  </p>
-                </div>
-                <Users className="h-8 w-8 text-green-600" />
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Visitors</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {reportData.summary.total_visitors}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-purple-600" />
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Offerings (UGX)</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {reportData.summary.total_offerings.toLocaleString()}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-orange-600" />
-              </div>
+              <FileText className="h-8 w-8 text-blue-600" />
             </div>
           </div>
 
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Attendance</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {reportData?.summary?.total_attendance || 0}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-green-600" />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Visitors</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {reportData?.summary?.total_visitors || 0}
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-purple-600" />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Offerings (UGX)</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {(reportData?.summary?.total_offerings || 0).toLocaleString()}
+                </p>
+              </div>
+              <DollarSign className="h-8 w-8 text-orange-600" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reportData && (
+        <>
           {/* Report Header for Print */}
           <div className="hidden print:block mb-8 text-center">
             <h1 className="text-2xl font-bold">Kanyanya Seventh-day Adventist Church</h1>
@@ -200,7 +198,7 @@ const WeeklyReport = () => {
             <p className="text-gray-600 mt-1">
               {selectedQuarterObj?.name} {selectedQuarterObj?.year} - Week {selectedWeek}
             </p>
-            {reportData.classes[0] && (
+            {reportData.classes?.[0] && (
               <p className="text-gray-600">
                 Sabbath Date: {new Date(reportData.classes[0].sabbath_date).toLocaleDateString()}
               </p>
@@ -210,8 +208,8 @@ const WeeklyReport = () => {
           {/* Detailed Class Reports */}
           <div className="card">
             <h2 className="text-xl font-semibold mb-6">Class Details</h2>
-            
-            {reportData.classes.length === 0 ? (
+
+            {!reportData.classes || reportData.classes.length === 0 ? (
               <div className="text-center py-12">
                 <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600">No data submitted for this week yet</p>
@@ -238,10 +236,10 @@ const WeeklyReport = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
-                              {classData.class.class_name}
+                              {classData.class?.class_name}
                             </div>
                             <div className="text-sm text-gray-500">
-                              Teacher: {classData.class.teacher_name}
+                              Teacher: {classData.class?.teacher_name}
                             </div>
                           </div>
                         </td>
@@ -273,32 +271,30 @@ const WeeklyReport = () => {
                     ))}
                     {/* Totals Row */}
                     <tr className="bg-gray-50 font-semibold">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        TOTALS
-                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">TOTALS</td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-700">
-                        {reportData.summary.total_offerings.toLocaleString()}
+                        {(reportData.summary?.total_offerings || 0).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_attendance}
+                        {reportData.summary?.total_attendance || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_visits || 0}
+                        {reportData.summary?.total_visits || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_bible_studies || 0}
+                        {reportData.summary?.total_bible_studies || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_visitors}
+                        {reportData.summary?.total_visitors || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_helped_others || 0}
+                        {reportData.summary?.total_helped_others || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_studied_lesson || 0}
+                        {reportData.summary?.total_studied_lesson || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
-                        {reportData.summary.total_guides_distributed || 0}
+                        {reportData.summary?.total_guides_distributed || 0}
                       </td>
                     </tr>
                   </tbody>
@@ -308,7 +304,7 @@ const WeeklyReport = () => {
           </div>
 
           {/* Secretary Notes */}
-          {reportData.classes.some(c => c.members_summary) && (
+          {reportData.classes?.some(c => c.members_summary) && (
             <div className="card mt-6">
               <h2 className="text-xl font-semibold mb-4">Secretary Notes</h2>
               <div className="space-y-4">
@@ -316,7 +312,7 @@ const WeeklyReport = () => {
                   classData.members_summary && (
                     <div key={index} className="border-b border-gray-200 pb-4 last:border-0">
                       <h3 className="font-medium text-gray-900 mb-2">
-                        {classData.class.class_name}
+                        {classData.class?.class_name}
                       </h3>
                       <div className="mb-2">
                         <p className="text-sm font-medium text-gray-700">Notes:</p>
@@ -329,6 +325,17 @@ const WeeklyReport = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Show empty state when no report data and not loading */}
+      {!reportData && !loading && selectedQuarter && (
+        <div className="card">
+          <h2 className="text-xl font-semibold mb-6">Class Details</h2>
+          <div className="text-center py-12">
+            <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-600">No data submitted for this week yet</p>
+          </div>
+        </div>
       )}
     </div>
   );
