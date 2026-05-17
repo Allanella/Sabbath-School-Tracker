@@ -20,17 +20,14 @@ const WeeklyDataEntry = () => {
   const [pendingMembersCount, setPendingMembersCount] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   
-  // Members management state
   const [members, setMembers] = useState([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [editingMember, setEditingMember] = useState(null);
 
-  // Payment totals state - cumulative totals from database
   const [paymentTotals, setPaymentTotals] = useState({});
   const [loadingTotals, setLoadingTotals] = useState(false);
 
-  // Payment tracking - stores THIS WEEK's payment amounts {memberId: amount}
   const [paymentsLessonEnglish, setPaymentsLessonEnglish] = useState({});
   const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
   const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
@@ -51,17 +48,10 @@ const WeeklyDataEntry = () => {
 
   const isDevelopment = process.env.NODE_ENV === 'development';
 
-  // Listen for quarter changes from Layout
   useEffect(() => {
-    const handleQuarterChange = () => {
-      loadClasses();
-    };
-    
+    const handleQuarterChange = () => { loadClasses(); };
     window.addEventListener('quarterChanged', handleQuarterChange);
-    
-    return () => {
-      window.removeEventListener('quarterChanged', handleQuarterChange);
-    };
+    return () => window.removeEventListener('quarterChanged', handleQuarterChange);
   }, []);
 
   useEffect(() => {
@@ -69,42 +59,21 @@ const WeeklyDataEntry = () => {
     checkPendingMembers();
   }, []);
 
-  // Enhanced online/offline detection with auto-sync
   useEffect(() => {
     const updateOnlineStatus = () => {
       const actualStatus = navigator.onLine;
       const wasOffline = !isOnline;
       const nowOnline = actualStatus && !manualOffline;
-      
-      if (isDevelopment) {
-        console.log('Browser reports online:', actualStatus);
-        console.log('Manual offline mode:', manualOffline);
-      }
-      
       setIsOnline(nowOnline);
-
-      if (wasOffline && nowOnline) {
-        autoSyncPendingData();
-      }
+      if (wasOffline && nowOnline) { autoSyncPendingData(); }
     };
 
     updateOnlineStatus();
-
-    const handleOnline = () => {
-      if (isDevelopment) console.log('🟢 ONLINE event fired');
-      updateOnlineStatus();
-    };
-    
-    const handleOffline = () => {
-      if (isDevelopment) console.log('🔴 OFFLINE event fired');
-      updateOnlineStatus();
-    };
-
+    const handleOnline = () => updateOnlineStatus();
+    const handleOffline = () => updateOnlineStatus();
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     const intervalId = setInterval(updateOnlineStatus, 2000);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -116,9 +85,7 @@ const WeeklyDataEntry = () => {
     if (selectedClass) {
       loadMembersWithLocal();
       loadPaymentTotals();
-      if (weekNumber) {
-        checkExistingData();
-      }
+      if (weekNumber) { checkExistingData(); }
     }
   }, [selectedClass, weekNumber]);
 
@@ -126,9 +93,7 @@ const WeeklyDataEntry = () => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       setPendingMembersCount(localMembers.length);
-      if (isDevelopment) console.log('Pending members count:', localMembers.length);
     } catch (error) {
-      console.error('Error checking pending members:', error);
       setPendingMembersCount(0);
     }
   };
@@ -137,14 +102,8 @@ const WeeklyDataEntry = () => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       const pendingData = await offlineStorage.getPendingCount();
-      
       if (localMembers.length > 0 || pendingData > 0) {
-        if (isDevelopment) console.log('🔄 Auto-syncing pending data...');
-        
-        if (localMembers.length > 0) {
-          await syncPendingMembers(true);
-        }
-        
+        if (localMembers.length > 0) { await syncPendingMembers(true); }
         showToast('✅ Data synced successfully!');
       }
     } catch (error) {
@@ -164,35 +123,23 @@ const WeeklyDataEntry = () => {
   const loadClasses = async () => {
     try {
       const quarterId = localStorage.getItem('selectedQuarterId');
-      
       if (!quarterId) {
         setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar' });
         setClasses([]);
         return;
       }
-      
-      if (isDevelopment) console.log('Loading classes for quarter:', quarterId);
       const response = await api.get(`/classes?quarter_id=${quarterId}`);
-      
       const classesData = response.data?.data || response.data || [];
-      
       if (Array.isArray(classesData)) {
         setClasses(classesData);
         if (classesData.length > 0) {
           setSelectedClass(classesData[0].id);
         } else {
-          setMessage({ 
-            type: 'error', 
-            text: 'No classes available for this quarter. Please create classes first.' 
-          });
+          setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
         }
       } else {
-        console.error('Classes data is not an array:', classesData);
         setClasses([]);
-        setMessage({ 
-          type: 'error', 
-          text: 'Invalid data format received for classes.' 
-        });
+        setMessage({ type: 'error', text: 'Invalid data format received for classes.' });
       }
     } catch (error) {
       console.error('Failed to load classes:', error);
@@ -203,17 +150,9 @@ const WeeklyDataEntry = () => {
 
   const loadMembers = async () => {
     try {
-      if (isDevelopment) console.log('Loading members for class:', selectedClass);
       const response = await classMemberService.getByClass(selectedClass);
-      
       const membersData = Array.isArray(response) ? response : (response.data || []);
-      
-      if (Array.isArray(membersData)) {
-        setMembers(membersData);
-      } else {
-        console.error('Members data is not an array:', membersData);
-        setMembers([]);
-      }
+      setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error) {
       console.error('Failed to load members:', error);
       setMembers([]);
@@ -224,21 +163,13 @@ const WeeklyDataEntry = () => {
     try {
       setLoadingTotals(true);
       const quarterId = localStorage.getItem('selectedQuarterId');
-      
-      if (!quarterId || !selectedClass) {
-        setPaymentTotals({});
-        return;
-      }
-
+      if (!quarterId || !selectedClass) { setPaymentTotals({}); return; }
       const response = await paymentService.getClassPaymentTotals(selectedClass, quarterId);
-      
+      const totalsArray = Array.isArray(response) ? response : (response.data || []);
       const totalsMap = {};
-      if (response.data && Array.isArray(response.data)) {
-        response.data.forEach(memberData => {
-          totalsMap[memberData.id] = memberData.totals;
-        });
-      }
-      
+      totalsArray.forEach(memberData => {
+        totalsMap[memberData.id] = memberData.totals;
+      });
       setPaymentTotals(totalsMap);
     } catch (error) {
       console.error('Failed to load payment totals:', error);
@@ -251,15 +182,11 @@ const WeeklyDataEntry = () => {
   const loadMembersWithLocal = async () => {
     try {
       await loadMembers();
-      
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data.class_id === selectedClass);
-      
       if (pendingAdds.length > 0) {
         const tempMembers = pendingAdds.map(item => item.data);
         setMembers(prev => [...prev, ...tempMembers]);
-        
-        if (isDevelopment) console.log('Loaded pending local members:', tempMembers);
       }
     } catch (error) {
       console.error('Error loading members with local:', error);
@@ -271,38 +198,18 @@ const WeeklyDataEntry = () => {
       setMessage({ type: 'error', text: 'Please enter a member name.' });
       return;
     }
-
     const isActuallyOnline = navigator.onLine && !manualOffline;
-
     if (!isActuallyOnline) {
       try {
         const tempId = `temp-${Date.now()}`;
-        const newMember = {
-          id: tempId,
-          member_name: newMemberName.trim(),
-          class_id: selectedClass,
-          isLocal: true
-        };
-
+        const newMember = { id: tempId, member_name: newMemberName.trim(), class_id: selectedClass, isLocal: true };
         setMembers([...members, newMember]);
-        setNewMemberName('');
-        setEditingMember(null);
-        setShowMemberModal(false);
-
+        setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
         const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-        localMembers.push({
-          action: 'create',
-          data: newMember,
-          timestamp: Date.now()
-        });
+        localMembers.push({ action: 'create', data: newMember, timestamp: Date.now() });
         localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
         checkPendingMembers();
-
-        setMessage({ 
-          type: 'warning', 
-          text: '📴 Offline: Member added locally. Will sync when online.' 
-        });
-
+        setMessage({ type: 'warning', text: '📴 Offline: Member added locally. Will sync when online.' });
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
         return;
       } catch (offlineError) {
@@ -310,22 +217,15 @@ const WeeklyDataEntry = () => {
         return;
       }
     }
-
     try {
       if (editingMember) {
         await classMemberService.update(editingMember.id, { member_name: newMemberName });
         setMessage({ type: 'success', text: 'Member updated successfully!' });
       } else {
-        await classMemberService.create({
-          class_id: selectedClass,
-          member_name: newMemberName,
-        });
+        await classMemberService.create({ class_id: selectedClass, member_name: newMemberName });
         setMessage({ type: 'success', text: 'Member added successfully!' });
       }
-      
-      setNewMemberName('');
-      setEditingMember(null);
-      setShowMemberModal(false);
+      setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
       loadMembers();
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
@@ -341,24 +241,17 @@ const WeeklyDataEntry = () => {
 
   const handleDeleteMember = async (memberId) => {
     if (!window.confirm('Are you sure you want to remove this member?')) return;
-
     const isActuallyOnline = navigator.onLine && !manualOffline;
-
     if (!isActuallyOnline) {
       setMembers(members.filter(m => m.id !== memberId));
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      localMembers.push({
-        action: 'delete',
-        memberId: memberId,
-        timestamp: Date.now()
-      });
+      localMembers.push({ action: 'delete', memberId, timestamp: Date.now() });
       localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
       checkPendingMembers();
       setMessage({ type: 'warning', text: '📴 Offline: Member removed locally.' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       return;
     }
-
     try {
       await classMemberService.delete(memberId);
       setMessage({ type: 'success', text: 'Member removed successfully!' });
@@ -373,17 +266,12 @@ const WeeklyDataEntry = () => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       if (localMembers.length === 0) return;
-
       setLoading(true);
       let syncedCount = 0;
-
       for (const item of localMembers) {
         try {
           if (item.action === 'create') {
-            await classMemberService.create({
-              class_id: item.data.class_id,
-              member_name: item.data.member_name
-            });
+            await classMemberService.create({ class_id: item.data.class_id, member_name: item.data.member_name });
             syncedCount++;
           } else if (item.action === 'delete' && !item.memberId.startsWith('temp-')) {
             await classMemberService.delete(item.memberId);
@@ -393,11 +281,9 @@ const WeeklyDataEntry = () => {
           console.error('Failed to sync member:', item, error);
         }
       }
-
       localStorage.removeItem('pendingMembers');
       checkPendingMembers();
       await loadMembers();
-      
       if (!isAutoSync) {
         setMessage({ type: 'success', text: `✅ Synced ${syncedCount} members!` });
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -408,10 +294,7 @@ const WeeklyDataEntry = () => {
   };
 
   const handlePaymentChange = (memberId, amount, setPayments) => {
-    setPayments(prev => ({
-      ...prev,
-      [memberId]: parseFloat(amount) || 0
-    }));
+    setPayments(prev => ({ ...prev, [memberId]: parseFloat(amount) || 0 }));
   };
 
   const calculateTotal = (payments) => {
@@ -451,7 +334,7 @@ const WeeklyDataEntry = () => {
   const checkExistingData = async () => {
     try {
       const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
-      if (response.data) {
+      if (response && response.data) {
         const data = response.data;
         setFormData(data);
         setPaymentsLessonEnglish(parsePaymentsFromSaved(data.members_paid_lesson_english));
@@ -517,42 +400,52 @@ const WeeklyDataEntry = () => {
         await weeklyDataService.submit(dataToSubmit);
       }
 
+      // ✅ FIXED: Save payments correctly - one record per member with proper field names
       const quarterId = localStorage.getItem('selectedQuarterId');
-      const allPayments = [
-        ...Object.entries(paymentsLessonEnglish).map(([id, amount]) => ({ member_id: id, payment_type: 'lesson_english', amount })),
-        ...Object.entries(paymentsLessonLuganda).map(([id, amount]) => ({ member_id: id, payment_type: 'lesson_luganda', amount })),
-        ...Object.entries(paymentsMorningWatchEnglish).map(([id, amount]) => ({ member_id: id, payment_type: 'morning_watch_english', amount })),
-        ...Object.entries(paymentsMorningWatchLuganda).map(([id, amount]) => ({ member_id: id, payment_type: 'morning_watch_luganda', amount }))
-      ].filter(p => p.amount > 0);
+      const currentWeek = parseInt(weekNumber); // always 1-13 from input field
 
-      for (const payment of allPayments) {
+      // Get all unique member IDs that have any payment
+      const memberIds = new Set([
+        ...Object.keys(paymentsLessonEnglish),
+        ...Object.keys(paymentsLessonLuganda),
+        ...Object.keys(paymentsMorningWatchEnglish),
+        ...Object.keys(paymentsMorningWatchLuganda),
+      ]);
+
+      for (const memberId of memberIds) {
+        const lessonEng = parseFloat(paymentsLessonEnglish[memberId] || 0);
+        const lessonLug = parseFloat(paymentsLessonLuganda[memberId] || 0);
+        const mwEng = parseFloat(paymentsMorningWatchEnglish[memberId] || 0);
+        const mwLug = parseFloat(paymentsMorningWatchLuganda[memberId] || 0);
+
+        const weekTotal = lessonEng + lessonLug + mwEng + mwLug;
+        if (weekTotal === 0) continue; // skip members with no payments
+
         await paymentService.recordPayment({
-          ...payment, quarter_id: quarterId, week_number: parseInt(weekNumber), payment_date: formData.sabbath_date
+          member_id: memberId,
+          quarter_id: quarterId,
+          week_number: currentWeek,        // ✅ correct 1-13 week number
+          payment_date: formData.sabbath_date,
+          lesson_english: lessonEng,        // ✅ correct field names
+          lesson_luganda: lessonLug,
+          morning_watch_english: mwEng,
+          morning_watch_luganda: mwLug,
+          offering: 0,
+          week_total: weekTotal,
         });
       }
 
-      // Reload the data to show updated values
       await checkExistingData();
       await loadPaymentTotals();
       window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      // Show success message and stay on page
       showToast(formData.id ? '✅ Data updated successfully!' : '🎉 Data submitted successfully!');
-
-      // Don't redirect - stay on the page for continued editing
     } catch (error) {
       console.error('❌ Submit error:', error);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          error.message || 
-                          'Failed to save data';
-                          
-      setMessage({
-        type: 'error',
-        text: `❌ Error: ${errorMessage}. Please check your data and try again.`
-      });
-      
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to save data';
+      setMessage({ type: 'error', text: `❌ Error: ${errorMessage}. Please check your data and try again.` });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
@@ -561,7 +454,6 @@ const WeeklyDataEntry = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      {/* Toast and Offline Banner */}
       {showSuccessToast && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-2">
           <CheckCircle className="h-5 w-5" />
@@ -609,7 +501,7 @@ const WeeklyDataEntry = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Week Number</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Week Number (1-13)</label>
             <input type="number" min="1" max="13" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required />
           </div>
           <div>
@@ -618,7 +510,7 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Member Management Section */}
+        {/* Member Management */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center space-x-2">
@@ -643,7 +535,7 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Lesson & Morning Watch Payment Section */}
+        {/* Payment Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {[
             { title: 'Lesson Study Guides', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
@@ -688,9 +580,12 @@ const WeeklyDataEntry = () => {
           ))}
         </div>
 
-        {/* Statistical Data Grid */}
+        {/* Statistics */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex items-center space-x-2 mb-6"><TrendingUp className="h-6 w-6 text-indigo-600" /><h2 className="text-xl font-bold text-gray-800">Weekly Statistics</h2></div>
+          <div className="flex items-center space-x-2 mb-6">
+            <TrendingUp className="h-6 w-6 text-indigo-600" />
+            <h2 className="text-xl font-bold text-gray-800">Weekly Statistics</h2>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { label: 'Attendance', name: 'total_attendance' },
@@ -716,7 +611,7 @@ const WeeklyDataEntry = () => {
           <textarea name="members_summary" value={formData.members_summary} onChange={handleChange} rows="3" className="w-full rounded-xl border-gray-300 focus:ring-indigo-500" placeholder="Enter any notes, testimonies, or special events for the week..."></textarea>
         </div>
 
-        {/* Submit Section */}
+        {/* Submit */}
         <div className="flex flex-col md:flex-row items-center gap-4 py-8">
           <button type="submit" disabled={loading} className="w-full md:w-auto px-12 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 shadow-xl">
             {loading ? <RefreshCw className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
