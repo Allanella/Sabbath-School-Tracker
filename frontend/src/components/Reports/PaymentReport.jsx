@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Download, Users, Calendar, Filter, CheckCircle } from 'lucide-react';
 import classService from '../../services/classService';
-import weeklyDataService from '../../services/WeeklyDataService';
 import quarterService from '../../services/quarterService';
+import memberPaymentService from '../../services/memberPaymentService';
 
 const PaymentReport = () => {
   const [quarters, setQuarters] = useState([]);
@@ -16,8 +16,13 @@ const PaymentReport = () => {
 
   useEffect(() => {
     loadQuarters();
-    loadClasses();
   }, []);
+
+  useEffect(() => {
+    if (selectedQuarter) {
+      loadClasses(selectedQuarter);
+    }
+  }, [selectedQuarter]);
 
   useEffect(() => {
     if (selectedQuarter) {
@@ -28,127 +33,113 @@ const PaymentReport = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+      setQuarters(quartersList);
+      const activeQuarter = quartersList.find(q => q.is_active);
+      if (activeQuarter) {
+        setSelectedQuarter(activeQuarter.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
     }
   };
 
-  const loadClasses = async () => {
+  const loadClasses = async (quarterId) => {
     try {
-      const response = await classService.getAll();
-      setClasses(response.data || []);
+      const response = await classService.getAll(quarterId);
+      const classList = Array.isArray(response) ? response : (response.data || []);
+      setClasses(classList);
+      setSelectedClass('');
     } catch (error) {
       console.error('Failed to load classes:', error);
+      setClasses([]);
     }
-  };
-
-  const parsePayments = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return [];
-    
-    const payments = [];
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      if (name && amount) {
-        const numAmount = parseFloat(amount);
-        if (!isNaN(numAmount)) {
-          payments.push({ name, amount: numAmount });
-        }
-      }
-    });
-    
-    return payments;
   };
 
   const loadPaymentData = async () => {
     if (!selectedQuarter) return;
-
     setLoading(true);
+
     try {
-      const classesToQuery = selectedClass 
-        ? [classes.find(c => c.id === selectedClass)]
-        : classes.filter(c => c.quarter_id === selectedQuarter);
+      // Get classes to query
+      const classResponse = await classService.getAll(selectedQuarter);
+      const allClasses = Array.isArray(classResponse) ? classResponse : (classResponse.data || []);
+      const classesToQuery = selectedClass
+        ? allClasses.filter(c => c.id === selectedClass)
+        : allClasses;
 
       const allPayments = [];
 
       for (const cls of classesToQuery) {
-        if (!cls) continue;
+        // Get payment totals for this class
+        const totalsResponse = await memberPaymentService.getClassPaymentTotals(cls.id, selectedQuarter);
+        const members = Array.isArray(totalsResponse) ? totalsResponse : (totalsResponse.data || []);
 
-        const weeklyDataResponse = await weeklyDataService.getByClass(cls.id);
-        const weeklyData = weeklyDataResponse.data || [];
+        members.forEach(member => {
+          const t = member.totals || {};
 
-        weeklyData.forEach(week => {
-          // Skip if specific week selected and doesn't match
-          if (selectedWeek !== 'all' && week.week_number !== parseInt(selectedWeek)) {
-            return;
-          }
-
-          // Lesson English
-          if (selectedPaymentType === 'all' || selectedPaymentType === 'lesson_english') {
-            const lessonEnglish = parsePayments(week.members_paid_lesson_english);
-            lessonEnglish.forEach(payment => {
-              allPayments.push({
-                memberName: payment.name,
-                amount: payment.amount,
-                paymentType: 'Lesson (English)',
-                className: cls.class_name,
-                weekNumber: week.week_number,
-                sabbathDate: week.sabbath_date,
-                category: 'lesson_english'
-              });
+          // Add lesson english payment
+          if ((selectedPaymentType === 'all' || selectedPaymentType === 'lesson_english') && t.lesson_english > 0) {
+            allPayments.push({
+              memberName: member.member_name,
+              amount: t.lesson_english,
+              paymentType: 'Lesson (English)',
+              className: cls.class_name,
+              weeksPaid: t.weeks_paid || 0,
+              category: 'lesson_english',
             });
           }
 
-          // Lesson Luganda
-          if (selectedPaymentType === 'all' || selectedPaymentType === 'lesson_luganda') {
-            const lessonLuganda = parsePayments(week.members_paid_lesson_luganda);
-            lessonLuganda.forEach(payment => {
-              allPayments.push({
-                memberName: payment.name,
-                amount: payment.amount,
-                paymentType: 'Lesson (Luganda)',
-                className: cls.class_name,
-                weekNumber: week.week_number,
-                sabbathDate: week.sabbath_date,
-                category: 'lesson_luganda'
-              });
+          // Add lesson luganda payment
+          if ((selectedPaymentType === 'all' || selectedPaymentType === 'lesson_luganda') && t.lesson_luganda > 0) {
+            allPayments.push({
+              memberName: member.member_name,
+              amount: t.lesson_luganda,
+              paymentType: 'Lesson (Luganda)',
+              className: cls.class_name,
+              weeksPaid: t.weeks_paid || 0,
+              category: 'lesson_luganda',
             });
           }
 
-          // Morning Watch English
-          if (selectedPaymentType === 'all' || selectedPaymentType === 'morning_watch_english') {
-            const morningWatchEnglish = parsePayments(week.members_paid_morning_watch_english);
-            morningWatchEnglish.forEach(payment => {
-              allPayments.push({
-                memberName: payment.name,
-                amount: payment.amount,
-                paymentType: 'Morning Watch (English)',
-                className: cls.class_name,
-                weekNumber: week.week_number,
-                sabbathDate: week.sabbath_date,
-                category: 'morning_watch_english'
-              });
+          // Add morning watch english payment
+          if ((selectedPaymentType === 'all' || selectedPaymentType === 'morning_watch_english') && t.morning_watch_english > 0) {
+            allPayments.push({
+              memberName: member.member_name,
+              amount: t.morning_watch_english,
+              paymentType: 'Morning Watch (English)',
+              className: cls.class_name,
+              weeksPaid: t.weeks_paid || 0,
+              category: 'morning_watch_english',
             });
           }
 
-          // Morning Watch Luganda
-          if (selectedPaymentType === 'all' || selectedPaymentType === 'morning_watch_luganda') {
-            const morningWatchLuganda = parsePayments(week.members_paid_morning_watch_luganda);
-            morningWatchLuganda.forEach(payment => {
-              allPayments.push({
-                memberName: payment.name,
-                amount: payment.amount,
-                paymentType: 'Morning Watch (Luganda)',
-                className: cls.class_name,
-                weekNumber: week.week_number,
-                sabbathDate: week.sabbath_date,
-                category: 'morning_watch_luganda'
-              });
+          // Add morning watch luganda payment
+          if ((selectedPaymentType === 'all' || selectedPaymentType === 'morning_watch_luganda') && t.morning_watch_luganda > 0) {
+            allPayments.push({
+              memberName: member.member_name,
+              amount: t.morning_watch_luganda,
+              paymentType: 'Morning Watch (Luganda)',
+              className: cls.class_name,
+              weeksPaid: t.weeks_paid || 0,
+              category: 'morning_watch_luganda',
+            });
+          }
+
+          // Add offering
+          if ((selectedPaymentType === 'all' || selectedPaymentType === 'offering') && t.offering > 0) {
+            allPayments.push({
+              memberName: member.member_name,
+              amount: t.offering,
+              paymentType: 'Offering',
+              className: cls.class_name,
+              weeksPaid: t.weeks_paid || 0,
+              category: 'offering',
             });
           }
         });
@@ -173,27 +164,15 @@ const PaymentReport = () => {
           lesson_luganda: allPayments.filter(p => p.category === 'lesson_luganda').reduce((sum, p) => sum + p.amount, 0),
           morning_watch_english: allPayments.filter(p => p.category === 'morning_watch_english').reduce((sum, p) => sum + p.amount, 0),
           morning_watch_luganda: allPayments.filter(p => p.category === 'morning_watch_luganda').reduce((sum, p) => sum + p.amount, 0),
-        }
+        },
       };
 
-      setPaymentData({
-        payments: allPayments,
-        summary
-      });
-
+      setPaymentData({ payments: allPayments, summary });
     } catch (error) {
       console.error('Error loading payment data:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
   };
 
   const getPaymentTypeColor = (category) => {
@@ -202,6 +181,7 @@ const PaymentReport = () => {
       lesson_luganda: 'text-blue-600 bg-blue-50 border-blue-200',
       morning_watch_english: 'text-purple-600 bg-purple-50 border-purple-200',
       morning_watch_luganda: 'text-orange-600 bg-orange-50 border-orange-200',
+      offering: 'text-red-600 bg-red-50 border-red-200',
     };
     return colors[category] || 'text-gray-600 bg-gray-50 border-gray-200';
   };
@@ -251,11 +231,12 @@ const PaymentReport = () => {
             <select
               value={selectedQuarter}
               onChange={(e) => setSelectedQuarter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
+              <option value="">Choose Quarter</option>
               {quarters.map((quarter) => (
                 <option key={quarter.id} value={quarter.id}>
-                  {quarter.name} {quarter.year}
+                  {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
                 </option>
               ))}
             </select>
@@ -266,16 +247,14 @@ const PaymentReport = () => {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
               <option value="">All Classes</option>
-              {classes
-                .filter(cls => cls.quarter_id === selectedQuarter)
-                .map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.class_name}
-                  </option>
-                ))}
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>
+                  {cls.class_name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -284,7 +263,7 @@ const PaymentReport = () => {
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
               <option value="all">All Weeks</option>
               {[...Array(13)].map((_, i) => (
@@ -298,13 +277,14 @@ const PaymentReport = () => {
             <select
               value={selectedPaymentType}
               onChange={(e) => setSelectedPaymentType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
               <option value="all">All Types</option>
               <option value="lesson_english">Lesson (English)</option>
               <option value="lesson_luganda">Lesson (Luganda)</option>
               <option value="morning_watch_english">Morning Watch (English)</option>
               <option value="morning_watch_luganda">Morning Watch (Luganda)</option>
+              <option value="offering">Offering</option>
             </select>
           </div>
         </div>
@@ -352,7 +332,7 @@ const PaymentReport = () => {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Avg per Payment</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {paymentData.summary.totalPayments > 0 
+                    {paymentData.summary.totalPayments > 0
                       ? Math.round(paymentData.summary.totalAmount / paymentData.summary.totalPayments).toLocaleString()
                       : 0}
                   </p>
@@ -411,16 +391,13 @@ const PaymentReport = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Type</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Week</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {paymentData.payments.map((payment, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {index + 1}
-                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -441,29 +418,22 @@ const PaymentReport = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
                           {payment.amount.toLocaleString()} UGX
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {payment.className}
-                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{payment.className}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
-                            Week {payment.weekNumber}
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                            {payment.weeksPaid}/13
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {formatDate(payment.sabbathDate)}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-gray-50 font-bold">
                     <tr>
-                      <td colSpan="3" className="px-6 py-4 text-left text-sm uppercase text-gray-700">
-                        Total
-                      </td>
+                      <td colSpan="3" className="px-6 py-4 text-left text-sm uppercase text-gray-700">Total</td>
                       <td className="px-6 py-4 text-right text-lg text-green-700">
                         {paymentData.summary.totalAmount.toLocaleString()} UGX
                       </td>
-                      <td colSpan="3" className="px-6 py-4 text-right text-sm text-gray-600">
+                      <td colSpan="2" className="px-6 py-4 text-right text-sm text-gray-600">
                         {paymentData.payments.length} payments
                       </td>
                     </tr>
