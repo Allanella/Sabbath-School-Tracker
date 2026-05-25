@@ -19,7 +19,7 @@ const WeeklyDataEntry = () => {
   const [manualOffline, setManualOffline] = useState(false);
   const [pendingMembersCount, setPendingMembersCount] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-  
+
   const [members, setMembers] = useState([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
@@ -32,6 +32,9 @@ const WeeklyDataEntry = () => {
   const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
   const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
   const [paymentsMorningWatchLuganda, setPaymentsMorningWatchLuganda] = useState({});
+
+  // Track existing payment IDs for update/delete
+  const [existingPaymentIds, setExistingPaymentIds] = useState({});
 
   const [formData, setFormData] = useState({
     sabbath_date: '',
@@ -67,7 +70,6 @@ const WeeklyDataEntry = () => {
       setIsOnline(nowOnline);
       if (wasOffline && nowOnline) { autoSyncPendingData(); }
     };
-
     updateOnlineStatus();
     const handleOnline = () => updateOnlineStatus();
     const handleOffline = () => updateOnlineStatus();
@@ -139,12 +141,10 @@ const WeeklyDataEntry = () => {
         }
       } else {
         setClasses([]);
-        setMessage({ type: 'error', text: 'Invalid data format received for classes.' });
       }
     } catch (error) {
       console.error('Failed to load classes:', error);
       setClasses([]);
-      setMessage({ type: 'error', text: 'Failed to load classes for selected quarter' });
     }
   };
 
@@ -191,6 +191,124 @@ const WeeklyDataEntry = () => {
     } catch (error) {
       console.error('Error loading members with local:', error);
     }
+  };
+
+  const checkExistingData = async () => {
+    try {
+      const quarterId = localStorage.getItem('selectedQuarterId');
+
+      // Load weekly attendance/offering data
+      const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
+      if (response && response.data) {
+        const data = response.data;
+        setFormData(data);
+        setMessage({ type: 'info', text: '📝 Editing existing data for this week.' });
+      } else {
+        setFormData({
+          sabbath_date: '', total_attendance: 0, member_visits: 0,
+          members_conducted_bible_studies: 0, members_helped_others: 0,
+          members_studied_lesson: 0, number_of_visitors: 0,
+          bible_study_guides_distributed: 0, offering_global_mission: 0,
+          members_summary: '',
+        });
+        setMessage({ type: '', text: '' });
+      }
+
+      // Reset payment inputs
+      setPaymentsLessonEnglish({});
+      setPaymentsLessonLuganda({});
+      setPaymentsMorningWatchEnglish({});
+      setPaymentsMorningWatchLuganda({});
+      setExistingPaymentIds({});
+
+      // Load existing member payments for this week
+      if (quarterId) {
+        try {
+          const weekPaymentsRes = await api.get(
+            `/member-payments/class/${selectedClass}/week?quarter_id=${quarterId}&week_number=${weekNumber}`
+          );
+          const weekPayments = weekPaymentsRes.data?.data || weekPaymentsRes.data || [];
+
+          const newLessonEng = {};
+          const newLessonLug = {};
+          const newMwEng = {};
+          const newMwLug = {};
+          const paymentIds = {};
+
+          weekPayments.forEach(member => {
+            if (member.payment) {
+              // Store payment ID for update/delete later
+              paymentIds[member.id] = member.payment.id;
+
+              if (member.payment.lesson_english > 0) newLessonEng[member.id] = member.payment.lesson_english;
+              if (member.payment.lesson_luganda > 0) newLessonLug[member.id] = member.payment.lesson_luganda;
+              if (member.payment.morning_watch_english > 0) newMwEng[member.id] = member.payment.morning_watch_english;
+              if (member.payment.morning_watch_luganda > 0) newMwLug[member.id] = member.payment.morning_watch_luganda;
+            }
+          });
+
+          setPaymentsLessonEnglish(newLessonEng);
+          setPaymentsLessonLuganda(newLessonLug);
+          setPaymentsMorningWatchEnglish(newMwEng);
+          setPaymentsMorningWatchLuganda(newMwLug);
+          setExistingPaymentIds(paymentIds);
+
+          if (Object.keys(paymentIds).length > 0) {
+            setMessage({ type: 'info', text: '📝 Existing payments loaded — you can edit and save.' });
+          }
+        } catch (err) {
+          console.error('Could not load week payments:', err);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing data:', error);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handlePaymentChange = (memberId, amount, setPayments) => {
+    setPayments(prev => ({ ...prev, [memberId]: parseFloat(amount) || 0 }));
+  };
+
+  const calculateTotal = (payments) => {
+    return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
+  };
+
+  const getCumulativeTotal = (memberId, paymentType) => {
+    const memberTotals = paymentTotals[memberId];
+    if (!memberTotals) return 0;
+    return memberTotals[paymentType] || 0;
+  };
+
+  const formatPaymentsForSave = (payments) => {
+    if (!payments || Object.keys(payments).length === 0) return '';
+    const entries = Object.entries(payments)
+      .filter(([id, amount]) => amount && amount > 0)
+      .map(([id, amount]) => {
+        const member = members.find(m => m.id === id);
+        return member ? `${member.member_name}: ${amount}` : null;
+      })
+      .filter(Boolean);
+    return entries.length > 0 ? entries.join(', ') : '';
+  };
+
+  const parsePaymentsFromSaved = (paymentString) => {
+    if (!paymentString || paymentString.trim() === '') return {};
+    const payments = {};
+    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
+    entries.forEach(entry => {
+      const [name, amount] = entry.split(':').map(s => s.trim());
+      const member = members.find(m => m.member_name === name);
+      if (member && amount) payments[member.id] = parseFloat(amount);
+    });
+    return payments;
   };
 
   const handleAddMember = async () => {
@@ -293,80 +411,6 @@ const WeeklyDataEntry = () => {
     }
   };
 
-  const handlePaymentChange = (memberId, amount, setPayments) => {
-    setPayments(prev => ({ ...prev, [memberId]: parseFloat(amount) || 0 }));
-  };
-
-  const calculateTotal = (payments) => {
-    return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
-  };
-
-  const getCumulativeTotal = (memberId, paymentType) => {
-    const memberTotals = paymentTotals[memberId];
-    if (!memberTotals) return 0;
-    return memberTotals[paymentType] || 0;
-  };
-
-  const formatPaymentsForSave = (payments) => {
-    if (!payments || Object.keys(payments).length === 0) return '';
-    const entries = Object.entries(payments)
-      .filter(([id, amount]) => amount && amount > 0)
-      .map(([id, amount]) => {
-        const member = members.find(m => m.id === id);
-        return member ? `${member.member_name}: ${amount}` : null;
-      })
-      .filter(Boolean);
-    return entries.length > 0 ? entries.join(', ') : '';
-  };
-
-  const parsePaymentsFromSaved = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return {};
-    const payments = {};
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      const member = members.find(m => m.member_name === name);
-      if (member && amount) payments[member.id] = parseFloat(amount);
-    });
-    return payments;
-  };
-
-  const checkExistingData = async () => {
-    try {
-      const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
-      if (response && response.data) {
-        const data = response.data;
-        setFormData(data);
-        setPaymentsLessonEnglish(parsePaymentsFromSaved(data.members_paid_lesson_english));
-        setPaymentsLessonLuganda(parsePaymentsFromSaved(data.members_paid_lesson_luganda));
-        setPaymentsMorningWatchEnglish(parsePaymentsFromSaved(data.members_paid_morning_watch_english));
-        setPaymentsMorningWatchLuganda(parsePaymentsFromSaved(data.members_paid_morning_watch_luganda));
-        setMessage({ type: 'info', text: 'Editing existing data for this week.' });
-      } else {
-        setFormData({
-          sabbath_date: '', total_attendance: 0, member_visits: 0,
-          members_conducted_bible_studies: 0, members_helped_others: 0,
-          members_studied_lesson: 0, number_of_visitors: 0,
-          bible_study_guides_distributed: 0, offering_global_mission: 0,
-          members_summary: '',
-        });
-        setPaymentsLessonEnglish({}); setPaymentsLessonLuganda({});
-        setPaymentsMorningWatchEnglish({}); setPaymentsMorningWatchLuganda({});
-        setMessage({ type: '', text: '' });
-      }
-    } catch (error) {
-      console.error('Error checking existing data:', error);
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
-    }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -394,17 +438,17 @@ const WeeklyDataEntry = () => {
         return;
       }
 
+      // Save weekly attendance/offering data
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
       } else {
         await weeklyDataService.submit(dataToSubmit);
       }
 
-      // ✅ FIXED: Save payments correctly - one record per member with proper field names
       const quarterId = localStorage.getItem('selectedQuarterId');
-      const currentWeek = parseInt(weekNumber); // always 1-13 from input field
+      const currentWeek = parseInt(weekNumber); // always 1-13
 
-      // Get all unique member IDs that have any payment
+      // Get all unique member IDs with any payment
       const memberIds = new Set([
         ...Object.keys(paymentsLessonEnglish),
         ...Object.keys(paymentsLessonLuganda),
@@ -417,16 +461,23 @@ const WeeklyDataEntry = () => {
         const lessonLug = parseFloat(paymentsLessonLuganda[memberId] || 0);
         const mwEng = parseFloat(paymentsMorningWatchEnglish[memberId] || 0);
         const mwLug = parseFloat(paymentsMorningWatchLuganda[memberId] || 0);
-
         const weekTotal = lessonEng + lessonLug + mwEng + mwLug;
+
+        // Delete existing payment for this member/week if it exists (for edit)
+        const existingPaymentId = existingPaymentIds[memberId];
+        if (existingPaymentId) {
+          await paymentService.deletePayment(existingPaymentId);
+        }
+
         if (weekTotal === 0) continue; // skip members with no payments
 
+        // Save new/updated payment
         await paymentService.recordPayment({
           member_id: memberId,
           quarter_id: quarterId,
-          week_number: currentWeek,        // ✅ correct 1-13 week number
+          week_number: currentWeek,
           payment_date: formData.sabbath_date,
-          lesson_english: lessonEng,        // ✅ correct field names
+          lesson_english: lessonEng,
           lesson_luganda: lessonLug,
           morning_watch_english: mwEng,
           morning_watch_luganda: mwLug,
@@ -486,13 +537,18 @@ const WeeklyDataEntry = () => {
       </div>
 
       {message.text && !showSuccessToast && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center space-x-3 ${message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+        <div className={`mb-6 p-4 rounded-lg flex items-center space-x-3 ${
+          message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
+          message.type === 'info' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+          'bg-green-50 text-green-700 border border-green-200'
+        }`}>
           {message.type === 'error' ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
           <p>{message.text}</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Class, Week, Date */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Class</label>
@@ -518,8 +574,7 @@ const WeeklyDataEntry = () => {
               <h2 className="text-xl font-bold text-gray-800">Class Members</h2>
             </div>
             <button type="button" onClick={() => { setEditingMember(null); setNewMemberName(''); setShowMemberModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center space-x-2 hover:bg-indigo-700 transition">
-              <Plus className="h-4 w-4" />
-              <span>Add Member</span>
+              <Plus className="h-4 w-4" /><span>Add Member</span>
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -560,10 +615,14 @@ const WeeklyDataEntry = () => {
                       <tr key={m.id}>
                         <td className="py-3">
                           <div className="font-medium text-gray-800">{m.member_name}</div>
-                          <div className="text-xs text-gray-400">Total: {getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)}</div>
+                          <div className="text-xs text-gray-400">Quarter total: {getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)}</div>
                         </td>
-                        <td className="py-3"><input type="number" step="100" value={section.eng[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" /></td>
-                        <td className="py-3"><input type="number" step="100" value={section.lug[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" /></td>
+                        <td className="py-3">
+                          <input type="number" step="100" value={section.eng[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
+                        </td>
+                        <td className="py-3">
+                          <input type="number" step="100" value={section.lug[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -605,7 +664,7 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Summary Notes */}
+        {/* Notes */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <label className="block text-sm font-bold text-gray-700 mb-2">Weekly Summary / Testimony</label>
           <textarea name="members_summary" value={formData.members_summary} onChange={handleChange} rows="3" className="w-full rounded-xl border-gray-300 focus:ring-indigo-500" placeholder="Enter any notes, testimonies, or special events for the week..."></textarea>
