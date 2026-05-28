@@ -3,7 +3,6 @@ const router = express.Router();
 const memberPaymentController = require('../controllers/memberPaymentController');
 const authenticate = require('../middleware/auth');
 
-// All routes require authentication
 router.use(authenticate);
 
 // Record a payment
@@ -17,6 +16,9 @@ router.get('/member/:memberId/totals', memberPaymentController.getMemberTotals);
 
 // Get all payments for a quarter
 router.get('/quarter/:quarterId', memberPaymentController.getQuarterPayments);
+
+// Get payments for a class for a specific week (for editing)
+router.get('/class/:classId/week', memberPaymentController.getWeekPayments);
 
 // Get payment totals for all members in a class
 router.get('/class/:classId/totals', memberPaymentController.getClassPaymentTotals);

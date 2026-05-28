@@ -1,706 +1,337 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../services/api';
-import classService from '../../services/classService';
-import weeklyDataService from '../../services/WeeklyDataService';
-import classMemberService from '../../services/classMemberService';
-import paymentService from '../../services/paymentService';
-import offlineStorage from '../../utils/offlineStorage';
-import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff, RefreshCw, TrendingUp } from 'lucide-react';
+const supabase = require('../config/database');
 
-const WeeklyDataEntry = () => {
-  const navigate = useNavigate();
-  const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState('');
-  const [weekNumber, setWeekNumber] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [manualOffline, setManualOffline] = useState(false);
-  const [pendingMembersCount, setPendingMembersCount] = useState(0);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+// Record a payment for a member
+const recordPayment = async (req, res) => {
+  try {
+    const paymentData = req.body;
 
-  const [members, setMembers] = useState([]);
-  const [showMemberModal, setShowMemberModal] = useState(false);
-  const [newMemberName, setNewMemberName] = useState('');
-  const [editingMember, setEditingMember] = useState(null);
+    const { data, error } = await supabase
+      .from('member_payment_history')
+      .insert(paymentData)
+      .select()
+      .single();
 
-  const [paymentTotals, setPaymentTotals] = useState({});
-  const [loadingTotals, setLoadingTotals] = useState(false);
+    if (error) throw error;
 
-  const [paymentsLessonEnglish, setPaymentsLessonEnglish] = useState({});
-  const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
-  const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
-  const [paymentsMorningWatchLuganda, setPaymentsMorningWatchLuganda] = useState({});
-
-  // Track existing payment IDs for update/delete
-  const [existingPaymentIds, setExistingPaymentIds] = useState({});
-
-  const [formData, setFormData] = useState({
-    sabbath_date: '',
-    total_attendance: 0,
-    member_visits: 0,
-    members_conducted_bible_studies: 0,
-    members_helped_others: 0,
-    members_studied_lesson: 0,
-    number_of_visitors: 0,
-    bible_study_guides_distributed: 0,
-    offering_global_mission: 0,
-    members_summary: '',
-  });
-
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
-  useEffect(() => {
-    const handleQuarterChange = () => { loadClasses(); };
-    window.addEventListener('quarterChanged', handleQuarterChange);
-    return () => window.removeEventListener('quarterChanged', handleQuarterChange);
-  }, []);
-
-  useEffect(() => {
-    loadClasses();
-    checkPendingMembers();
-  }, []);
-
-  useEffect(() => {
-    const updateOnlineStatus = () => {
-      const actualStatus = navigator.onLine;
-      const wasOffline = !isOnline;
-      const nowOnline = actualStatus && !manualOffline;
-      setIsOnline(nowOnline);
-      if (wasOffline && nowOnline) { autoSyncPendingData(); }
-    };
-    updateOnlineStatus();
-    const handleOnline = () => updateOnlineStatus();
-    const handleOffline = () => updateOnlineStatus();
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    const intervalId = setInterval(updateOnlineStatus, 2000);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      clearInterval(intervalId);
-    };
-  }, [isOnline, manualOffline]);
-
-  useEffect(() => {
-    if (selectedClass) {
-      loadMembersWithLocal();
-      loadPaymentTotals();
-      if (weekNumber) { checkExistingData(); }
-    }
-  }, [selectedClass, weekNumber]);
-
-  const checkPendingMembers = () => {
-    try {
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      setPendingMembersCount(localMembers.length);
-    } catch (error) {
-      setPendingMembersCount(0);
-    }
-  };
-
-  const autoSyncPendingData = async () => {
-    try {
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      const pendingData = await offlineStorage.getPendingCount();
-      if (localMembers.length > 0 || pendingData > 0) {
-        if (localMembers.length > 0) { await syncPendingMembers(true); }
-        showToast('✅ Data synced successfully!');
-      }
-    } catch (error) {
-      console.error('Auto-sync error:', error);
-    }
-  };
-
-  const showToast = (msg) => {
-    setShowSuccessToast(true);
-    setMessage({ type: 'success', text: msg });
-    setTimeout(() => {
-      setShowSuccessToast(false);
-      setMessage({ type: '', text: '' });
-    }, 3000);
-  };
-
-  const loadClasses = async () => {
-    try {
-      const quarterId = localStorage.getItem('selectedQuarterId');
-      if (!quarterId) {
-        setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar' });
-        setClasses([]);
-        return;
-      }
-      const response = await api.get(`/classes?quarter_id=${quarterId}`);
-      const classesData = response.data?.data || response.data || [];
-      if (Array.isArray(classesData)) {
-        setClasses(classesData);
-        if (classesData.length > 0) {
-          setSelectedClass(classesData[0].id);
-        } else {
-          setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
-        }
-      } else {
-        setClasses([]);
-      }
-    } catch (error) {
-      console.error('Failed to load classes:', error);
-      setClasses([]);
-    }
-  };
-
-  const loadMembers = async () => {
-    try {
-      const response = await classMemberService.getByClass(selectedClass);
-      const membersData = Array.isArray(response) ? response : (response.data || []);
-      setMembers(Array.isArray(membersData) ? membersData : []);
-    } catch (error) {
-      console.error('Failed to load members:', error);
-      setMembers([]);
-    }
-  };
-
-  const loadPaymentTotals = async () => {
-    try {
-      setLoadingTotals(true);
-      const quarterId = localStorage.getItem('selectedQuarterId');
-      if (!quarterId || !selectedClass) { setPaymentTotals({}); return; }
-      const response = await paymentService.getClassPaymentTotals(selectedClass, quarterId);
-      const totalsArray = Array.isArray(response) ? response : (response.data || []);
-      const totalsMap = {};
-      totalsArray.forEach(memberData => {
-        totalsMap[memberData.id] = memberData.totals;
-      });
-      setPaymentTotals(totalsMap);
-    } catch (error) {
-      console.error('Failed to load payment totals:', error);
-      setPaymentTotals({});
-    } finally {
-      setLoadingTotals(false);
-    }
-  };
-
-  const loadMembersWithLocal = async () => {
-    try {
-      await loadMembers();
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data.class_id === selectedClass);
-      if (pendingAdds.length > 0) {
-        const tempMembers = pendingAdds.map(item => item.data);
-        setMembers(prev => [...prev, ...tempMembers]);
-      }
-    } catch (error) {
-      console.error('Error loading members with local:', error);
-    }
-  };
-
-  const checkExistingData = async () => {
-    try {
-      const quarterId = localStorage.getItem('selectedQuarterId');
-
-      // Load weekly attendance/offering data
-      const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
-      if (response && response.data) {
-        const data = response.data;
-        setFormData(data);
-        setMessage({ type: 'info', text: '📝 Editing existing data for this week.' });
-      } else {
-        setFormData({
-          sabbath_date: '', total_attendance: 0, member_visits: 0,
-          members_conducted_bible_studies: 0, members_helped_others: 0,
-          members_studied_lesson: 0, number_of_visitors: 0,
-          bible_study_guides_distributed: 0, offering_global_mission: 0,
-          members_summary: '',
-        });
-        setMessage({ type: '', text: '' });
-      }
-
-      // Reset payment inputs
-      setPaymentsLessonEnglish({});
-      setPaymentsLessonLuganda({});
-      setPaymentsMorningWatchEnglish({});
-      setPaymentsMorningWatchLuganda({});
-      setExistingPaymentIds({});
-
-      // Load existing member payments for this week
-      if (quarterId) {
-        try {
-          const weekPaymentsRes = await api.get(
-            `/member-payments/class/${selectedClass}/week?quarter_id=${quarterId}&week_number=${weekNumber}`
-          );
-          const weekPayments = weekPaymentsRes.data?.data || weekPaymentsRes.data || [];
-
-          const newLessonEng = {};
-          const newLessonLug = {};
-          const newMwEng = {};
-          const newMwLug = {};
-          const paymentIds = {};
-
-          weekPayments.forEach(member => {
-            if (member.payment) {
-              // Store payment ID for update/delete later
-              paymentIds[member.id] = member.payment.id;
-
-              if (member.payment.lesson_english > 0) newLessonEng[member.id] = member.payment.lesson_english;
-              if (member.payment.lesson_luganda > 0) newLessonLug[member.id] = member.payment.lesson_luganda;
-              if (member.payment.morning_watch_english > 0) newMwEng[member.id] = member.payment.morning_watch_english;
-              if (member.payment.morning_watch_luganda > 0) newMwLug[member.id] = member.payment.morning_watch_luganda;
-            }
-          });
-
-          setPaymentsLessonEnglish(newLessonEng);
-          setPaymentsLessonLuganda(newLessonLug);
-          setPaymentsMorningWatchEnglish(newMwEng);
-          setPaymentsMorningWatchLuganda(newMwLug);
-          setExistingPaymentIds(paymentIds);
-
-          if (Object.keys(paymentIds).length > 0) {
-            setMessage({ type: 'info', text: '📝 Existing payments loaded — you can edit and save.' });
-          }
-        } catch (err) {
-          console.error('Could not load week payments:', err);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking existing data:', error);
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value,
-    }));
-  };
-
-  const handlePaymentChange = (memberId, amount, setPayments) => {
-    setPayments(prev => ({ ...prev, [memberId]: parseFloat(amount) || 0 }));
-  };
-
-  const calculateTotal = (payments) => {
-    return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
-  };
-
-  const getCumulativeTotal = (memberId, paymentType) => {
-    const memberTotals = paymentTotals[memberId];
-    if (!memberTotals) return 0;
-    return memberTotals[paymentType] || 0;
-  };
-
-  const formatPaymentsForSave = (payments) => {
-    if (!payments || Object.keys(payments).length === 0) return '';
-    const entries = Object.entries(payments)
-      .filter(([id, amount]) => amount && amount > 0)
-      .map(([id, amount]) => {
-        const member = members.find(m => m.id === id);
-        return member ? `${member.member_name}: ${amount}` : null;
-      })
-      .filter(Boolean);
-    return entries.length > 0 ? entries.join(', ') : '';
-  };
-
-  const parsePaymentsFromSaved = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return {};
-    const payments = {};
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      const member = members.find(m => m.member_name === name);
-      if (member && amount) payments[member.id] = parseFloat(amount);
+    res.json({
+      success: true,
+      data,
+      message: 'Payment recorded successfully',
     });
-    return payments;
-  };
-
-  const handleAddMember = async () => {
-    if (!newMemberName.trim()) {
-      setMessage({ type: 'error', text: 'Please enter a member name.' });
-      return;
-    }
-    const isActuallyOnline = navigator.onLine && !manualOffline;
-    if (!isActuallyOnline) {
-      try {
-        const tempId = `temp-${Date.now()}`;
-        const newMember = { id: tempId, member_name: newMemberName.trim(), class_id: selectedClass, isLocal: true };
-        setMembers([...members, newMember]);
-        setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
-        const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-        localMembers.push({ action: 'create', data: newMember, timestamp: Date.now() });
-        localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-        checkPendingMembers();
-        setMessage({ type: 'warning', text: '📴 Offline: Member added locally. Will sync when online.' });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-        return;
-      } catch (offlineError) {
-        setMessage({ type: 'error', text: `Offline save failed: ${offlineError.message}` });
-        return;
-      }
-    }
-    try {
-      if (editingMember) {
-        await classMemberService.update(editingMember.id, { member_name: newMemberName });
-        setMessage({ type: 'success', text: 'Member updated successfully!' });
-      } else {
-        await classMemberService.create({ class_id: selectedClass, member_name: newMemberName });
-        setMessage({ type: 'success', text: 'Member added successfully!' });
-      }
-      setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
-      loadMembers();
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch (error) {
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save member' });
-    }
-  };
-
-  const handleEditMember = (member) => {
-    setEditingMember(member);
-    setNewMemberName(member.member_name);
-    setShowMemberModal(true);
-  };
-
-  const handleDeleteMember = async (memberId) => {
-    if (!window.confirm('Are you sure you want to remove this member?')) return;
-    const isActuallyOnline = navigator.onLine && !manualOffline;
-    if (!isActuallyOnline) {
-      setMembers(members.filter(m => m.id !== memberId));
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      localMembers.push({ action: 'delete', memberId, timestamp: Date.now() });
-      localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
-      checkPendingMembers();
-      setMessage({ type: 'warning', text: '📴 Offline: Member removed locally.' });
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-      return;
-    }
-    try {
-      await classMemberService.delete(memberId);
-      setMessage({ type: 'success', text: 'Member removed successfully!' });
-      loadMembers();
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to remove member.' });
-    }
-  };
-
-  const syncPendingMembers = async (isAutoSync = false) => {
-    try {
-      const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      if (localMembers.length === 0) return;
-      setLoading(true);
-      let syncedCount = 0;
-      for (const item of localMembers) {
-        try {
-          if (item.action === 'create') {
-            await classMemberService.create({ class_id: item.data.class_id, member_name: item.data.member_name });
-            syncedCount++;
-          } else if (item.action === 'delete' && !item.memberId.startsWith('temp-')) {
-            await classMemberService.delete(item.memberId);
-            syncedCount++;
-          }
-        } catch (error) {
-          console.error('Failed to sync member:', item, error);
-        }
-      }
-      localStorage.removeItem('pendingMembers');
-      checkPendingMembers();
-      await loadMembers();
-      if (!isAutoSync) {
-        setMessage({ type: 'success', text: `✅ Synced ${syncedCount} members!` });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-
-    const dataToSubmit = {
-      class_id: selectedClass,
-      week_number: parseInt(weekNumber),
-      ...formData,
-      members_paid_lesson_english: formatPaymentsForSave(paymentsLessonEnglish),
-      members_paid_lesson_luganda: formatPaymentsForSave(paymentsLessonLuganda),
-      members_paid_morning_watch_english: formatPaymentsForSave(paymentsMorningWatchEnglish),
-      members_paid_morning_watch_luganda: formatPaymentsForSave(paymentsMorningWatchLuganda),
-    };
-
-    const isActuallyOnline = navigator.onLine && !manualOffline;
-
-    try {
-      if (!isActuallyOnline) {
-        await offlineStorage.savePendingData({ data: dataToSubmit });
-        setMessage({ type: 'warning', text: '📴 Offline! Data saved locally and will sync later.' });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        setTimeout(() => navigate('/secretary'), 3000);
-        setLoading(false);
-        return;
-      }
-
-      // Save weekly attendance/offering data
-      if (formData.id) {
-        await weeklyDataService.update(formData.id, dataToSubmit);
-      } else {
-        await weeklyDataService.submit(dataToSubmit);
-      }
-
-      const quarterId = localStorage.getItem('selectedQuarterId');
-      const currentWeek = parseInt(weekNumber); // always 1-13
-
-      // Get all unique member IDs with any payment
-      const memberIds = new Set([
-        ...Object.keys(paymentsLessonEnglish),
-        ...Object.keys(paymentsLessonLuganda),
-        ...Object.keys(paymentsMorningWatchEnglish),
-        ...Object.keys(paymentsMorningWatchLuganda),
-      ]);
-
-      for (const memberId of memberIds) {
-        const lessonEng = parseFloat(paymentsLessonEnglish[memberId] || 0);
-        const lessonLug = parseFloat(paymentsLessonLuganda[memberId] || 0);
-        const mwEng = parseFloat(paymentsMorningWatchEnglish[memberId] || 0);
-        const mwLug = parseFloat(paymentsMorningWatchLuganda[memberId] || 0);
-        const weekTotal = lessonEng + lessonLug + mwEng + mwLug;
-
-        // Delete existing payment for this member/week if it exists (for edit)
-        const existingPaymentId = existingPaymentIds[memberId];
-        if (existingPaymentId) {
-          await paymentService.deletePayment(existingPaymentId);
-        }
-
-        if (weekTotal === 0) continue; // skip members with no payments
-
-        // Save new/updated payment
-        await paymentService.recordPayment({
-          member_id: memberId,
-          quarter_id: quarterId,
-          week_number: currentWeek,
-          payment_date: formData.sabbath_date,
-          lesson_english: lessonEng,
-          lesson_luganda: lessonLug,
-          morning_watch_english: mwEng,
-          morning_watch_luganda: mwLug,
-          offering: 0,
-          week_total: weekTotal,
-        });
-      }
-
-      await checkExistingData();
-      await loadPaymentTotals();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      showToast(formData.id ? '✅ Data updated successfully!' : '🎉 Data submitted successfully!');
-    } catch (error) {
-      console.error('❌ Submit error:', error);
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message ||
-        'Failed to save data';
-      setMessage({ type: 'error', text: `❌ Error: ${errorMessage}. Please check your data and try again.` });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-6xl mx-auto p-4">
-      {showSuccessToast && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-2">
-          <CheckCircle className="h-5 w-5" />
-          <span className="font-medium">{message.text}</span>
-        </div>
-      )}
-
-      {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 bg-orange-600 text-white py-2 px-4 text-center text-sm font-medium z-40">
-          <div className="flex items-center justify-center space-x-2">
-            <WifiOff className="h-4 w-4" />
-            <span>You're offline - Data will sync when you're back online</span>
-          </div>
-        </div>
-      )}
-
-      <div className={`flex items-center justify-between mb-8 ${!isOnline ? 'mt-12' : ''}`}>
-        <h1 className="text-3xl font-bold text-gray-900">Weekly Data Entry</h1>
-        <div className="flex items-center space-x-3">
-          {pendingMembersCount > 0 && (
-            <button onClick={() => syncPendingMembers(false)} className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center space-x-2 shadow-md">
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Sync {pendingMembersCount} Members</span>
-            </button>
-          )}
-          <div className={`px-4 py-2 rounded-lg border-2 ${isOnline && !manualOffline ? 'bg-green-100 border-green-500 text-green-800' : 'bg-orange-100 border-orange-500 text-orange-800'}`}>
-            {isOnline && !manualOffline ? 'Online' : 'Offline'}
-          </div>
-        </div>
-      </div>
-
-      {message.text && !showSuccessToast && (
-        <div className={`mb-6 p-4 rounded-lg flex items-center space-x-3 ${
-          message.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
-          message.type === 'info' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-          'bg-green-50 text-green-700 border border-green-200'
-        }`}>
-          {message.type === 'error' ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
-          <p>{message.text}</p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Class, Week, Date */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Class</label>
-            <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required>
-              {classes.map((c) => (<option key={c.id} value={c.id}>{c.class_name}</option>))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Week Number (1-13)</label>
-            <input type="number" min="1" max="13" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Sabbath Date</label>
-            <input type="date" name="sabbath_date" value={formData.sabbath_date} onChange={handleChange} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" required />
-          </div>
-        </div>
-
-        {/* Member Management */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center space-x-2">
-              <Users className="h-6 w-6 text-indigo-600" />
-              <h2 className="text-xl font-bold text-gray-800">Class Members</h2>
-            </div>
-            <button type="button" onClick={() => { setEditingMember(null); setNewMemberName(''); setShowMemberModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center space-x-2 hover:bg-indigo-700 transition">
-              <Plus className="h-4 w-4" /><span>Add Member</span>
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 group">
-                <span className="font-medium text-gray-700">{member.member_name}</span>
-                <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button type="button" onClick={() => handleEditMember(member)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md"><Edit2 className="h-4 w-4" /></button>
-                  <button type="button" onClick={() => handleDeleteMember(member.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md"><Trash2 className="h-4 w-4" /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Payment Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {[
-            { title: 'Lesson Study Guides', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
-            { title: 'Morning Watch', eng: paymentsMorningWatchEnglish, lug: paymentsMorningWatchLuganda, setEng: setPaymentsMorningWatchEnglish, setLug: setPaymentsMorningWatchLuganda, typeEng: 'morning_watch_english', typeLug: 'morning_watch_luganda' }
-          ].map((section, idx) => (
-            <div key={idx} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-indigo-900">{section.title}</h2>
-                <DollarSign className="h-5 w-5 text-indigo-600" />
-              </div>
-              <div className="p-6 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-gray-500 border-b">
-                      <th className="text-left py-2 font-semibold">Member</th>
-                      <th className="text-right py-2 font-semibold">English</th>
-                      <th className="text-right py-2 font-semibold">Luganda</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {members.map(m => (
-                      <tr key={m.id}>
-                        <td className="py-3">
-                          <div className="font-medium text-gray-800">{m.member_name}</div>
-                          <div className="text-xs text-gray-400">Quarter total: {getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)}</div>
-                        </td>
-                        <td className="py-3">
-                          <input type="number" step="100" value={section.eng[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
-                        </td>
-                        <td className="py-3">
-                          <input type="number" step="100" value={section.lug[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50 font-bold">
-                      <td className="py-2 px-2 text-indigo-700">Subtotals</td>
-                      <td className="py-2 text-right px-2 text-indigo-700">{calculateTotal(section.eng).toLocaleString()}</td>
-                      <td className="py-2 text-right px-2 text-indigo-700">{calculateTotal(section.lug).toLocaleString()}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Statistics */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex items-center space-x-2 mb-6">
-            <TrendingUp className="h-6 w-6 text-indigo-600" />
-            <h2 className="text-xl font-bold text-gray-800">Weekly Statistics</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { label: 'Attendance', name: 'total_attendance' },
-              { label: 'Member Visits', name: 'member_visits' },
-              { label: 'Bible Studies', name: 'members_conducted_bible_studies' },
-              { label: 'Helped Others', name: 'members_helped_others' },
-              { label: 'Studied Lesson', name: 'members_studied_lesson' },
-              { label: 'Visitors', name: 'number_of_visitors' },
-              { label: 'Guides Shared', name: 'bible_study_guides_distributed' },
-              { label: 'Global Mission', name: 'offering_global_mission' }
-            ].map(stat => (
-              <div key={stat.name}>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{stat.label}</label>
-                <input type="number" name={stat.name} value={formData[stat.name]} onChange={handleChange} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500" min="0" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <label className="block text-sm font-bold text-gray-700 mb-2">Weekly Summary / Testimony</label>
-          <textarea name="members_summary" value={formData.members_summary} onChange={handleChange} rows="3" className="w-full rounded-xl border-gray-300 focus:ring-indigo-500" placeholder="Enter any notes, testimonies, or special events for the week..."></textarea>
-        </div>
-
-        {/* Submit */}
-        <div className="flex flex-col md:flex-row items-center gap-4 py-8">
-          <button type="submit" disabled={loading} className="w-full md:w-auto px-12 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 shadow-xl">
-            {loading ? <RefreshCw className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-            <span>{formData.id ? 'Update Weekly Data' : 'Submit Weekly Data'}</span>
-          </button>
-          <button type="button" onClick={() => navigate('/secretary')} className="w-full md:w-auto px-8 py-4 bg-white text-gray-700 border-2 border-gray-200 rounded-xl font-bold text-lg hover:bg-gray-50 transition">Cancel</button>
-        </div>
-      </form>
-
-      {/* Member Modal */}
-      {showMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-indigo-600 flex justify-between items-center text-white">
-              <h3 className="text-xl font-bold">{editingMember ? 'Edit Member' : 'Add New Member'}</h3>
-              <button onClick={() => setShowMemberModal(false)}><X className="h-6 w-6" /></button>
-            </div>
-            <div className="p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Member Name</label>
-              <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} className="w-full rounded-xl border-gray-300 focus:ring-indigo-500 mb-6 text-lg py-3" placeholder="Enter full name" autoFocus />
-              <div className="flex space-x-3">
-                <button type="button" onClick={handleAddMember} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Save Member</button>
-                <button type="button" onClick={() => setShowMemberModal(false)} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  } catch (error) {
+    console.error('Error recording payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record payment',
+      error: error.message,
+    });
+  }
 };
 
-export default WeeklyDataEntry;
+// Get payment history for a member
+const getMemberPaymentHistory = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { quarter_id } = req.query;
+
+    let query = supabase
+      .from('member_payment_history')
+      .select(`
+        *,
+        class_members!inner(member_name, class_id),
+        quarters(name, year)
+      `)
+      .eq('member_id', memberId)
+      .order('payment_date', { ascending: false });
+
+    if (quarter_id) {
+      query = query.eq('quarter_id', quarter_id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: data || [],
+      count: data?.length || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching payment history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment history',
+      error: error.message,
+    });
+  }
+};
+
+// Get cumulative totals for a member
+const getMemberTotals = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { quarter_id } = req.query;
+
+    let query = supabase
+      .from('member_payment_totals')
+      .select('*')
+      .eq('member_id', memberId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (quarter_id) {
+      query = query.eq('quarter_id', quarter_id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    const totalsData = data && data.length > 0 ? data[0] : null;
+
+    res.json({
+      success: true,
+      data: totalsData,
+      count: totalsData ? 1 : 0,
+    });
+  } catch (error) {
+    console.error('Error fetching member totals:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch member totals',
+      error: error.message,
+    });
+  }
+};
+
+// Get all payments for a quarter
+const getQuarterPayments = async (req, res) => {
+  try {
+    const { quarterId } = req.params;
+    const { week_number } = req.query;
+
+    let query = supabase
+      .from('member_payment_history')
+      .select(`
+        *,
+        class_members!inner(member_name, class_id)
+      `)
+      .eq('quarter_id', quarterId)
+      .order('week_number', { ascending: true });
+
+    if (week_number) {
+      query = query.eq('week_number', week_number);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: data || [],
+      count: data?.length || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching quarter payments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch quarter payments',
+      error: error.message,
+    });
+  }
+};
+
+// Get payment totals for all members in a class
+const getClassPaymentTotals = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    let { quarter_id, quarter_name } = req.query;
+
+    // Resolve "Q2 2026" → actual UUID if name passed instead of ID
+    if (!quarter_id && quarter_name) {
+      const parts = quarter_name.trim().split(' ');
+      const name = parts[0];
+      const year = parts[1];
+
+      const { data: quarter, error } = await supabase
+        .from('quarters')
+        .select('id')
+        .eq('name', name)
+        .eq('year', year)
+        .single();
+
+      if (error || !quarter) {
+        return res.status(400).json({
+          success: false,
+          message: `Quarter "${quarter_name}" not found`,
+        });
+      }
+      quarter_id = quarter.id;
+    }
+
+    if (!quarter_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'quarter_id is required',
+      });
+    }
+
+    // Get all members in the class
+    const { data: members, error: membersError } = await supabase
+      .from('class_members')
+      .select('*')
+      .eq('class_id', classId);
+
+    if (membersError) throw membersError;
+
+    const memberIds = members.map((m) => m.id);
+
+    const { data: totals, error: totalsError } = await supabase
+      .from('member_payment_totals')
+      .select('*')
+      .in('member_id', memberIds)
+      .eq('quarter_id', quarter_id);
+
+    if (totalsError) throw totalsError;
+
+    const result = members.map((member) => {
+      const memberTotal = totals.find((t) => t.member_id === member.id);
+      return {
+        ...member,
+        totals: memberTotal
+          ? {
+              lesson_english: memberTotal.quarter_lesson_english_total || 0,
+              lesson_luganda: memberTotal.quarter_lesson_luganda_total || 0,
+              morning_watch_english: memberTotal.quarter_morning_watch_english_total || 0,
+              morning_watch_luganda: memberTotal.quarter_morning_watch_luganda_total || 0,
+              offering: memberTotal.quarter_offering_total || 0,
+              adult_lesson_english: memberTotal.quarter_adult_lesson_english_total || 0,
+              adult_lesson_luganda: memberTotal.quarter_adult_lesson_luganda_total || 0,
+              quarter_grand_total: memberTotal.quarter_grand_total || 0,
+              year_grand_total: memberTotal.year_grand_total || 0,
+              weeks_paid: memberTotal.weeks_paid || 0,
+            }
+          : {
+              lesson_english: 0,
+              lesson_luganda: 0,
+              morning_watch_english: 0,
+              morning_watch_luganda: 0,
+              offering: 0,
+              adult_lesson_english: 0,
+              adult_lesson_luganda: 0,
+              quarter_grand_total: 0,
+              year_grand_total: 0,
+              weeks_paid: 0,
+            },
+      };
+    });
+
+    res.json({
+      success: true,
+      data: result,
+      count: result.length,
+    });
+  } catch (error) {
+    console.error('Error fetching class payment totals:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch class payment totals',
+      error: error.message,
+    });
+  }
+};
+
+// Get payments for a class for a specific week (for editing)
+const getWeekPayments = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { quarter_id, week_number } = req.query;
+
+    if (!quarter_id || !week_number) {
+      return res.status(400).json({
+        success: false,
+        message: 'quarter_id and week_number are required',
+      });
+    }
+
+    // Get all members in the class
+    const { data: members, error: membersError } = await supabase
+      .from('class_members')
+      .select('*')
+      .eq('class_id', classId);
+
+    if (membersError) throw membersError;
+
+    const memberIds = members.map((m) => m.id);
+
+    // Get payment history for this specific week
+    const { data: payments, error: paymentsError } = await supabase
+      .from('member_payment_history')
+      .select('*')
+      .in('member_id', memberIds)
+      .eq('quarter_id', quarter_id)
+      .eq('week_number', parseInt(week_number));
+
+    if (paymentsError) throw paymentsError;
+
+    // Map payments to members
+    const result = members.map((member) => {
+      const payment = payments.find((p) => p.member_id === member.id);
+      return {
+        ...member,
+        payment: payment || null,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: result,
+      count: result.length,
+    });
+  } catch (error) {
+    console.error('Error fetching week payments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch week payments',
+      error: error.message,
+    });
+  }
+};
+
+// Delete a payment record
+const deletePayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    const { error } = await supabase
+      .from('member_payment_history')
+      .delete()
+      .eq('id', paymentId);
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      message: 'Payment deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete payment',
+      error: error.message,
+    });
+  }
+};
+
+module.exports = {
+  recordPayment,
+  getMemberPaymentHistory,
+  getMemberTotals,
+  getQuarterPayments,
+  getClassPaymentTotals,
+  getWeekPayments,
+  deletePayment,
+};
