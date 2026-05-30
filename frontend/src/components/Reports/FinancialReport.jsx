@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import quarterService from '../../services/quarterService';
 import classService from '../../services/classService';
+import paymentService from '../../services/paymentService';
+import weeklyDataService from '../../services/WeeklyDataService';
 import { DollarSign, TrendingUp, Users, FileText, Download } from 'lucide-react';
 
 const FinancialReport = () => {
@@ -18,7 +20,6 @@ const FinancialReport = () => {
   useEffect(() => {
     if (selectedQuarter) {
       loadClasses(selectedQuarter);
-      generateReport(selectedQuarter, selectedClass);
     }
   }, [selectedQuarter]);
 
@@ -26,19 +27,16 @@ const FinancialReport = () => {
     if (selectedQuarter) {
       generateReport(selectedQuarter, selectedClass);
     }
-  }, [selectedClass]);
+  }, [selectedQuarter, selectedClass]);
 
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
       const allQuarters = Array.isArray(response) ? response : (response.data || []);
-
-      // Only show Q1 and Q2 of 2026
       const quartersList = allQuarters.filter(q =>
         q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
       );
       setQuarters(quartersList);
-
       const activeQuarter = quartersList.find(q => q.is_active);
       if (activeQuarter) {
         setSelectedQuarter(activeQuarter.id);
@@ -65,46 +63,12 @@ const FinancialReport = () => {
   const generateReport = async (quarterId, classId) => {
     if (!quarterId) return;
     setLoading(true);
+    setReportData(null);
 
     try {
-      const supabaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const token = localStorage.getItem('token');
-
-      // Build URL
-      let url = `${supabaseUrl}/member-payments/class-summary?quarter_id=${quarterId}`;
-      if (classId) url += `&class_id=${classId}`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setReportData(data.data);
-      } else {
-        // Fallback: calculate from member_payment_totals via existing API
-        await generateFromPaymentTotals(quarterId, classId);
-      }
-    } catch (error) {
-      console.error('Error generating report:', error);
-      await generateFromPaymentTotals(quarterId, classId);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateFromPaymentTotals = async (quarterId, classId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
       // Get all classes for this quarter
-      const classRes = await fetch(
-        `${apiUrl}/classes?quarter_id=${quarterId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const classData = await classRes.json();
-      const allClasses = classData.data || [];
+      const classResponse = await classService.getAll(quarterId);
+      const allClasses = Array.isArray(classResponse) ? classResponse : (classResponse.data || []);
       const filteredClasses = classId
         ? allClasses.filter(c => c.id === classId)
         : allClasses;
@@ -118,12 +82,10 @@ const FinancialReport = () => {
 
       for (const cls of filteredClasses) {
         // Get payment totals for this class
-        const totalsRes = await fetch(
-          `${apiUrl}/member-payments/class/${cls.id}/totals?quarter_id=${quarterId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const totalsData = await totalsRes.json();
-        const members = totalsData.data || [];
+        const totalsResponse = await paymentService.getClassPaymentTotals(cls.id, quarterId);
+        const members = Array.isArray(totalsResponse)
+          ? totalsResponse
+          : (totalsResponse.data || []);
 
         let classLessonEnglish = 0;
         let classLessonLuganda = 0;
@@ -140,20 +102,16 @@ const FinancialReport = () => {
           classOffering += t.offering || 0;
         });
 
-        // Get offerings from weekly data
-        const weeklyRes = await fetch(
-          `${apiUrl}/weekly-data/class/${cls.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const weeklyData = await weeklyRes.json();
-        const weeks = weeklyData.data || [];
+        // Also get offerings from weekly data
+        const weeklyResponse = await weeklyDataService.getByClass(cls.id);
+        const weeks = Array.isArray(weeklyResponse) ? weeklyResponse : (weeklyResponse.data || []);
         let weeklyOfferings = 0;
         weeks.forEach(w => {
           weeklyOfferings += parseFloat(w.offering_global_mission || 0);
         });
 
-        // Use the higher of the two offering sources
-        const finalOffering = Math.max(classOffering, weeklyOfferings);
+        // Use whichever offering source has data
+        const finalOffering = weeklyOfferings > 0 ? weeklyOfferings : classOffering;
 
         totalLessonEnglish += classLessonEnglish;
         totalLessonLuganda += classLessonLuganda;
@@ -164,17 +122,15 @@ const FinancialReport = () => {
         const classTotal = finalOffering + classLessonEnglish + classLessonLuganda +
           classMorningWatchEnglish + classMorningWatchLuganda;
 
-        if (classTotal > 0 || members.length > 0) {
-          classBreakdown.push({
-            className: cls.class_name,
-            offerings: finalOffering,
-            lessonEnglish: classLessonEnglish,
-            lessonLuganda: classLessonLuganda,
-            morningWatchEnglish: classMorningWatchEnglish,
-            morningWatchLuganda: classMorningWatchLuganda,
-            total: classTotal,
-          });
-        }
+        classBreakdown.push({
+          className: cls.class_name,
+          offerings: finalOffering,
+          lessonEnglish: classLessonEnglish,
+          lessonLuganda: classLessonLuganda,
+          morningWatchEnglish: classMorningWatchEnglish,
+          morningWatchLuganda: classMorningWatchLuganda,
+          total: classTotal,
+        });
       }
 
       const totalLessonPayments = totalLessonEnglish + totalLessonLuganda;
@@ -193,7 +149,9 @@ const FinancialReport = () => {
         classBreakdown,
       });
     } catch (error) {
-      console.error('Error generating from payment totals:', error);
+      console.error('Error generating report:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -286,7 +244,7 @@ const FinancialReport = () => {
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-          <span className="ml-3 text-gray-600">Calculating...</span>
+          <span className="ml-3 text-gray-600">Calculating totals...</span>
         </div>
       )}
 
@@ -294,55 +252,37 @@ const FinancialReport = () => {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard
-              icon={DollarSign}
-              title="Total Collected"
-              value={reportData.grandTotal}
-              subtitle="All contributions"
-              color="#10b981"
-            />
-            <StatCard
-              icon={TrendingUp}
-              title="Global Mission"
-              value={reportData.totalOfferings}
-              subtitle="Sabbath offerings"
-              color="#3b82f6"
-            />
-            <StatCard
-              icon={Users}
-              title="Lesson Payments"
-              value={reportData.totalLessonPayments}
-              subtitle="English + Luganda"
-              color="#f59e0b"
-            />
-            <StatCard
-              icon={FileText}
-              title="Morning Watch"
-              value={reportData.totalMorningWatchPayments}
-              subtitle="English + Luganda"
-              color="#8b5cf6"
-            />
+            <StatCard icon={DollarSign} title="Total Collected" value={reportData.grandTotal} subtitle="All contributions" color="#10b981" />
+            <StatCard icon={TrendingUp} title="Global Mission" value={reportData.totalOfferings} subtitle="Sabbath offerings" color="#3b82f6" />
+            <StatCard icon={Users} title="Lesson Payments" value={reportData.totalLessonPayments} subtitle="English + Luganda" color="#f59e0b" />
+            <StatCard icon={FileText} title="Morning Watch" value={reportData.totalMorningWatchPayments} subtitle="English + Luganda" color="#8b5cf6" />
           </div>
 
-          {/* Contribution Breakdown */}
+          {/* Breakdown */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Contribution Breakdown</h3>
               <div className="space-y-3">
-                {[
-                  { label: 'Global Mission Offerings', value: reportData.totalOfferings, color: 'blue' },
-                  { label: 'Lesson (English)', value: reportData.totalLessonEnglish, color: 'green' },
-                  { label: 'Lesson (Luganda)', value: reportData.totalLessonLuganda, color: 'blue' },
-                  { label: 'Morning Watch (English)', value: reportData.totalMorningWatchEnglish, color: 'purple' },
-                  { label: 'Morning Watch (Luganda)', value: reportData.totalMorningWatchLuganda, color: 'orange' },
-                ].map((item, i) => (
-                  <div key={i} className={`flex items-center justify-between p-3 bg-${item.color}-50 rounded-lg`}>
-                    <span className="text-sm font-medium text-gray-700">{item.label}</span>
-                    <span className={`text-base font-bold text-${item.color}-700`}>
-                      {item.value.toLocaleString()} UGX
-                    </span>
-                  </div>
-                ))}
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Global Mission Offerings</span>
+                  <span className="text-base font-bold text-blue-700">{reportData.totalOfferings.toLocaleString()} UGX</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Lesson (English)</span>
+                  <span className="text-base font-bold text-green-700">{reportData.totalLessonEnglish.toLocaleString()} UGX</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Lesson (Luganda)</span>
+                  <span className="text-base font-bold text-blue-700">{reportData.totalLessonLuganda.toLocaleString()} UGX</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Morning Watch (English)</span>
+                  <span className="text-base font-bold text-purple-700">{reportData.totalMorningWatchEnglish.toLocaleString()} UGX</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Morning Watch (Luganda)</span>
+                  <span className="text-base font-bold text-orange-700">{reportData.totalMorningWatchLuganda.toLocaleString()} UGX</span>
+                </div>
               </div>
             </div>
 
