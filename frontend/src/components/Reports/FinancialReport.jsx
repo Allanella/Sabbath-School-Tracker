@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import quarterService from '../../services/quarterService';
 import classService from '../../services/classService';
 import paymentService from '../../services/paymentService';
-import weeklyDataService from '../../services/WeeklyDataService';
+import api from '../../services/api';
 import { DollarSign, TrendingUp, Users, FileText, Download } from 'lucide-react';
 
 const FinancialReport = () => {
@@ -81,7 +81,7 @@ const FinancialReport = () => {
       const classBreakdown = [];
 
       for (const cls of filteredClasses) {
-        // Get payment totals for this class
+        // Get payment totals for this class filtered by quarter
         const totalsResponse = await paymentService.getClassPaymentTotals(cls.id, quarterId);
         const members = Array.isArray(totalsResponse)
           ? totalsResponse
@@ -102,15 +102,22 @@ const FinancialReport = () => {
           classOffering += t.offering || 0;
         });
 
-        // Also get offerings from weekly data
-        const weeklyResponse = await weeklyDataService.getByClass(cls.id);
-        const weeks = Array.isArray(weeklyResponse) ? weeklyResponse : (weeklyResponse.data || []);
+        // Get offerings from weekly_data filtered by this specific class ID
+        // cls.id is quarter-specific so this correctly filters by quarter
         let weeklyOfferings = 0;
-        weeks.forEach(w => {
-          weeklyOfferings += parseFloat(w.offering_global_mission || 0);
-        });
+        try {
+          const weeklyRes = await api.get(`/weekly-data/class/${cls.id}`);
+          const weeks = weeklyRes.data?.data || weeklyRes.data || [];
+          if (Array.isArray(weeks)) {
+            weeks.forEach(w => {
+              weeklyOfferings += parseFloat(w.offering_global_mission || 0);
+            });
+          }
+        } catch (err) {
+          console.error('Could not load weekly offerings for', cls.class_name);
+        }
 
-        // Use whichever offering source has data
+        // Use weekly offerings if available, otherwise use payment totals offering
         const finalOffering = weeklyOfferings > 0 ? weeklyOfferings : classOffering;
 
         totalLessonEnglish += classLessonEnglish;
@@ -204,9 +211,7 @@ const FinancialReport = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Select Quarter
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Select Quarter</label>
             <select
               value={selectedQuarter}
               onChange={(e) => setSelectedQuarter(e.target.value)}
@@ -222,9 +227,7 @@ const FinancialReport = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Filter by Class (Optional)
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Class (Optional)</label>
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
@@ -232,9 +235,7 @@ const FinancialReport = () => {
             >
               <option value="">All Classes</option>
               {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.class_name}
-                </option>
+                <option key={cls.id} value={cls.id}>{cls.class_name}</option>
               ))}
             </select>
           </div>
