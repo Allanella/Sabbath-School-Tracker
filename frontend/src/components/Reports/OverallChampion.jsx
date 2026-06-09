@@ -3,6 +3,7 @@ import { Crown, Trophy, Star, TrendingUp, Users, DollarSign, Calendar, Award, Za
 import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import quarterService from '../../services/quarterService';
+import paymentService from '../../services/paymentService';
 
 const OverallChampion = () => {
   const [quarters, setQuarters] = useState([]);
@@ -23,44 +24,41 @@ const OverallChampion = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+      setQuarters(quartersList);
+      const activeQuarter = quartersList.find(q => q.is_active);
+      if (activeQuarter) {
+        setSelectedQuarter(activeQuarter.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
     }
   };
 
-  const parsePaymentAmount = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return 0;
-    let total = 0;
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      if (amount) {
-        const numAmount = parseFloat(amount);
-        if (!isNaN(numAmount)) {
-          total += numAmount;
-        }
-      }
-    });
-    return total;
-  };
-
   const loadChampionData = async () => {
     if (!selectedQuarter) return;
-
     setLoading(true);
+
     try {
-      const classesResponse = await classService.getAll();
-      const allClasses = (classesResponse.data || []).filter(cls => cls.quarter_id === selectedQuarter);
+      // Get classes for this quarter only
+      const classesResponse = await classService.getAll(selectedQuarter);
+      const allClasses = Array.isArray(classesResponse)
+        ? classesResponse
+        : (classesResponse.data || []);
 
       const classPerformance = [];
 
       for (const cls of allClasses) {
+        // Get weekly data for attendance/offerings/stats
         const weeklyDataResponse = await weeklyDataService.getByClass(cls.id);
-        const weeklyData = weeklyDataResponse.data || [];
+        const weeklyData = Array.isArray(weeklyDataResponse)
+          ? weeklyDataResponse
+          : (weeklyDataResponse.data || []);
 
         let totalAttendance = 0;
         let totalOfferings = 0;
@@ -70,7 +68,6 @@ const OverallChampion = () => {
         let totalHelpedOthers = 0;
         let totalStudiedLesson = 0;
         let totalGuidesDistributed = 0;
-        let totalPayments = 0;
         let weeksReported = weeklyData.length;
 
         weeklyData.forEach(week => {
@@ -82,38 +79,53 @@ const OverallChampion = () => {
           totalHelpedOthers += parseInt(week.members_helped_others) || 0;
           totalStudiedLesson += parseInt(week.members_studied_lesson) || 0;
           totalGuidesDistributed += parseInt(week.bible_study_guides_distributed) || 0;
-
-          totalPayments += parsePaymentAmount(week.members_paid_lesson_english);
-          totalPayments += parsePaymentAmount(week.members_paid_lesson_luganda);
-          totalPayments += parsePaymentAmount(week.members_paid_morning_watch_english);
-          totalPayments += parsePaymentAmount(week.members_paid_morning_watch_luganda);
         });
+
+        // Get payment totals from member_payment_totals (correct source)
+        let totalPayments = 0;
+        try {
+          const totalsResponse = await paymentService.getClassPaymentTotals(cls.id, selectedQuarter);
+          const members = Array.isArray(totalsResponse)
+            ? totalsResponse
+            : (totalsResponse.data || []);
+
+          members.forEach(member => {
+            const t = member.totals || {};
+            totalPayments += (t.lesson_english || 0) +
+              (t.lesson_luganda || 0) +
+              (t.morning_watch_english || 0) +
+              (t.morning_watch_luganda || 0) +
+              (t.offering || 0);
+          });
+        } catch (err) {
+          console.error('Could not load payment totals for', cls.class_name);
+        }
 
         const avgAttendance = weeksReported > 0 ? totalAttendance / weeksReported : 0;
         const avgOffering = weeksReported > 0 ? totalOfferings / weeksReported : 0;
 
-        // Improved comprehensive scoring system
-        const attendanceScore = avgAttendance * 5;           // Weight: 5 per person
-        const offeringScore = (totalOfferings / 1000) * 2;   // Weight: 2 per 1000 UGX
-        const visitsScore = totalVisits * 3;                 // Weight: 3 per visit
-        const bibleStudiesScore = totalBibleStudies * 4;     // Weight: 4 per study
-        const visitorsScore = totalVisitors * 3;             // Weight: 3 per visitor
-        const helpedOthersScore = totalHelpedOthers * 2;     // Weight: 2 per person
-        const studiedLessonScore = totalStudiedLesson * 1;   // Weight: 1 per person
-        const guidesScore = totalGuidesDistributed * 2;      // Weight: 2 per guide
-        const paymentsScore = (totalPayments / 5000) * 1;    // Weight: 1 per 5000 UGX
-        const consistencyScore = (weeksReported / 13) * 30;  // Max 30 points
+        // Scoring system
+        const attendanceScore = avgAttendance * 5;
+        const offeringScore = (totalOfferings / 1000) * 2;
+        const visitsScore = totalVisits * 3;
+        const bibleStudiesScore = totalBibleStudies * 4;
+        const visitorsScore = totalVisitors * 3;
+        const helpedOthersScore = totalHelpedOthers * 2;
+        const studiedLessonScore = totalStudiedLesson * 1;
+        const guidesScore = totalGuidesDistributed * 2;
+        const paymentsScore = (totalPayments / 5000) * 1;
+        const consistencyScore = (weeksReported / 13) * 30;
 
-        const overallScore = 
-          attendanceScore + 
-          offeringScore + 
-          visitsScore + 
-          bibleStudiesScore + 
-          visitorsScore + 
-          helpedOthersScore + 
-          studiedLessonScore + 
-          guidesScore + 
-          paymentsScore + 
+        const overallScore =
+          attendanceScore +
+          offeringScore +
+          visitsScore +
+          bibleStudiesScore +
+          visitorsScore +
+          helpedOthersScore +
+          studiedLessonScore +
+          guidesScore +
+          paymentsScore +
           consistencyScore;
 
         classPerformance.push({
@@ -131,14 +143,19 @@ const OverallChampion = () => {
           totalPayments,
           weeksReported,
           overallScore: overallScore.toFixed(2),
-          weeklyData
+          weeklyData,
         });
       }
 
-      // Sort to find the champion
+      // Sort to find champion
       classPerformance.sort((a, b) => b.overallScore - a.overallScore);
 
-      // Get leaders in each category
+      if (classPerformance.length === 0) {
+        setChampionData(null);
+        return;
+      }
+
+      // Category leaders
       const attendanceLeader = [...classPerformance].sort((a, b) => parseFloat(b.avgAttendance) - parseFloat(a.avgAttendance))[0];
       const offeringLeader = [...classPerformance].sort((a, b) => b.totalOfferings - a.totalOfferings)[0];
       const visitsLeader = [...classPerformance].sort((a, b) => b.totalVisits - a.totalVisits)[0];
@@ -147,7 +164,6 @@ const OverallChampion = () => {
       const paymentsLeader = [...classPerformance].sort((a, b) => b.totalPayments - a.totalPayments)[0];
       const consistencyLeader = [...classPerformance].sort((a, b) => b.weeksReported - a.weeksReported)[0];
 
-      // Calculate how many categories the champion won
       const champion = classPerformance[0];
       let categoriesWon = 0;
       if (champion.class.id === attendanceLeader.class.id) categoriesWon++;
@@ -161,6 +177,7 @@ const OverallChampion = () => {
       setChampionData({
         champion: { ...champion, categoriesWon },
         runners: classPerformance.slice(1, 4),
+        allClasses: classPerformance,
         categoryLeaders: {
           attendance: attendanceLeader,
           offering: offeringLeader,
@@ -168,10 +185,9 @@ const OverallChampion = () => {
           bibleStudies: bibleStudiesLeader,
           visitors: visitorsLeader,
           payments: paymentsLeader,
-          consistency: consistencyLeader
-        }
+          consistency: consistencyLeader,
+        },
       });
-
     } catch (error) {
       console.error('Error loading champion data:', error);
     } finally {
@@ -204,22 +220,27 @@ const OverallChampion = () => {
       {/* Filter */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="max-w-md mx-auto">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Select Quarter
-          </label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Select Quarter</label>
           <select
             value={selectedQuarter}
             onChange={(e) => setSelectedQuarter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
           >
+            <option value="">Choose Quarter</option>
             {quarters.map((quarter) => (
               <option key={quarter.id} value={quarter.id}>
-                {quarter.name} {quarter.year}
+                {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
               </option>
             ))}
           </select>
         </div>
       </div>
+
+      {!championData && !loading && selectedQuarter && (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          No data available for the selected quarter.
+        </div>
+      )}
 
       {championData && (
         <>
@@ -245,48 +266,61 @@ const OverallChampion = () => {
               </p>
             </div>
 
-            {/* Champion Stats Grid */}
+            {/* Champion Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-blue-200">
-                <Users className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Avg Attendance</p>
-                <p className="text-2xl font-bold text-blue-600">{championData.champion.avgAttendance}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-green-200">
-                <DollarSign className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Total Offerings</p>
-                <p className="text-2xl font-bold text-green-600">{championData.champion.totalOfferings.toLocaleString()}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-purple-200">
-                <TrendingUp className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Member Visits</p>
-                <p className="text-2xl font-bold text-purple-600">{championData.champion.totalVisits}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-orange-200">
-                <Calendar className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Bible Studies</p>
-                <p className="text-2xl font-bold text-orange-600">{championData.champion.totalBibleStudies}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-pink-200">
-                <Users className="h-8 w-8 text-pink-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Visitors</p>
-                <p className="text-2xl font-bold text-pink-600">{championData.champion.totalVisitors}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-indigo-200">
-                <Target className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Helped Others</p>
-                <p className="text-2xl font-bold text-indigo-600">{championData.champion.totalHelpedOthers}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-yellow-200">
-                <Zap className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Total Payments</p>
-                <p className="text-2xl font-bold text-yellow-600">{championData.champion.totalPayments.toLocaleString()}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow text-center border-2 border-gray-200">
-                <Star className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                <p className="text-xs text-gray-600 mb-1">Consistency</p>
-                <p className="text-2xl font-bold text-gray-600">{championData.champion.weeksReported}/13</p>
-              </div>
+              {[
+                { icon: Users, label: 'Avg Attendance', value: championData.champion.avgAttendance, color: 'blue' },
+                { icon: DollarSign, label: 'Total Offerings', value: championData.champion.totalOfferings.toLocaleString(), color: 'green' },
+                { icon: TrendingUp, label: 'Member Visits', value: championData.champion.totalVisits, color: 'purple' },
+                { icon: Calendar, label: 'Bible Studies', value: championData.champion.totalBibleStudies, color: 'orange' },
+                { icon: Users, label: 'Visitors', value: championData.champion.totalVisitors, color: 'pink' },
+                { icon: Target, label: 'Helped Others', value: championData.champion.totalHelpedOthers, color: 'indigo' },
+                { icon: Zap, label: 'Total Payments', value: championData.champion.totalPayments.toLocaleString(), color: 'yellow' },
+                { icon: Star, label: 'Consistency', value: `${championData.champion.weeksReported}/13`, color: 'gray' },
+              ].map((stat, i) => (
+                <div key={i} className={`bg-white rounded-lg p-4 shadow text-center border-2 border-${stat.color}-200`}>
+                  <stat.icon className={`h-8 w-8 text-${stat.color}-600 mx-auto mb-2`} />
+                  <p className="text-xs text-gray-600 mb-1">{stat.label}</p>
+                  <p className={`text-2xl font-bold text-${stat.color}-600`}>{stat.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* All Classes Ranking Table */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-900">Full Rankings</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Score</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Avg Attendance</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offerings</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Payments</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {championData.allClasses.map((cls, index) => (
+                    <tr key={index} className={index === 0 ? 'bg-yellow-50' : 'hover:bg-gray-50'}>
+                      <td className="px-4 py-3 text-sm font-bold">
+                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{cls.class.class_name}</td>
+                      <td className="px-4 py-3 text-sm text-right font-bold text-yellow-600">{cls.overallScore}</td>
+                      <td className="px-4 py-3 text-sm text-right">{cls.avgAttendance}</td>
+                      <td className="px-4 py-3 text-sm text-right">{cls.totalOfferings.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-right">{cls.totalPayments.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-center">{cls.weeksReported}/13</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -302,9 +336,7 @@ const OverallChampion = () => {
                     {index === 2 && <Award className="h-10 w-10 text-gray-500" />}
                   </div>
                   <h4 className="text-xl font-bold text-gray-900 mb-1">
-                    {index === 0 && '2nd Place'}
-                    {index === 1 && '3rd Place'}
-                    {index === 2 && '4th Place'}
+                    {index === 0 ? '2nd Place' : index === 1 ? '3rd Place' : '4th Place'}
                   </h4>
                   <p className="text-lg font-semibold text-gray-700 mb-2">{runner.class.class_name}</p>
                   <div className="inline-block px-4 py-2 bg-gray-200 rounded-full">
@@ -329,89 +361,40 @@ const OverallChampion = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-2xl font-semibold text-gray-900 mb-6 text-center">Category Champions</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-blue-50 rounded-lg p-6 border-2 border-blue-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-blue-900">👥 Attendance Leader</h4>
-                  {championData.categoryLeaders.attendance.class.id === championData.champion.class.id && (
-                    <Crown className="h-6 w-6 text-yellow-500" />
-                  )}
+              {[
+                { key: 'attendance', label: '👥 Attendance Leader', color: 'blue', value: `Avg: ${championData.categoryLeaders.attendance.avgAttendance}` },
+                { key: 'offering', label: '💰 Offering Leader', color: 'green', value: `${championData.categoryLeaders.offering.totalOfferings.toLocaleString()} UGX` },
+                { key: 'visits', label: '🚀 Visits Leader', color: 'purple', value: `${championData.categoryLeaders.visits.totalVisits} visits` },
+                { key: 'bibleStudies', label: '📖 Bible Studies Leader', color: 'orange', value: `${championData.categoryLeaders.bibleStudies.totalBibleStudies} studies` },
+                { key: 'visitors', label: '🎉 Visitors Leader', color: 'pink', value: `${championData.categoryLeaders.visitors.totalVisitors} visitors` },
+                { key: 'payments', label: '💵 Payments Leader', color: 'yellow', value: `${championData.categoryLeaders.payments.totalPayments.toLocaleString()} UGX` },
+              ].map((cat) => (
+                <div key={cat.key} className={`bg-${cat.color}-50 rounded-lg p-6 border-2 border-${cat.color}-300`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className={`text-lg font-semibold text-${cat.color}-900`}>{cat.label}</h4>
+                    {championData.categoryLeaders[cat.key].class.id === championData.champion.class.id && (
+                      <Crown className="h-6 w-6 text-yellow-500" />
+                    )}
+                  </div>
+                  <p className={`text-xl font-bold text-${cat.color}-700`}>
+                    {championData.categoryLeaders[cat.key].class.class_name}
+                  </p>
+                  <p className={`text-sm text-${cat.color}-600 mt-2`}>{cat.value}</p>
                 </div>
-                <p className="text-xl font-bold text-blue-700">{championData.categoryLeaders.attendance.class.class_name}</p>
-                <p className="text-sm text-blue-600 mt-2">Avg: {championData.categoryLeaders.attendance.avgAttendance}</p>
-              </div>
-
-              <div className="bg-green-50 rounded-lg p-6 border-2 border-green-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-green-900">💰 Offering Leader</h4>
-                  {championData.categoryLeaders.offering.class.id === championData.champion.class.id && (
-                    <Crown className="h-6 w-6 text-yellow-500" />
-                  )}
-                </div>
-                <p className="text-xl font-bold text-green-700">{championData.categoryLeaders.offering.class.class_name}</p>
-                <p className="text-sm text-green-600 mt-2">{championData.categoryLeaders.offering.totalOfferings.toLocaleString()} UGX</p>
-              </div>
-
-              <div className="bg-purple-50 rounded-lg p-6 border-2 border-purple-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-purple-900">🚀 Visits Leader</h4>
-                  {championData.categoryLeaders.visits.class.id === championData.champion.class.id && (
-                    <Crown className="h-6 w-6 text-yellow-500" />
-                  )}
-                </div>
-                <p className="text-xl font-bold text-purple-700">{championData.categoryLeaders.visits.class.class_name}</p>
-                <p className="text-sm text-purple-600 mt-2">{championData.categoryLeaders.visits.totalVisits} visits</p>
-              </div>
-
-              <div className="bg-orange-50 rounded-lg p-6 border-2 border-orange-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-orange-900">📖 Bible Studies Leader</h4>
-                  {championData.categoryLeaders.bibleStudies.class.id === championData.champion.class.id && (
-                    <Crown className="h-6 w-6 text-yellow-500" />
-                  )}
-                </div>
-                <p className="text-xl font-bold text-orange-700">{championData.categoryLeaders.bibleStudies.class.class_name}</p>
-                <p className="text-sm text-orange-600 mt-2">{championData.categoryLeaders.bibleStudies.totalBibleStudies} studies</p>
-              </div>
-
-              <div className="bg-pink-50 rounded-lg p-6 border-2 border-pink-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-pink-900">🎉 Visitors Leader</h4>
-                  {championData.categoryLeaders.visitors.class.id === championData.champion.class.id && (
-                    <Crown className="h-6 w-6 text-yellow-500" />
-                  )}
-                </div>
-                <p className="text-xl font-bold text-pink-700">{championData.categoryLeaders.visitors.class.class_name}</p>
-                <p className="text-sm text-pink-600 mt-2">{championData.categoryLeaders.visitors.totalVisitors} visitors</p>
-              </div>
-
-              <div className="bg-yellow-50 rounded-lg p-6 border-2 border-yellow-300">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-yellow-900">💵 Payments Leader</h4>
-                  {championData.categoryLeaders.payments.class.id === championData.champion.class.id && (
-                    <Crown className="h-6 w-6 text-yellow-500" />
-                  )}
-                </div>
-                <p className="text-xl font-bold text-yellow-700">{championData.categoryLeaders.payments.class.class_name}</p>
-                <p className="text-sm text-yellow-600 mt-2">{championData.categoryLeaders.payments.totalPayments.toLocaleString()} UGX</p>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Achievement Badge */}
+          {/* Congratulations */}
           <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg shadow-xl p-8 text-white text-center">
             <Star className="h-16 w-16 mx-auto mb-4 animate-spin-slow" />
             <h3 className="text-3xl font-bold mb-2">Congratulations!</h3>
-            <p className="text-xl mb-4">
-              {championData.champion.class.class_name} is the Overall Champion
-            </p>
-            <p className="text-lg opacity-90">
-              Outstanding performance across all metrics this quarter!
-            </p>
+            <p className="text-xl mb-4">{championData.champion.class.class_name} is the Overall Champion</p>
+            <p className="text-lg opacity-90">Outstanding performance across all metrics this quarter!</p>
           </div>
         </>
       )}
 
-      {/* Add slow spin animation */}
       <style>{`
         @keyframes spin-slow {
           from { transform: rotate(0deg); }
