@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Minus, BarChart3, Calendar, Download } from '
 import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import quarterService from '../../services/quarterService';
+import paymentService from '../../services/paymentService';
 
 const PerformanceComparison = () => {
   const [quarters, setQuarters] = useState([]);
@@ -14,8 +15,13 @@ const PerformanceComparison = () => {
 
   useEffect(() => {
     loadQuarters();
-    loadClasses();
   }, []);
+
+  useEffect(() => {
+    if (selectedQuarter) {
+      loadClasses(selectedQuarter);
+    }
+  }, [selectedQuarter]);
 
   useEffect(() => {
     if (selectedClass) {
@@ -26,47 +32,62 @@ const PerformanceComparison = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+      setQuarters(quartersList);
+      const activeQuarter = quartersList.find(q => q.is_active);
+      if (activeQuarter) {
+        setSelectedQuarter(activeQuarter.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
     }
   };
 
-  const loadClasses = async () => {
+  const loadClasses = async (quarterId) => {
     try {
-      const response = await classService.getAll();
-      setClasses(response.data || []);
+      const response = await classService.getAll(quarterId);
+      const classList = Array.isArray(response) ? response : (response.data || []);
+      setClasses(classList);
+      setSelectedClass('');
     } catch (error) {
       console.error('Failed to load classes:', error);
+      setClasses([]);
     }
-  };
-
-  const parsePaymentAmount = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return 0;
-    let total = 0;
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      if (amount) {
-        const numAmount = parseFloat(amount);
-        if (!isNaN(numAmount)) {
-          total += numAmount;
-        }
-      }
-    });
-    return total;
   };
 
   const loadPerformanceData = async () => {
     if (!selectedClass) return;
-
     setLoading(true);
+
     try {
+      // Get weekly data
       const response = await weeklyDataService.getByClass(selectedClass);
-      const weeklyData = (response.data || []).sort((a, b) => a.week_number - b.week_number);
+      const weeklyData = (Array.isArray(response) ? response : (response.data || []))
+        .sort((a, b) => a.week_number - b.week_number);
+
+      // Get payment totals per week from member_payment_history
+      const weeklyPayments = {};
+      try {
+        const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
+        const members = Array.isArray(totalsResponse) ? totalsResponse : (totalsResponse.data || []);
+        // Calculate total payments for the class
+        let total = 0;
+        members.forEach(member => {
+          const t = member.totals || {};
+          total += (t.lesson_english || 0) + (t.lesson_luganda || 0) +
+            (t.morning_watch_english || 0) + (t.morning_watch_luganda || 0);
+        });
+        // Distribute evenly across weeks for display
+        weeklyPayments.total = total;
+        weeklyPayments.perWeek = weeklyData.length > 0 ? total / weeklyData.length : 0;
+      } catch (err) {
+        console.error('Could not load payment totals:', err);
+      }
 
       const performance = weeklyData.map((week, index) => {
         const previousWeek = index > 0 ? weeklyData[index - 1] : null;
@@ -76,12 +97,7 @@ const PerformanceComparison = () => {
         const currentVisits = parseInt(week.member_visits) || 0;
         const currentBibleStudies = parseInt(week.members_conducted_bible_studies) || 0;
         const currentVisitors = parseInt(week.number_of_visitors) || 0;
-
-        const currentLessonEnglish = parsePaymentAmount(week.members_paid_lesson_english);
-        const currentLessonLuganda = parsePaymentAmount(week.members_paid_lesson_luganda);
-        const currentMorningWatchEnglish = parsePaymentAmount(week.members_paid_morning_watch_english);
-        const currentMorningWatchLuganda = parsePaymentAmount(week.members_paid_morning_watch_luganda);
-        const currentTotalPayments = currentLessonEnglish + currentLessonLuganda + currentMorningWatchEnglish + currentMorningWatchLuganda;
+        const currentTotalPayments = Math.round(weeklyPayments.perWeek || 0);
 
         let changes = {};
         if (previousWeek) {
@@ -91,22 +107,18 @@ const PerformanceComparison = () => {
           const prevBibleStudies = parseInt(previousWeek.members_conducted_bible_studies) || 0;
           const prevVisitors = parseInt(previousWeek.number_of_visitors) || 0;
 
-          const prevLessonEnglish = parsePaymentAmount(previousWeek.members_paid_lesson_english);
-          const prevLessonLuganda = parsePaymentAmount(previousWeek.members_paid_lesson_luganda);
-          const prevMorningWatchEnglish = parsePaymentAmount(previousWeek.members_paid_morning_watch_english);
-          const prevMorningWatchLuganda = parsePaymentAmount(previousWeek.members_paid_morning_watch_luganda);
-          const prevTotalPayments = prevLessonEnglish + prevLessonLuganda + prevMorningWatchEnglish + prevMorningWatchLuganda;
-
           changes = {
             attendance: currentAttendance - prevAttendance,
-            attendancePercent: prevAttendance > 0 ? ((currentAttendance - prevAttendance) / prevAttendance * 100).toFixed(1) : 0,
+            attendancePercent: prevAttendance > 0
+              ? ((currentAttendance - prevAttendance) / prevAttendance * 100).toFixed(1) : 0,
             offering: currentOffering - prevOffering,
-            offeringPercent: prevOffering > 0 ? ((currentOffering - prevOffering) / prevOffering * 100).toFixed(1) : 0,
+            offeringPercent: prevOffering > 0
+              ? ((currentOffering - prevOffering) / prevOffering * 100).toFixed(1) : 0,
             visits: currentVisits - prevVisits,
             bibleStudies: currentBibleStudies - prevBibleStudies,
             visitors: currentVisitors - prevVisitors,
-            totalPayments: currentTotalPayments - prevTotalPayments,
-            totalPaymentsPercent: prevTotalPayments > 0 ? ((currentTotalPayments - prevTotalPayments) / prevTotalPayments * 100).toFixed(1) : 0,
+            totalPayments: 0,
+            totalPaymentsPercent: 0,
           };
         }
 
@@ -120,15 +132,21 @@ const PerformanceComparison = () => {
           visitors: currentVisitors,
           totalPayments: currentTotalPayments,
           changes,
-          hasComparison: !!previousWeek
+          hasComparison: !!previousWeek,
         };
       });
+
+      if (performance.length === 0) {
+        setPerformanceData(null);
+        setLoading(false);
+        return;
+      }
 
       const totalWeeks = performance.length;
       const avgAttendance = performance.reduce((sum, p) => sum + p.attendance, 0) / totalWeeks;
       const avgOffering = performance.reduce((sum, p) => sum + p.offering, 0) / totalWeeks;
       const totalOffering = performance.reduce((sum, p) => sum + p.offering, 0);
-      const totalPayments = performance.reduce((sum, p) => sum + p.totalPayments, 0);
+      const totalPayments = weeklyPayments.total || 0;
 
       const bestAttendance = performance.reduce((max, p) => p.attendance > max.attendance ? p : max, performance[0]);
       const worstAttendance = performance.reduce((min, p) => p.attendance < min.attendance ? p : min, performance[0]);
@@ -144,10 +162,9 @@ const PerformanceComparison = () => {
           totalPayments,
           bestAttendance,
           worstAttendance,
-          bestOffering
-        }
+          bestOffering,
+        },
       });
-
     } catch (error) {
       console.error('Error loading performance data:', error);
     } finally {
@@ -169,8 +186,7 @@ const PerformanceComparison = () => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
+      month: 'short', day: 'numeric',
     });
   };
 
@@ -208,43 +224,48 @@ const PerformanceComparison = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Select Quarter
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Select Quarter</label>
             <select
               value={selectedQuarter}
               onChange={(e) => setSelectedQuarter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
+              <option value="">Choose Quarter</option>
               {quarters.map((quarter) => (
                 <option key={quarter.id} value={quarter.id}>
-                  {quarter.name} {quarter.year}
+                  {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Select Class
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Select Class</label>
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Choose a class</option>
-              {classes
-                .filter(cls => cls.quarter_id === selectedQuarter)
-                .map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.class_name}
-                  </option>
-                ))}
+              {classes.map((cls) => (
+                <option key={cls.id} value={cls.id}>{cls.class_name}</option>
+              ))}
             </select>
           </div>
         </div>
       </div>
+
+      {!selectedClass && (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          Select a quarter and class to view performance data.
+        </div>
+      )}
+
+      {selectedClass && !performanceData && !loading && (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          No weekly data submitted for this class yet.
+        </div>
+      )}
 
       {performanceData && (
         <>
@@ -257,31 +278,39 @@ const PerformanceComparison = () => {
             </div>
             <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
               <p className="text-sm text-gray-600 mb-1">Average Offering</p>
-              <p className="text-3xl font-bold text-gray-900">{parseFloat(performanceData.stats.avgOffering).toLocaleString()}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {parseFloat(performanceData.stats.avgOffering).toLocaleString()}
+              </p>
               <p className="text-xs text-gray-500 mt-1">UGX per week</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
               <p className="text-sm text-gray-600 mb-1">Total Offering</p>
-              <p className="text-3xl font-bold text-gray-900">{performanceData.stats.totalOffering.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {performanceData.stats.totalOffering.toLocaleString()}
+              </p>
               <p className="text-xs text-gray-500 mt-1">UGX</p>
             </div>
             <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
               <p className="text-sm text-gray-600 mb-1">Total Payments</p>
-              <p className="text-3xl font-bold text-gray-900">{performanceData.stats.totalPayments.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {performanceData.stats.totalPayments.toLocaleString()}
+              </p>
               <p className="text-xs text-gray-500 mt-1">UGX</p>
             </div>
           </div>
 
-          {/* Best/Worst Performance Highlights */}
+          {/* Best/Worst Highlights */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center space-x-2 mb-3">
                 <TrendingUp className="h-5 w-5 text-green-600" />
                 <h3 className="font-semibold text-gray-900">Best Attendance</h3>
               </div>
-              <p className="text-2xl font-bold text-green-600">{performanceData.stats.bestAttendance.attendance}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {performanceData.stats.bestAttendance.attendance}
+              </p>
               <p className="text-sm text-gray-600 mt-1">
-                Week {performanceData.stats.bestAttendance.week_number} - {formatDate(performanceData.stats.bestAttendance.sabbath_date)}
+                Week {performanceData.stats.bestAttendance.week_number} — {formatDate(performanceData.stats.bestAttendance.sabbath_date)}
               </p>
             </div>
 
@@ -290,9 +319,11 @@ const PerformanceComparison = () => {
                 <TrendingDown className="h-5 w-5 text-red-600" />
                 <h3 className="font-semibold text-gray-900">Lowest Attendance</h3>
               </div>
-              <p className="text-2xl font-bold text-red-600">{performanceData.stats.worstAttendance.attendance}</p>
+              <p className="text-2xl font-bold text-red-600">
+                {performanceData.stats.worstAttendance.attendance}
+              </p>
               <p className="text-sm text-gray-600 mt-1">
-                Week {performanceData.stats.worstAttendance.week_number} - {formatDate(performanceData.stats.worstAttendance.sabbath_date)}
+                Week {performanceData.stats.worstAttendance.week_number} — {formatDate(performanceData.stats.worstAttendance.sabbath_date)}
               </p>
             </div>
 
@@ -301,14 +332,16 @@ const PerformanceComparison = () => {
                 <BarChart3 className="h-5 w-5 text-green-600" />
                 <h3 className="font-semibold text-gray-900">Best Offering</h3>
               </div>
-              <p className="text-2xl font-bold text-green-600">{performanceData.stats.bestOffering.offering.toLocaleString()} UGX</p>
+              <p className="text-2xl font-bold text-green-600">
+                {performanceData.stats.bestOffering.offering.toLocaleString()} UGX
+              </p>
               <p className="text-sm text-gray-600 mt-1">
-                Week {performanceData.stats.bestOffering.week_number} - {formatDate(performanceData.stats.bestOffering.sabbath_date)}
+                Week {performanceData.stats.bestOffering.week_number} — {formatDate(performanceData.stats.bestOffering.sabbath_date)}
               </p>
             </div>
           </div>
 
-          {/* Week-by-Week Comparison Table */}
+          {/* Week-by-Week Table */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-xl font-semibold text-gray-900">Week-by-Week Performance</h3>
@@ -325,8 +358,7 @@ const PerformanceComparison = () => {
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Change</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visits</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Bible Studies</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Payments</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Change</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visitors</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -355,7 +387,7 @@ const PerformanceComparison = () => {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs">No comparison</span>
+                          <span className="text-gray-400 text-xs">—</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-green-600">
@@ -373,7 +405,7 @@ const PerformanceComparison = () => {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs">No comparison</span>
+                          <span className="text-gray-400 text-xs">—</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
@@ -392,22 +424,12 @@ const PerformanceComparison = () => {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-purple-600">
-                        {week.totalPayments.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        {week.hasComparison ? (
-                          <div className="flex items-center justify-end space-x-1">
-                            {getTrendIcon(week.changes.totalPayments)}
-                            <span className={`font-semibold ${getTrendColor(week.changes.totalPayments)}`}>
-                              {week.changes.totalPayments > 0 ? '+' : ''}{week.changes.totalPayments.toLocaleString()}
-                            </span>
-                            <span className={`text-xs ${getTrendColor(week.changes.totalPayments)}`}>
-                              ({week.changes.totalPaymentsPercent}%)
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">No comparison</span>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                        {week.visitors}
+                        {week.hasComparison && week.changes.visitors !== 0 && (
+                          <span className={`ml-2 text-xs ${getTrendColor(week.changes.visitors)}`}>
+                            ({week.changes.visitors > 0 ? '+' : ''}{week.changes.visitors})
+                          </span>
                         )}
                       </td>
                     </tr>
