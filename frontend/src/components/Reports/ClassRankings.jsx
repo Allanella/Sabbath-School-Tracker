@@ -3,6 +3,7 @@ import { Trophy, Medal, Award, TrendingUp, Users, DollarSign, Calendar, Download
 import classService from '../../services/classService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import quarterService from '../../services/quarterService';
+import paymentService from '../../services/paymentService';
 
 const ClassRankings = () => {
   const [quarters, setQuarters] = useState([]);
@@ -23,44 +24,41 @@ const ClassRankings = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data || []);
-      if (response.data && response.data.length > 0) {
-        setSelectedQuarter(response.data[0].id);
+      const allQuarters = Array.isArray(response) ? response : (response.data || []);
+      const quartersList = allQuarters.filter(q =>
+        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+      );
+      setQuarters(quartersList);
+      const activeQuarter = quartersList.find(q => q.is_active);
+      if (activeQuarter) {
+        setSelectedQuarter(activeQuarter.id);
+      } else if (quartersList.length > 0) {
+        setSelectedQuarter(quartersList[0].id);
       }
     } catch (error) {
       console.error('Failed to load quarters:', error);
     }
   };
 
-  const parsePaymentAmount = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return 0;
-    let total = 0;
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      if (amount) {
-        const numAmount = parseFloat(amount);
-        if (!isNaN(numAmount)) {
-          total += numAmount;
-        }
-      }
-    });
-    return total;
-  };
-
   const loadRankings = async () => {
     if (!selectedQuarter) return;
-
     setLoading(true);
+
     try {
-      const classesResponse = await classService.getAll();
-      const allClasses = (classesResponse.data || []).filter(cls => cls.quarter_id === selectedQuarter);
+      // Get classes for this quarter only
+      const classesResponse = await classService.getAll(selectedQuarter);
+      const allClasses = Array.isArray(classesResponse)
+        ? classesResponse
+        : (classesResponse.data || []);
 
       const classPerformance = [];
 
       for (const cls of allClasses) {
+        // Get weekly data for attendance/offerings/stats
         const weeklyDataResponse = await weeklyDataService.getByClass(cls.id);
-        const weeklyData = weeklyDataResponse.data || [];
+        const weeklyData = Array.isArray(weeklyDataResponse)
+          ? weeklyDataResponse
+          : (weeklyDataResponse.data || []);
 
         let totalAttendance = 0;
         let totalOfferings = 0;
@@ -70,8 +68,7 @@ const ClassRankings = () => {
         let totalHelpedOthers = 0;
         let totalStudiedLesson = 0;
         let totalGuidesDistributed = 0;
-        let totalPayments = 0;
-        let weeksReported = weeklyData.length;
+        const weeksReported = weeklyData.length;
 
         weeklyData.forEach(week => {
           totalAttendance += parseInt(week.total_attendance) || 0;
@@ -82,39 +79,46 @@ const ClassRankings = () => {
           totalHelpedOthers += parseInt(week.members_helped_others) || 0;
           totalStudiedLesson += parseInt(week.members_studied_lesson) || 0;
           totalGuidesDistributed += parseInt(week.bible_study_guides_distributed) || 0;
-
-          totalPayments += parsePaymentAmount(week.members_paid_lesson_english);
-          totalPayments += parsePaymentAmount(week.members_paid_lesson_luganda);
-          totalPayments += parsePaymentAmount(week.members_paid_morning_watch_english);
-          totalPayments += parsePaymentAmount(week.members_paid_morning_watch_luganda);
         });
+
+        // Get payment totals from member_payment_totals (correct source)
+        let totalPayments = 0;
+        try {
+          const totalsResponse = await paymentService.getClassPaymentTotals(cls.id, selectedQuarter);
+          const members = Array.isArray(totalsResponse)
+            ? totalsResponse
+            : (totalsResponse.data || []);
+          members.forEach(member => {
+            const t = member.totals || {};
+            totalPayments += (t.lesson_english || 0) +
+              (t.lesson_luganda || 0) +
+              (t.morning_watch_english || 0) +
+              (t.morning_watch_luganda || 0) +
+              (t.offering || 0);
+          });
+        } catch (err) {
+          console.error('Could not load payments for', cls.class_name);
+        }
 
         const avgAttendance = weeksReported > 0 ? totalAttendance / weeksReported : 0;
         const avgOffering = weeksReported > 0 ? totalOfferings / weeksReported : 0;
 
-        // Improved scoring system with balanced weights
-        const attendanceScore = avgAttendance * 5;           // Weight: 5 per person
-        const offeringScore = (totalOfferings / 1000) * 2;   // Weight: 2 per 1000 UGX
-        const visitsScore = totalVisits * 3;                 // Weight: 3 per visit
-        const bibleStudiesScore = totalBibleStudies * 4;     // Weight: 4 per study
-        const visitorsScore = totalVisitors * 3;             // Weight: 3 per visitor
-        const helpedOthersScore = totalHelpedOthers * 2;     // Weight: 2 per person helped
-        const studiedLessonScore = totalStudiedLesson * 1;   // Weight: 1 per person
-        const guidesScore = totalGuidesDistributed * 2;      // Weight: 2 per guide
-        const paymentsScore = (totalPayments / 5000) * 1;    // Weight: 1 per 5000 UGX
-        const consistencyScore = (weeksReported / 13) * 30;  // Max 30 points for full reporting
+        // Scoring system
+        const attendanceScore = avgAttendance * 5;
+        const offeringScore = (totalOfferings / 1000) * 2;
+        const visitsScore = totalVisits * 3;
+        const bibleStudiesScore = totalBibleStudies * 4;
+        const visitorsScore = totalVisitors * 3;
+        const helpedOthersScore = totalHelpedOthers * 2;
+        const studiedLessonScore = totalStudiedLesson * 1;
+        const guidesScore = totalGuidesDistributed * 2;
+        const paymentsScore = (totalPayments / 5000) * 1;
+        const consistencyScore = (weeksReported / 13) * 30;
 
-        const overallScore = 
-          attendanceScore + 
-          offeringScore + 
-          visitsScore + 
-          bibleStudiesScore + 
-          visitorsScore + 
-          helpedOthersScore + 
-          studiedLessonScore + 
-          guidesScore + 
-          paymentsScore + 
-          consistencyScore;
+        const overallScore =
+          attendanceScore + offeringScore + visitsScore +
+          bibleStudiesScore + visitorsScore + helpedOthersScore +
+          studiedLessonScore + guidesScore + paymentsScore + consistencyScore;
 
         classPerformance.push({
           class: cls,
@@ -128,29 +132,21 @@ const ClassRankings = () => {
           totalPayments,
           weeksReported,
           overallScore: overallScore.toFixed(2),
-          grade: getGrade(overallScore)
+          grade: getGrade(overallScore),
         });
       }
 
       // Sort by overall score
       classPerformance.sort((a, b) => b.overallScore - a.overallScore);
 
-      // Create rankings for each category
-      const attendanceRanking = [...classPerformance].sort((a, b) => parseFloat(b.avgAttendance) - parseFloat(a.avgAttendance));
-      const offeringRanking = [...classPerformance].sort((a, b) => b.totalOfferings - a.totalOfferings);
-      const visitsRanking = [...classPerformance].sort((a, b) => b.totalVisits - a.totalVisits);
-      const bibleStudiesRanking = [...classPerformance].sort((a, b) => b.totalBibleStudies - a.totalBibleStudies);
-      const paymentsRanking = [...classPerformance].sort((a, b) => b.totalPayments - a.totalPayments);
-
       setRankings({
         overall: classPerformance,
-        attendance: attendanceRanking,
-        offering: offeringRanking,
-        visits: visitsRanking,
-        bibleStudies: bibleStudiesRanking,
-        payments: paymentsRanking
+        attendance: [...classPerformance].sort((a, b) => parseFloat(b.avgAttendance) - parseFloat(a.avgAttendance)),
+        offering: [...classPerformance].sort((a, b) => b.totalOfferings - a.totalOfferings),
+        visits: [...classPerformance].sort((a, b) => b.totalVisits - a.totalVisits),
+        bibleStudies: [...classPerformance].sort((a, b) => b.totalBibleStudies - a.totalBibleStudies),
+        payments: [...classPerformance].sort((a, b) => b.totalPayments - a.totalPayments),
       });
-
     } catch (error) {
       console.error('Error loading rankings:', error);
     } finally {
@@ -212,29 +208,33 @@ const ClassRankings = () => {
       {/* Filter */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="max-w-md">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Select Quarter
-          </label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Select Quarter</label>
           <select
             value={selectedQuarter}
             onChange={(e) => setSelectedQuarter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
           >
+            <option value="">Choose Quarter</option>
             {quarters.map((quarter) => (
               <option key={quarter.id} value={quarter.id}>
-                {quarter.name} {quarter.year}
+                {quarter.name} {quarter.year} {quarter.is_active ? '(Active)' : ''}
               </option>
             ))}
           </select>
         </div>
       </div>
 
+      {!rankings && !loading && selectedQuarter && (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          No data available for the selected quarter.
+        </div>
+      )}
+
       {rankings && (
         <>
           {/* Top 3 Podium */}
           {rankings.overall.length >= 3 && (
             <div className="grid grid-cols-3 gap-4">
-              {/* 2nd Place */}
               <div className="bg-white rounded-lg shadow-lg p-6 transform translate-y-8">
                 <div className="flex flex-col items-center">
                   <Medal className="h-12 w-12 text-gray-400 mb-2" />
@@ -251,7 +251,6 @@ const ClassRankings = () => {
                 </div>
               </div>
 
-              {/* 1st Place */}
               <div className="bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg shadow-2xl p-6 transform -translate-y-4">
                 <div className="flex flex-col items-center text-white">
                   <Trophy className="h-16 w-16 mb-2 animate-pulse" />
@@ -269,7 +268,6 @@ const ClassRankings = () => {
                 </div>
               </div>
 
-              {/* 3rd Place */}
               <div className="bg-white rounded-lg shadow-lg p-6 transform translate-y-12">
                 <div className="flex flex-col items-center">
                   <Award className="h-12 w-12 text-orange-600 mb-2" />
@@ -315,9 +313,7 @@ const ClassRankings = () => {
                   {rankings.overall.map((item, index) => (
                     <tr key={index} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {getRankBadge(index + 1)}
-                        </div>
+                        <div className="flex items-center">{getRankBadge(index + 1)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{item.class.class_name}</div>
@@ -357,7 +353,6 @@ const ClassRankings = () => {
 
           {/* Category Rankings */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Attendance Leaders */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <Users className="h-5 w-5 mr-2 text-blue-600" />
@@ -376,7 +371,6 @@ const ClassRankings = () => {
               </div>
             </div>
 
-            {/* Offering Leaders */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <DollarSign className="h-5 w-5 mr-2 text-green-600" />
@@ -395,7 +389,6 @@ const ClassRankings = () => {
               </div>
             </div>
 
-            {/* Visits Leaders */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <TrendingUp className="h-5 w-5 mr-2 text-purple-600" />
@@ -414,7 +407,6 @@ const ClassRankings = () => {
               </div>
             </div>
 
-            {/* Bible Studies Leaders */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <Calendar className="h-5 w-5 mr-2 text-orange-600" />
@@ -434,7 +426,7 @@ const ClassRankings = () => {
             </div>
           </div>
 
-          {/* Grading Legend */}
+          {/* Grading Scale */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Grading Scale</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
