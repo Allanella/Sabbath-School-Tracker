@@ -36,7 +36,7 @@ const QuarterSetup = () => {
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      const quartersList = Array.isArray(response.data) ? response.data : [];
+      const quartersList = Array.isArray(response) ? response : (response.data || []);
       setQuarters(quartersList);
     } catch (error) {
       console.error('Failed to load quarters:', error);
@@ -51,15 +51,11 @@ const QuarterSetup = () => {
     loadQuarters();
   }, []);
 
-  // Listen for quarter changes from sidebar
   useEffect(() => {
     const handleQuarterChange = () => {
-      console.log('Quarter changed - reloading quarters');
       loadQuarters();
     };
-    
     window.addEventListener('quarterChanged', handleQuarterChange);
-    
     return () => {
       window.removeEventListener('quarterChanged', handleQuarterChange);
     };
@@ -133,9 +129,11 @@ const QuarterSetup = () => {
         copyData.targetQuarterId
       );
 
+      const resultData = response.data || response;
+
       setMessage({
         type: "success",
-        text: `Successfully copied ${response.data.classes_copied} classes and ${response.data.members_copied} members!`,
+        text: `Successfully copied ${resultData.classes_copied} classes and ${resultData.members_copied} members!`,
       });
 
       setTimeout(() => {
@@ -325,7 +323,6 @@ const QuarterSetup = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {quarters
           .sort((a, b) => {
-            // Sort by year descending, then by quarter name descending (Q4, Q3, Q2, Q1)
             if (a.year !== b.year) return b.year - a.year;
             const qOrder = { Q4: 4, Q3: 3, Q2: 2, Q1: 1 };
             return qOrder[b.name] - qOrder[a.name];
@@ -574,7 +571,6 @@ const QuarterSetup = () => {
                   {quarters
                     .filter(q => q.id !== selectedQuarter.id)
                     .sort((a, b) => {
-                      // Sort by year descending, then by quarter name descending
                       if (a.year !== b.year) return b.year - a.year;
                       const qOrder = { Q4: 4, Q3: 3, Q2: 2, Q1: 1 };
                       return qOrder[b.name] - qOrder[a.name];
