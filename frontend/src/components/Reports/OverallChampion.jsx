@@ -26,7 +26,7 @@ const OverallChampion = () => {
       const response = await quarterService.getAll();
       const allQuarters = Array.isArray(response) ? response : (response.data || []);
       const quartersList = allQuarters.filter(q =>
-        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+        q.year === 2026
       );
       setQuarters(quartersList);
       const activeQuarter = quartersList.find(q => q.is_active);

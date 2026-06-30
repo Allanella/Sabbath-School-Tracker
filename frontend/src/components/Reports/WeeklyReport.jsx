@@ -36,7 +36,7 @@ const WeeklyReport = () => {
 
       // Only show Q1 and Q2 of 2026
       const quartersList = allQuarters.filter(q =>
-        q.year === 2026 && (q.name === 'Q1' || q.name === 'Q2')
+        q.year === 2026
       );
 
       setQuarters(quartersList);
