@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, Download, Users, Calendar, Filter, CheckCircle } from 'lucide-react';
 import classService from '../../services/classService';
 import quarterService from '../../services/quarterService';
-import memberPaymentService from '../../services/memberPaymentService';
+import paymentService from '../../services/paymentService';
 
 const PaymentReport = () => {
   const [quarters, setQuarters] = useState([]);
@@ -25,8 +25,10 @@ const PaymentReport = () => {
   }, [selectedQuarter]);
 
   useEffect(() => {
-    if (selectedQuarter) {
+    if (selectedQuarter && selectedClass) {
       loadPaymentData();
+    } else {
+      setPaymentData(null);
     }
   }, [selectedQuarter, selectedClass, selectedWeek, selectedPaymentType]);
 
@@ -34,9 +36,7 @@ const PaymentReport = () => {
     try {
       const response = await quarterService.getAll();
       const allQuarters = Array.isArray(response) ? response : (response.data || []);
-      const quartersList = allQuarters.filter(q =>
-        q.year === 2026
-      );
+      const quartersList = allQuarters.filter(q => q.year === 2026);
       setQuarters(quartersList);
       const activeQuarter = quartersList.find(q => q.is_active);
       if (activeQuarter) {
@@ -55,6 +55,7 @@ const PaymentReport = () => {
       const classList = Array.isArray(response) ? response : (response.data || []);
       setClasses(classList);
       setSelectedClass('');
+      setPaymentData(null);
     } catch (error) {
       console.error('Failed to load classes:', error);
       setClasses([]);
@@ -62,93 +63,45 @@ const PaymentReport = () => {
   };
 
   const loadPaymentData = async () => {
-    if (!selectedQuarter) return;
+    if (!selectedQuarter || !selectedClass) return;
     setLoading(true);
 
     try {
-      // Get classes to query
-      const classResponse = await classService.getAll(selectedQuarter);
-      const allClasses = Array.isArray(classResponse) ? classResponse : (classResponse.data || []);
-      const classesToQuery = selectedClass
-        ? allClasses.filter(c => c.id === selectedClass)
-        : allClasses;
+      // Single API call - get all payment totals for selected class
+      const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
+      const members = Array.isArray(totalsResponse)
+        ? totalsResponse
+        : (totalsResponse.data || []);
 
       const allPayments = [];
 
-      for (const cls of classesToQuery) {
-        // Get payment totals for this class
-        const totalsResponse = await memberPaymentService.getClassPaymentTotals(cls.id, selectedQuarter);
-        const members = Array.isArray(totalsResponse) ? totalsResponse : (totalsResponse.data || []);
+      members.forEach(member => {
+        const t = member.totals || {};
 
-        members.forEach(member => {
-          const t = member.totals || {};
-
-          // Add lesson english payment
-          if ((selectedPaymentType === 'all' || selectedPaymentType === 'lesson_english') && t.lesson_english > 0) {
-            allPayments.push({
-              memberName: member.member_name,
-              amount: t.lesson_english,
-              paymentType: 'Lesson (English)',
-              className: cls.class_name,
-              weeksPaid: t.weeks_paid || 0,
-              category: 'lesson_english',
-            });
+        const addPayment = (type, label, amount) => {
+          if (amount > 0) {
+            if (selectedPaymentType === 'all' || selectedPaymentType === type) {
+              allPayments.push({
+                memberName: member.member_name,
+                amount,
+                paymentType: label,
+                weeksPaid: t.weeks_paid || 0,
+                category: type,
+              });
+            }
           }
+        };
 
-          // Add lesson luganda payment
-          if ((selectedPaymentType === 'all' || selectedPaymentType === 'lesson_luganda') && t.lesson_luganda > 0) {
-            allPayments.push({
-              memberName: member.member_name,
-              amount: t.lesson_luganda,
-              paymentType: 'Lesson (Luganda)',
-              className: cls.class_name,
-              weeksPaid: t.weeks_paid || 0,
-              category: 'lesson_luganda',
-            });
-          }
-
-          // Add morning watch english payment
-          if ((selectedPaymentType === 'all' || selectedPaymentType === 'morning_watch_english') && t.morning_watch_english > 0) {
-            allPayments.push({
-              memberName: member.member_name,
-              amount: t.morning_watch_english,
-              paymentType: 'Morning Watch (English)',
-              className: cls.class_name,
-              weeksPaid: t.weeks_paid || 0,
-              category: 'morning_watch_english',
-            });
-          }
-
-          // Add morning watch luganda payment
-          if ((selectedPaymentType === 'all' || selectedPaymentType === 'morning_watch_luganda') && t.morning_watch_luganda > 0) {
-            allPayments.push({
-              memberName: member.member_name,
-              amount: t.morning_watch_luganda,
-              paymentType: 'Morning Watch (Luganda)',
-              className: cls.class_name,
-              weeksPaid: t.weeks_paid || 0,
-              category: 'morning_watch_luganda',
-            });
-          }
-
-          // Add offering
-          if ((selectedPaymentType === 'all' || selectedPaymentType === 'offering') && t.offering > 0) {
-            allPayments.push({
-              memberName: member.member_name,
-              amount: t.offering,
-              paymentType: 'Offering',
-              className: cls.class_name,
-              weeksPaid: t.weeks_paid || 0,
-              category: 'offering',
-            });
-          }
-        });
-      }
+        addPayment('lesson_english', 'Lesson (English)', t.lesson_english || 0);
+        addPayment('lesson_luganda', 'Lesson (Luganda)', t.lesson_luganda || 0);
+        addPayment('morning_watch_english', 'Morning Watch (English)', t.morning_watch_english || 0);
+        addPayment('morning_watch_luganda', 'Morning Watch (Luganda)', t.morning_watch_luganda || 0);
+        addPayment('offering', 'Offering', t.offering || 0);
+      });
 
       // Sort by member name
       allPayments.sort((a, b) => a.memberName.localeCompare(b.memberName));
 
-      // Calculate summary
       const summary = {
         totalPayments: allPayments.length,
         totalAmount: allPayments.reduce((sum, p) => sum + p.amount, 0),
@@ -185,17 +138,6 @@ const PaymentReport = () => {
     };
     return colors[category] || 'text-gray-600 bg-gray-50 border-gray-200';
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading payment data...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -249,11 +191,9 @@ const PaymentReport = () => {
               onChange={(e) => setSelectedClass(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
-              <option value="">All Classes</option>
+              <option value="">Select a class</option>
               {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.class_name}
-                </option>
+                <option key={cls.id} value={cls.id}>{cls.class_name}</option>
               ))}
             </select>
           </div>
@@ -290,7 +230,23 @@ const PaymentReport = () => {
         </div>
       </div>
 
-      {paymentData && (
+      {/* Prompt to select class */}
+      {!selectedClass && (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          <DollarSign className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <p className="text-lg font-medium">Select a quarter and class to view payments</p>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+          <span className="ml-3 text-gray-600">Loading payments...</span>
+        </div>
+      )}
+
+      {paymentData && !loading && (
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -390,7 +346,6 @@ const PaymentReport = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Type</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
                     </tr>
                   </thead>
@@ -418,7 +373,6 @@ const PaymentReport = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
                           {payment.amount.toLocaleString()} UGX
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{payment.className}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
                             {payment.weeksPaid}/13
@@ -433,7 +387,7 @@ const PaymentReport = () => {
                       <td className="px-6 py-4 text-right text-lg text-green-700">
                         {paymentData.summary.totalAmount.toLocaleString()} UGX
                       </td>
-                      <td colSpan="2" className="px-6 py-4 text-right text-sm text-gray-600">
+                      <td className="px-6 py-4 text-center text-sm text-gray-600">
                         {paymentData.payments.length} payments
                       </td>
                     </tr>
