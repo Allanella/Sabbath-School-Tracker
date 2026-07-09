@@ -3,16 +3,16 @@ import { DollarSign, Download, Users, Calendar, Filter, CheckCircle } from 'luci
 import classService from '../../services/classService';
 import quarterService from '../../services/quarterService';
 import paymentService from '../../services/paymentService';
+import weeklyDataService from '../../services/WeeklyDataService';
 
 const PaymentReport = () => {
   const [quarters, setQuarters] = useState([]);
   const [classes, setClasses] = useState([]);
   const [selectedQuarter, setSelectedQuarter] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
-  const [selectedWeek, setSelectedWeek] = useState('all');
   const [selectedPaymentType, setSelectedPaymentType] = useState('all');
   const [loading, setLoading] = useState(false);
-  const [paymentData, setPaymentData] = useState(null);
+  const [reportData, setReportData] = useState(null);
 
   useEffect(() => {
     loadQuarters();
@@ -26,11 +26,11 @@ const PaymentReport = () => {
 
   useEffect(() => {
     if (selectedQuarter && selectedClass) {
-      loadPaymentData();
+      loadReportData();
     } else {
-      setPaymentData(null);
+      setReportData(null);
     }
-  }, [selectedQuarter, selectedClass, selectedWeek, selectedPaymentType]);
+  }, [selectedQuarter, selectedClass, selectedPaymentType]);
 
   const loadQuarters = async () => {
     try {
@@ -55,89 +55,123 @@ const PaymentReport = () => {
       const classList = Array.isArray(response) ? response : (response.data || []);
       setClasses(classList);
       setSelectedClass('');
-      setPaymentData(null);
+      setReportData(null);
     } catch (error) {
       console.error('Failed to load classes:', error);
       setClasses([]);
     }
   };
 
-  const loadPaymentData = async () => {
+  const loadReportData = async () => {
     if (!selectedQuarter || !selectedClass) return;
     setLoading(true);
 
     try {
-      // Single API call - get all payment totals for selected class
+      // Get member payment totals (lesson/morning watch)
       const totalsResponse = await paymentService.getClassPaymentTotals(selectedClass, selectedQuarter);
       const members = Array.isArray(totalsResponse)
         ? totalsResponse
         : (totalsResponse.data || []);
 
-      const allPayments = [];
+      // Get weekly data for offerings and attendance stats
+      const weeklyResponse = await weeklyDataService.getByClass(selectedClass);
+      const weeklyData = Array.isArray(weeklyResponse)
+        ? weeklyResponse
+        : (weeklyResponse.data || []);
 
-      members.forEach(member => {
-        const t = member.totals || {};
+      // Calculate weekly totals
+      let totalAttendance = 0;
+      let totalOfferings = 0;
+      let totalVisits = 0;
+      let totalBibleStudies = 0;
+      let totalVisitors = 0;
+      let totalHelpedOthers = 0;
+      let totalStudiedLesson = 0;
+      const weeksReported = weeklyData.length;
 
-        const addPayment = (type, label, amount) => {
-          if (amount > 0) {
-            if (selectedPaymentType === 'all' || selectedPaymentType === type) {
-              allPayments.push({
-                memberName: member.member_name,
-                amount,
-                paymentType: label,
-                weeksPaid: t.weeks_paid || 0,
-                category: type,
-              });
-            }
-          }
-        };
-
-        addPayment('lesson_english', 'Lesson (English)', t.lesson_english || 0);
-        addPayment('lesson_luganda', 'Lesson (Luganda)', t.lesson_luganda || 0);
-        addPayment('morning_watch_english', 'Morning Watch (English)', t.morning_watch_english || 0);
-        addPayment('morning_watch_luganda', 'Morning Watch (Luganda)', t.morning_watch_luganda || 0);
-        addPayment('offering', 'Offering', t.offering || 0);
+      weeklyData.forEach(week => {
+        totalAttendance += parseInt(week.total_attendance) || 0;
+        totalOfferings += parseFloat(week.offering_global_mission) || 0;
+        totalVisits += parseInt(week.member_visits) || 0;
+        totalBibleStudies += parseInt(week.members_conducted_bible_studies) || 0;
+        totalVisitors += parseInt(week.number_of_visitors) || 0;
+        totalHelpedOthers += parseInt(week.members_helped_others) || 0;
+        totalStudiedLesson += parseInt(week.members_studied_lesson) || 0;
       });
 
-      // Sort by member name
-      allPayments.sort((a, b) => a.memberName.localeCompare(b.memberName));
+      // Calculate member payment totals
+      let totalLessonEnglish = 0;
+      let totalLessonLuganda = 0;
+      let totalMwEnglish = 0;
+      let totalMwLuganda = 0;
+      let membersWithPayments = 0;
 
-      const summary = {
-        totalPayments: allPayments.length,
-        totalAmount: allPayments.reduce((sum, p) => sum + p.amount, 0),
-        uniqueMembers: new Set(allPayments.map(p => p.memberName)).size,
-        byType: {
-          lesson_english: allPayments.filter(p => p.category === 'lesson_english').length,
-          lesson_luganda: allPayments.filter(p => p.category === 'lesson_luganda').length,
-          morning_watch_english: allPayments.filter(p => p.category === 'morning_watch_english').length,
-          morning_watch_luganda: allPayments.filter(p => p.category === 'morning_watch_luganda').length,
-        },
-        amountByType: {
-          lesson_english: allPayments.filter(p => p.category === 'lesson_english').reduce((sum, p) => sum + p.amount, 0),
-          lesson_luganda: allPayments.filter(p => p.category === 'lesson_luganda').reduce((sum, p) => sum + p.amount, 0),
-          morning_watch_english: allPayments.filter(p => p.category === 'morning_watch_english').reduce((sum, p) => sum + p.amount, 0),
-          morning_watch_luganda: allPayments.filter(p => p.category === 'morning_watch_luganda').reduce((sum, p) => sum + p.amount, 0),
-        },
-      };
+      const memberPayments = members.map(member => {
+        const t = member.totals || {};
+        const lessonEng = t.lesson_english || 0;
+        const lessonLug = t.lesson_luganda || 0;
+        const mwEng = t.morning_watch_english || 0;
+        const mwLug = t.morning_watch_luganda || 0;
+        const total = lessonEng + lessonLug + mwEng + mwLug;
 
-      setPaymentData({ payments: allPayments, summary });
+        if (total > 0) membersWithPayments++;
+
+        totalLessonEnglish += lessonEng;
+        totalLessonLuganda += lessonLug;
+        totalMwEnglish += mwEng;
+        totalMwLuganda += mwLug;
+
+        return {
+          name: member.member_name,
+          lessonEnglish: lessonEng,
+          lessonLuganda: lessonLug,
+          morningWatchEnglish: mwEng,
+          morningWatchLuganda: mwLug,
+          total,
+          weeksPaid: t.weeks_paid || 0,
+        };
+      }).filter(m => {
+        if (selectedPaymentType === 'all') return m.total > 0 || totalOfferings > 0;
+        if (selectedPaymentType === 'lesson_english') return m.lessonEnglish > 0;
+        if (selectedPaymentType === 'lesson_luganda') return m.lessonLuganda > 0;
+        if (selectedPaymentType === 'morning_watch_english') return m.morningWatchEnglish > 0;
+        if (selectedPaymentType === 'morning_watch_luganda') return m.morningWatchLuganda > 0;
+        return false;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      const totalMemberPayments = totalLessonEnglish + totalLessonLuganda + totalMwEnglish + totalMwLuganda;
+      const grandTotal = totalOfferings + totalMemberPayments;
+
+      setReportData({
+        memberPayments,
+        weeklyData,
+        summary: {
+          totalAttendance,
+          totalOfferings,
+          totalVisits,
+          totalBibleStudies,
+          totalVisitors,
+          totalHelpedOthers,
+          totalStudiedLesson,
+          weeksReported,
+          totalLessonEnglish,
+          totalLessonLuganda,
+          totalMwEnglish,
+          totalMwLuganda,
+          totalMemberPayments,
+          grandTotal,
+          membersWithPayments,
+          totalMembers: members.length,
+        },
+      });
     } catch (error) {
-      console.error('Error loading payment data:', error);
+      console.error('Error loading report data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getPaymentTypeColor = (category) => {
-    const colors = {
-      lesson_english: 'text-green-600 bg-green-50 border-green-200',
-      lesson_luganda: 'text-blue-600 bg-blue-50 border-blue-200',
-      morning_watch_english: 'text-purple-600 bg-purple-50 border-purple-200',
-      morning_watch_luganda: 'text-orange-600 bg-orange-50 border-orange-200',
-      offering: 'text-red-600 bg-red-50 border-red-200',
-    };
-    return colors[category] || 'text-gray-600 bg-gray-50 border-gray-200';
-  };
+  const selectedClassName = classes.find(c => c.id === selectedClass)?.class_name || '';
 
   return (
     <div className="space-y-6">
@@ -149,12 +183,9 @@ const PaymentReport = () => {
               <DollarSign className="h-8 w-8 mr-3" />
               Payment Report
             </h1>
-            <p className="text-green-100">Detailed list of all lesson and morning watch payments</p>
+            <p className="text-green-100">Offerings, lessons and morning watch payments</p>
           </div>
-          <button
-            onClick={() => window.print()}
-            className="flex items-center space-x-2 px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition"
-          >
+          <button onClick={() => window.print()} className="flex items-center space-x-2 px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition">
             <Download className="h-5 w-5" />
             <span>Print</span>
           </button>
@@ -167,14 +198,10 @@ const PaymentReport = () => {
           <Filter className="h-5 w-5 text-gray-600" />
           <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Quarter</label>
-            <select
-              value={selectedQuarter}
-              onChange={(e) => setSelectedQuarter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            >
+            <select value={selectedQuarter} onChange={(e) => setSelectedQuarter(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
               <option value="">Choose Quarter</option>
               {quarters.map((quarter) => (
                 <option key={quarter.id} value={quarter.id}>
@@ -183,58 +210,33 @@ const PaymentReport = () => {
               ))}
             </select>
           </div>
-
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Class</label>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            >
+            <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
               <option value="">Select a class</option>
               {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>{cls.class_name}</option>
               ))}
             </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Week</label>
-            <select
-              value={selectedWeek}
-              onChange={(e) => setSelectedWeek(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            >
-              <option value="all">All Weeks</option>
-              {[...Array(13)].map((_, i) => (
-                <option key={i + 1} value={i + 1}>Week {i + 1}</option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Type</label>
-            <select
-              value={selectedPaymentType}
-              onChange={(e) => setSelectedPaymentType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            >
+            <select value={selectedPaymentType} onChange={(e) => setSelectedPaymentType(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
               <option value="all">All Types</option>
               <option value="lesson_english">Lesson (English)</option>
               <option value="lesson_luganda">Lesson (Luganda)</option>
               <option value="morning_watch_english">Morning Watch (English)</option>
               <option value="morning_watch_luganda">Morning Watch (Luganda)</option>
-              <option value="offering">Offering</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Prompt to select class */}
+      {/* Prompt */}
       {!selectedClass && (
         <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
           <DollarSign className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-lg font-medium">Select a quarter and class to view payments</p>
+          <p className="text-lg font-medium">Select a quarter and class to view the report</p>
         </div>
       )}
 
@@ -242,157 +244,179 @@ const PaymentReport = () => {
       {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-          <span className="ml-3 text-gray-600">Loading payments...</span>
+          <span className="ml-3 text-gray-600">Loading report...</span>
         </div>
       )}
 
-      {paymentData && !loading && (
+      {reportData && !loading && (
         <>
+          {/* Class Title */}
+          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+            <p className="text-lg font-bold text-gray-900">{selectedClassName}</p>
+            <p className="text-sm text-gray-600">{reportData.summary.weeksReported} weeks reported · {reportData.summary.totalMembers} members</p>
+          </div>
+
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Payments</p>
-                  <p className="text-3xl font-bold text-gray-900">{paymentData.summary.totalPayments}</p>
-                </div>
-                <CheckCircle className="h-10 w-10 text-green-600" />
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+              <p className="text-xs text-gray-600 mb-1">Total Attendance</p>
+              <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalAttendance}</p>
+              <p className="text-xs text-gray-500">Avg: {reportData.summary.weeksReported > 0 ? (reportData.summary.totalAttendance / reportData.summary.weeksReported).toFixed(1) : 0}/week</p>
             </div>
-
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Unique Members</p>
-                  <p className="text-3xl font-bold text-gray-900">{paymentData.summary.uniqueMembers}</p>
-                </div>
-                <Users className="h-10 w-10 text-blue-600" />
-              </div>
+            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+              <p className="text-xs text-gray-600 mb-1">Global Mission Offerings</p>
+              <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalOfferings.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">UGX</p>
             </div>
-
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Amount</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {paymentData.summary.totalAmount.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">UGX</p>
-                </div>
-                <DollarSign className="h-10 w-10 text-purple-600" />
-              </div>
+            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+              <p className="text-xs text-gray-600 mb-1">Member Payments</p>
+              <p className="text-2xl font-bold text-gray-900">{reportData.summary.totalMemberPayments.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">UGX · {reportData.summary.membersWithPayments} members paid</p>
             </div>
-
-            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Avg per Payment</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {paymentData.summary.totalPayments > 0
-                      ? Math.round(paymentData.summary.totalAmount / paymentData.summary.totalPayments).toLocaleString()
-                      : 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">UGX</p>
-                </div>
-                <Calendar className="h-10 w-10 text-orange-600" />
-              </div>
+            <div className="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+              <p className="text-xs text-gray-600 mb-1">Grand Total</p>
+              <p className="text-2xl font-bold text-orange-600">{reportData.summary.grandTotal.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">UGX</p>
             </div>
           </div>
 
-          {/* Payment Type Breakdown */}
+          {/* Activity Stats */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Type Breakdown</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-sm text-green-700 font-medium mb-2">Lesson (English)</p>
-                <p className="text-2xl font-bold text-green-900">{paymentData.summary.byType.lesson_english}</p>
-                <p className="text-sm text-green-600 mt-1">{paymentData.summary.amountByType.lesson_english.toLocaleString()} UGX</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Activity Summary</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <p className="text-2xl font-bold text-blue-700">{reportData.summary.totalVisits}</p>
+                <p className="text-xs text-gray-600 mt-1">Member Visits</p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-700 font-medium mb-2">Lesson (Luganda)</p>
-                <p className="text-2xl font-bold text-blue-900">{paymentData.summary.byType.lesson_luganda}</p>
-                <p className="text-sm text-blue-600 mt-1">{paymentData.summary.amountByType.lesson_luganda.toLocaleString()} UGX</p>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <p className="text-2xl font-bold text-green-700">{reportData.summary.totalBibleStudies}</p>
+                <p className="text-xs text-gray-600 mt-1">Bible Studies</p>
               </div>
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="text-sm text-purple-700 font-medium mb-2">Morning Watch (English)</p>
-                <p className="text-2xl font-bold text-purple-900">{paymentData.summary.byType.morning_watch_english}</p>
-                <p className="text-sm text-purple-600 mt-1">{paymentData.summary.amountByType.morning_watch_english.toLocaleString()} UGX</p>
+              <div className="text-center p-3 bg-purple-50 rounded-lg">
+                <p className="text-2xl font-bold text-purple-700">{reportData.summary.totalVisitors}</p>
+                <p className="text-xs text-gray-600 mt-1">Visitors</p>
               </div>
-              <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <p className="text-sm text-orange-700 font-medium mb-2">Morning Watch (Luganda)</p>
-                <p className="text-2xl font-bold text-orange-900">{paymentData.summary.byType.morning_watch_luganda}</p>
-                <p className="text-sm text-orange-600 mt-1">{paymentData.summary.amountByType.morning_watch_luganda.toLocaleString()} UGX</p>
+              <div className="text-center p-3 bg-orange-50 rounded-lg">
+                <p className="text-2xl font-bold text-orange-700">{reportData.summary.totalHelpedOthers}</p>
+                <p className="text-xs text-gray-600 mt-1">Helped Others</p>
               </div>
             </div>
           </div>
 
-          {/* Payment Details Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">Payment Details</h3>
-            </div>
-
-            {paymentData.payments.length === 0 ? (
-              <div className="p-12 text-center">
-                <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No payments found for the selected filters</p>
+          {/* Weekly Offerings Table */}
+          {reportData.weeklyData.length > 0 && (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Weekly Offerings</h3>
               </div>
-            ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Type</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks Paid</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Offering (UGX)</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Attendance</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visits</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Bible Studies</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visitors</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {paymentData.payments.map((payment, index) => (
+                  <tbody className="divide-y divide-gray-200">
+                    {reportData.weeklyData.sort((a, b) => a.week_number - b.week_number).map((week, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium text-indigo-600">
-                                {payment.memberName.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="ml-3">
-                              <p className="text-sm font-medium text-gray-900">{payment.memberName}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPaymentTypeColor(payment.category)}`}>
-                            {payment.paymentType}
+                        <td className="px-6 py-3">
+                          <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
+                            Week {week.week_number}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-gray-900">
-                          {payment.amount.toLocaleString()} UGX
+                        <td className="px-6 py-3 text-sm text-gray-600">
+                          {new Date(week.sabbath_date).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                            {payment.weeksPaid}/13
-                          </span>
+                        <td className="px-6 py-3 text-right text-sm font-semibold text-green-600">
+                          {parseFloat(week.offering_global_mission || 0).toLocaleString()}
                         </td>
+                        <td className="px-6 py-3 text-right text-sm">{week.total_attendance}</td>
+                        <td className="px-6 py-3 text-right text-sm">{week.member_visits || 0}</td>
+                        <td className="px-6 py-3 text-right text-sm">{week.members_conducted_bible_studies || 0}</td>
+                        <td className="px-6 py-3 text-right text-sm">{week.number_of_visitors || 0}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-gray-50 font-bold">
                     <tr>
-                      <td colSpan="3" className="px-6 py-4 text-left text-sm uppercase text-gray-700">Total</td>
-                      <td className="px-6 py-4 text-right text-lg text-green-700">
-                        {paymentData.summary.totalAmount.toLocaleString()} UGX
-                      </td>
-                      <td className="px-6 py-4 text-center text-sm text-gray-600">
-                        {paymentData.payments.length} payments
-                      </td>
+                      <td colSpan="2" className="px-6 py-3 text-sm">TOTALS</td>
+                      <td className="px-6 py-3 text-right text-sm text-green-700">{reportData.summary.totalOfferings.toLocaleString()}</td>
+                      <td className="px-6 py-3 text-right text-sm">{reportData.summary.totalAttendance}</td>
+                      <td className="px-6 py-3 text-right text-sm">{reportData.summary.totalVisits}</td>
+                      <td className="px-6 py-3 text-right text-sm">{reportData.summary.totalBibleStudies}</td>
+                      <td className="px-6 py-3 text-right text-sm">{reportData.summary.totalVisitors}</td>
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Member Payment Breakdown */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Member Payment Breakdown</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-sm text-green-700 font-medium mb-1">Lesson (English)</p>
+                <p className="text-xl font-bold text-green-900">{reportData.summary.totalLessonEnglish.toLocaleString()} UGX</p>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-700 font-medium mb-1">Lesson (Luganda)</p>
+                <p className="text-xl font-bold text-blue-900">{reportData.summary.totalLessonLuganda.toLocaleString()} UGX</p>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-sm text-purple-700 font-medium mb-1">MW (English)</p>
+                <p className="text-xl font-bold text-purple-900">{reportData.summary.totalMwEnglish.toLocaleString()} UGX</p>
+              </div>
+              <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-700 font-medium mb-1">MW (Luganda)</p>
+                <p className="text-xl font-bold text-orange-900">{reportData.summary.totalMwLuganda.toLocaleString()} UGX</p>
+              </div>
+            </div>
+
+            {reportData.memberPayments.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (EN)</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Lesson (LG)</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (EN)</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">MW (LG)</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Weeks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {reportData.memberPayments.map((member, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{member.name}</td>
+                        <td className="px-4 py-3 text-right text-sm">{member.lessonEnglish.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-sm">{member.lessonLuganda.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-sm">{member.morningWatchEnglish.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-sm">{member.morningWatchLuganda.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-green-700">{member.total.toLocaleString()} UGX</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                            {member.weeksPaid}/13
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No lesson or morning watch payments recorded yet for this class.</p>
+                <p className="text-sm mt-1">Offerings data is shown above in Weekly Offerings section.</p>
               </div>
             )}
           </div>
