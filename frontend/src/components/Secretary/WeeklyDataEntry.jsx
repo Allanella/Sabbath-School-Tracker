@@ -20,6 +20,9 @@ const WeeklyDataEntry = () => {
   const [pendingMembersCount, setPendingMembersCount] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
+  // ✅ quarterId in state — always reflects current sidebar selection
+  const [quarterId, setQuarterId] = useState(localStorage.getItem('selectedQuarterId') || '');
+
   const [members, setMembers] = useState([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
@@ -32,8 +35,6 @@ const WeeklyDataEntry = () => {
   const [paymentsLessonLuganda, setPaymentsLessonLuganda] = useState({});
   const [paymentsMorningWatchEnglish, setPaymentsMorningWatchEnglish] = useState({});
   const [paymentsMorningWatchLuganda, setPaymentsMorningWatchLuganda] = useState({});
-
-  // Track existing payment IDs for update/delete
   const [existingPaymentIds, setExistingPaymentIds] = useState({});
 
   const [formData, setFormData] = useState({
@@ -49,16 +50,20 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
+  // ✅ Listen for quarter changes from sidebar
   useEffect(() => {
-    const handleQuarterChange = () => { loadClasses(); };
+    const handleQuarterChange = (e) => {
+      const newQuarterId = e.detail?.quarterId || localStorage.getItem('selectedQuarterId');
+      console.log('Quarter changed to:', newQuarterId);
+      setQuarterId(newQuarterId);
+      loadClasses(newQuarterId);
+    };
     window.addEventListener('quarterChanged', handleQuarterChange);
     return () => window.removeEventListener('quarterChanged', handleQuarterChange);
   }, []);
 
   useEffect(() => {
-    loadClasses();
+    loadClasses(quarterId);
     checkPendingMembers();
   }, []);
 
@@ -122,15 +127,15 @@ const WeeklyDataEntry = () => {
     }, 3000);
   };
 
-  const loadClasses = async () => {
+  const loadClasses = async (qId) => {
     try {
-      const quarterId = localStorage.getItem('selectedQuarterId');
-      if (!quarterId) {
+      const currentQuarterId = qId || localStorage.getItem('selectedQuarterId');
+      if (!currentQuarterId) {
         setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar' });
         setClasses([]);
         return;
       }
-      const response = await api.get(`/classes?quarter_id=${quarterId}`);
+      const response = await api.get(`/classes?quarter_id=${currentQuarterId}`);
       const classesData = response.data?.data || response.data || [];
       if (Array.isArray(classesData)) {
         setClasses(classesData);
@@ -162,9 +167,9 @@ const WeeklyDataEntry = () => {
   const loadPaymentTotals = async () => {
     try {
       setLoadingTotals(true);
-      const quarterId = localStorage.getItem('selectedQuarterId');
-      if (!quarterId || !selectedClass) { setPaymentTotals({}); return; }
-      const response = await paymentService.getClassPaymentTotals(selectedClass, quarterId);
+      const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
+      if (!currentQuarterId || !selectedClass) { setPaymentTotals({}); return; }
+      const response = await paymentService.getClassPaymentTotals(selectedClass, currentQuarterId);
       const totalsArray = Array.isArray(response) ? response : (response.data || []);
       const totalsMap = {};
       totalsArray.forEach(memberData => {
@@ -195,9 +200,8 @@ const WeeklyDataEntry = () => {
 
   const checkExistingData = async () => {
     try {
-      const quarterId = localStorage.getItem('selectedQuarterId');
+      const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
 
-      // Load weekly attendance/offering data
       const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
       if (response && response.data) {
         const data = response.data;
@@ -214,18 +218,16 @@ const WeeklyDataEntry = () => {
         setMessage({ type: '', text: '' });
       }
 
-      // Reset payment inputs
       setPaymentsLessonEnglish({});
       setPaymentsLessonLuganda({});
       setPaymentsMorningWatchEnglish({});
       setPaymentsMorningWatchLuganda({});
       setExistingPaymentIds({});
 
-      // Load existing member payments for this week
-      if (quarterId) {
+      if (currentQuarterId) {
         try {
           const weekPaymentsRes = await api.get(
-            `/member-payments/class/${selectedClass}/week?quarter_id=${quarterId}&week_number=${weekNumber}`
+            `/member-payments/class/${selectedClass}/week?quarter_id=${currentQuarterId}&week_number=${weekNumber}`
           );
           const weekPayments = weekPaymentsRes.data?.data || weekPaymentsRes.data || [];
 
@@ -237,9 +239,7 @@ const WeeklyDataEntry = () => {
 
           weekPayments.forEach(member => {
             if (member.payment) {
-              // Store payment ID for update/delete later
               paymentIds[member.id] = member.payment.id;
-
               if (member.payment.lesson_english > 0) newLessonEng[member.id] = member.payment.lesson_english;
               if (member.payment.lesson_luganda > 0) newLessonLug[member.id] = member.payment.lesson_luganda;
               if (member.payment.morning_watch_english > 0) newMwEng[member.id] = member.payment.morning_watch_english;
@@ -327,8 +327,7 @@ const WeeklyDataEntry = () => {
         localMembers.push({ action: 'create', data: newMember, timestamp: Date.now() });
         localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
         checkPendingMembers();
-        setMessage({ type: 'warning', text: '📴 Offline: Member added locally. Will sync when online.' });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        showToast('📴 Offline: Member added locally. Will sync when online.');
         return;
       } catch (offlineError) {
         setMessage({ type: 'error', text: `Offline save failed: ${offlineError.message}` });
@@ -338,14 +337,13 @@ const WeeklyDataEntry = () => {
     try {
       if (editingMember) {
         await classMemberService.update(editingMember.id, { member_name: newMemberName });
-        setMessage({ type: 'success', text: 'Member updated successfully!' });
+        showToast('✅ Member updated successfully!');
       } else {
         await classMemberService.create({ class_id: selectedClass, member_name: newMemberName });
-        setMessage({ type: 'success', text: 'Member added successfully!' });
+        showToast('✅ Member added successfully!');
       }
       setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
       loadMembers();
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save member' });
     }
@@ -366,17 +364,15 @@ const WeeklyDataEntry = () => {
       localMembers.push({ action: 'delete', memberId, timestamp: Date.now() });
       localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
       checkPendingMembers();
-      setMessage({ type: 'warning', text: '📴 Offline: Member removed locally.' });
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      showToast('📴 Offline: Member removed locally.');
       return;
     }
     try {
       await classMemberService.delete(memberId);
-      setMessage({ type: 'success', text: 'Member removed successfully!' });
+      showToast('✅ Member removed successfully!');
       loadMembers();
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to remove member.' });
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to remove member.' });
     }
   };
 
@@ -403,8 +399,7 @@ const WeeklyDataEntry = () => {
       checkPendingMembers();
       await loadMembers();
       if (!isAutoSync) {
-        setMessage({ type: 'success', text: `✅ Synced ${syncedCount} members!` });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        showToast(`✅ Synced ${syncedCount} members!`);
       }
     } finally {
       setLoading(false);
@@ -415,6 +410,15 @@ const WeeklyDataEntry = () => {
     e.preventDefault();
     setLoading(true);
     setMessage({ type: '', text: '' });
+
+    // ✅ Use quarterId from state — always reflects current sidebar selection
+    const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
+
+    if (!currentQuarterId) {
+      setMessage({ type: 'error', text: 'Please select a quarter from the sidebar first.' });
+      setLoading(false);
+      return;
+    }
 
     const dataToSubmit = {
       class_id: selectedClass,
@@ -438,14 +442,12 @@ const WeeklyDataEntry = () => {
         return;
       }
 
-      // Save weekly attendance/offering data
       if (formData.id) {
         await weeklyDataService.update(formData.id, dataToSubmit);
       } else {
         await weeklyDataService.submit(dataToSubmit);
       }
 
-      const quarterId = localStorage.getItem('selectedQuarterId');
       const currentWeek = parseInt(weekNumber); // always 1-13
 
       // Get all unique member IDs with any payment
@@ -463,18 +465,18 @@ const WeeklyDataEntry = () => {
         const mwLug = parseFloat(paymentsMorningWatchLuganda[memberId] || 0);
         const weekTotal = lessonEng + lessonLug + mwEng + mwLug;
 
-        // Delete existing payment for this member/week if it exists (for edit)
+        // Delete existing payment for this member/week if editing
         const existingPaymentId = existingPaymentIds[memberId];
         if (existingPaymentId) {
           await paymentService.deletePayment(existingPaymentId);
         }
 
-        if (weekTotal === 0) continue; // skip members with no payments
+        if (weekTotal === 0) continue;
 
-        // Save new/updated payment
+        // ✅ Save with currentQuarterId from state — always correct quarter
         await paymentService.recordPayment({
           member_id: memberId,
-          quarter_id: quarterId,
+          quarter_id: currentQuarterId,
           week_number: currentWeek,
           payment_date: formData.sabbath_date,
           lesson_english: lessonEng,
@@ -482,7 +484,6 @@ const WeeklyDataEntry = () => {
           morning_watch_english: mwEng,
           morning_watch_luganda: mwLug,
           offering: 0,
-          week_total: weekTotal,
         });
       }
 
@@ -506,7 +507,7 @@ const WeeklyDataEntry = () => {
   return (
     <div className="max-w-6xl mx-auto p-4">
       {showSuccessToast && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-2">
+        <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-2">
           <CheckCircle className="h-5 w-5" />
           <span className="font-medium">{message.text}</span>
         </div>
@@ -544,6 +545,14 @@ const WeeklyDataEntry = () => {
         }`}>
           {message.type === 'error' ? <AlertCircle className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
           <p>{message.text}</p>
+        </div>
+      )}
+
+      {/* Show current quarter indicator */}
+      {quarterId && (
+        <div className="mb-4 px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 font-medium">
+          📅 Entering data for: {classes.length > 0 ? `Quarter ${quarterId.slice(0, 8)}...` : 'Loading...'}
+          {' — '}Change quarter using the sidebar selector
         </div>
       )}
 
@@ -615,7 +624,7 @@ const WeeklyDataEntry = () => {
                       <tr key={m.id}>
                         <td className="py-3">
                           <div className="font-medium text-gray-800">{m.member_name}</div>
-                          <div className="text-xs text-gray-400">Quarter total: {getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)}</div>
+                          <div className="text-xs text-gray-400">Quarter total: {(getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)).toLocaleString()}</div>
                         </td>
                         <td className="py-3">
                           <input type="number" step="100" value={section.eng[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
@@ -690,7 +699,7 @@ const WeeklyDataEntry = () => {
             </div>
             <div className="p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Member Name</label>
-              <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} className="w-full rounded-xl border-gray-300 focus:ring-indigo-500 mb-6 text-lg py-3" placeholder="Enter full name" autoFocus />
+              <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAddMember()} className="w-full rounded-xl border-gray-300 focus:ring-indigo-500 mb-6 text-lg py-3" placeholder="Enter full name" autoFocus />
               <div className="flex space-x-3">
                 <button type="button" onClick={handleAddMember} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">Save Member</button>
                 <button type="button" onClick={() => setShowMemberModal(false)} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition">Cancel</button>
