@@ -19,8 +19,6 @@ const WeeklyDataEntry = () => {
   const [manualOffline, setManualOffline] = useState(false);
   const [pendingMembersCount, setPendingMembersCount] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
-
-  // ✅ quarterId in state — always reflects current sidebar selection
   const [quarterId, setQuarterId] = useState(localStorage.getItem('selectedQuarterId') || '');
 
   const [members, setMembers] = useState([]);
@@ -50,11 +48,9 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  // ✅ Listen for quarter changes from sidebar
   useEffect(() => {
     const handleQuarterChange = (e) => {
       const newQuarterId = e.detail?.quarterId || localStorage.getItem('selectedQuarterId');
-      console.log('Quarter changed to:', newQuarterId);
       setQuarterId(newQuarterId);
       loadClasses(newQuarterId);
     };
@@ -201,7 +197,6 @@ const WeeklyDataEntry = () => {
   const checkExistingData = async () => {
     try {
       const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
-
       const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
       if (response && response.data) {
         const data = response.data;
@@ -230,7 +225,6 @@ const WeeklyDataEntry = () => {
             `/member-payments/class/${selectedClass}/week?quarter_id=${currentQuarterId}&week_number=${weekNumber}`
           );
           const weekPayments = weekPaymentsRes.data?.data || weekPaymentsRes.data || [];
-
           const newLessonEng = {};
           const newLessonLug = {};
           const newMwEng = {};
@@ -297,18 +291,6 @@ const WeeklyDataEntry = () => {
       })
       .filter(Boolean);
     return entries.length > 0 ? entries.join(', ') : '';
-  };
-
-  const parsePaymentsFromSaved = (paymentString) => {
-    if (!paymentString || paymentString.trim() === '') return {};
-    const payments = {};
-    const entries = paymentString.split(',').map(s => s.trim()).filter(Boolean);
-    entries.forEach(entry => {
-      const [name, amount] = entry.split(':').map(s => s.trim());
-      const member = members.find(m => m.member_name === name);
-      if (member && amount) payments[member.id] = parseFloat(amount);
-    });
-    return payments;
   };
 
   const handleAddMember = async () => {
@@ -398,9 +380,7 @@ const WeeklyDataEntry = () => {
       localStorage.removeItem('pendingMembers');
       checkPendingMembers();
       await loadMembers();
-      if (!isAutoSync) {
-        showToast(`✅ Synced ${syncedCount} members!`);
-      }
+      if (!isAutoSync) showToast(`✅ Synced ${syncedCount} members!`);
     } finally {
       setLoading(false);
     }
@@ -411,7 +391,6 @@ const WeeklyDataEntry = () => {
     setLoading(true);
     setMessage({ type: '', text: '' });
 
-    // ✅ Use quarterId from state — always reflects current sidebar selection
     const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
 
     if (!currentQuarterId) {
@@ -448,9 +427,7 @@ const WeeklyDataEntry = () => {
         await weeklyDataService.submit(dataToSubmit);
       }
 
-      const currentWeek = parseInt(weekNumber); // always 1-13
-
-      // Get all unique member IDs with any payment
+      const currentWeek = parseInt(weekNumber);
       const memberIds = new Set([
         ...Object.keys(paymentsLessonEnglish),
         ...Object.keys(paymentsLessonLuganda),
@@ -465,7 +442,6 @@ const WeeklyDataEntry = () => {
         const mwLug = parseFloat(paymentsMorningWatchLuganda[memberId] || 0);
         const weekTotal = lessonEng + lessonLug + mwEng + mwLug;
 
-        // Delete existing payment for this member/week if editing
         const existingPaymentId = existingPaymentIds[memberId];
         if (existingPaymentId) {
           await paymentService.deletePayment(existingPaymentId);
@@ -473,7 +449,6 @@ const WeeklyDataEntry = () => {
 
         if (weekTotal === 0) continue;
 
-        // ✅ Save with currentQuarterId from state — always correct quarter
         await paymentService.recordPayment({
           member_id: memberId,
           quarter_id: currentQuarterId,
@@ -493,10 +468,7 @@ const WeeklyDataEntry = () => {
       showToast(formData.id ? '✅ Data updated successfully!' : '🎉 Data submitted successfully!');
     } catch (error) {
       console.error('❌ Submit error:', error);
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.message ||
-        'Failed to save data';
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to save data';
       setMessage({ type: 'error', text: `❌ Error: ${errorMessage}. Please check your data and try again.` });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -548,14 +520,6 @@ const WeeklyDataEntry = () => {
         </div>
       )}
 
-      {/* Show current quarter indicator */}
-      {quarterId && (
-        <div className="mb-4 px-4 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 font-medium">
-          📅 Entering data for: {classes.length > 0 ? `Quarter ${quarterId.slice(0, 8)}...` : 'Loading...'}
-          {' — '}Change quarter using the sidebar selector
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Class, Week, Date */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -581,18 +545,19 @@ const WeeklyDataEntry = () => {
             <div className="flex items-center space-x-2">
               <Users className="h-6 w-6 text-indigo-600" />
               <h2 className="text-xl font-bold text-gray-800">Class Members</h2>
+              <span className="text-sm text-gray-500">({members.length})</span>
             </div>
             <button type="button" onClick={() => { setEditingMember(null); setNewMemberName(''); setShowMemberModal(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center space-x-2 hover:bg-indigo-700 transition">
               <Plus className="h-4 w-4" /><span>Add Member</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 group">
-                <span className="font-medium text-gray-700">{member.member_name}</span>
+              <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-indigo-300 transition">
+                <span className="font-medium text-gray-700 text-sm">{member.member_name}</span>
                 <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button type="button" onClick={() => handleEditMember(member)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md"><Edit2 className="h-4 w-4" /></button>
-                  <button type="button" onClick={() => handleDeleteMember(member.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md"><Trash2 className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => handleEditMember(member)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md"><Edit2 className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => handleDeleteMember(member.id)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </div>
             ))}
@@ -610,36 +575,79 @@ const WeeklyDataEntry = () => {
                 <h2 className="text-lg font-bold text-indigo-900">{section.title}</h2>
                 <DollarSign className="h-5 w-5 text-indigo-600" />
               </div>
-              <div className="p-6 overflow-x-auto">
+              <div className="p-4 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-gray-500 border-b">
-                      <th className="text-left py-2 font-semibold">Member</th>
-                      <th className="text-right py-2 font-semibold">English</th>
-                      <th className="text-right py-2 font-semibold">Luganda</th>
+                    <tr className="text-gray-500 border-b bg-gray-50">
+                      <th className="text-left py-2 px-2 font-semibold">Member</th>
+                      <th className="text-center py-2 font-semibold text-blue-600">
+                        English
+                        <div className="text-xs font-normal text-gray-400">Prev / This week</div>
+                      </th>
+                      <th className="text-center py-2 font-semibold text-purple-600">
+                        Luganda
+                        <div className="text-xs font-normal text-gray-400">Prev / This week</div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {members.map(m => (
-                      <tr key={m.id}>
-                        <td className="py-3">
-                          <div className="font-medium text-gray-800">{m.member_name}</div>
-                          <div className="text-xs text-gray-400">Quarter total: {(getCumulativeTotal(m.id, section.typeEng) + getCumulativeTotal(m.id, section.typeLug)).toLocaleString()}</div>
-                        </td>
-                        <td className="py-3">
-                          <input type="number" step="100" value={section.eng[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
-                        </td>
-                        <td className="py-3">
-                          <input type="number" step="100" value={section.lug[m.id] || ''} onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)} className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500" placeholder="0" />
-                        </td>
-                      </tr>
-                    ))}
+                    {members.map(m => {
+                      const prevEng = getCumulativeTotal(m.id, section.typeEng);
+                      const prevLug = getCumulativeTotal(m.id, section.typeLug);
+                      const hasPayments = prevEng > 0 || prevLug > 0;
+                      return (
+                        <tr key={m.id} className={hasPayments ? 'bg-green-50' : ''}>
+                          <td className="py-3 px-2">
+                            <div className="font-medium text-gray-800 text-sm">{m.member_name}</div>
+                            {hasPayments && (
+                              <div className="text-xs text-green-600 font-medium mt-0.5">
+                                ✓ {(prevEng + prevLug).toLocaleString()} UGX paid
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 text-center">
+                            <div className="flex flex-col items-center space-y-1">
+                              {prevEng > 0 && (
+                                <span className="text-xs text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">
+                                  {prevEng.toLocaleString()}
+                                </span>
+                              )}
+                              <input
+                                type="number"
+                                step="100"
+                                value={section.eng[m.id] || ''}
+                                onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)}
+                                className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="0"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-3 text-center">
+                            <div className="flex flex-col items-center space-y-1">
+                              {prevLug > 0 && (
+                                <span className="text-xs text-purple-700 font-semibold bg-purple-100 px-2 py-0.5 rounded-full">
+                                  {prevLug.toLocaleString()}
+                                </span>
+                              )}
+                              <input
+                                type="number"
+                                step="100"
+                                value={section.lug[m.id] || ''}
+                                onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)}
+                                className="w-20 text-right rounded border-gray-200 focus:ring-indigo-500 focus:border-indigo-500"
+                                placeholder="0"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-50 font-bold">
-                      <td className="py-2 px-2 text-indigo-700">Subtotals</td>
-                      <td className="py-2 text-right px-2 text-indigo-700">{calculateTotal(section.eng).toLocaleString()}</td>
-                      <td className="py-2 text-right px-2 text-indigo-700">{calculateTotal(section.lug).toLocaleString()}</td>
+                    <tr className="bg-indigo-50 font-bold border-t-2 border-indigo-200">
+                      <td className="py-2 px-2 text-indigo-700 text-sm">This week subtotals</td>
+                      <td className="py-2 text-center text-indigo-700">{calculateTotal(section.eng).toLocaleString()}</td>
+                      <td className="py-2 text-center text-indigo-700">{calculateTotal(section.lug).toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -654,7 +662,7 @@ const WeeklyDataEntry = () => {
             <TrendingUp className="h-6 w-6 text-indigo-600" />
             <h2 className="text-xl font-bold text-gray-800">Weekly Statistics</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: 'Attendance', name: 'total_attendance' },
               { label: 'Member Visits', name: 'member_visits' },
@@ -663,11 +671,11 @@ const WeeklyDataEntry = () => {
               { label: 'Studied Lesson', name: 'members_studied_lesson' },
               { label: 'Visitors', name: 'number_of_visitors' },
               { label: 'Guides Shared', name: 'bible_study_guides_distributed' },
-              { label: 'Global Mission', name: 'offering_global_mission' }
+              { label: 'Global Mission (UGX)', name: 'offering_global_mission' }
             ].map(stat => (
-              <div key={stat.name}>
-                <label className="block text-sm font-medium text-gray-600 mb-1">{stat.label}</label>
-                <input type="number" name={stat.name} value={formData[stat.name]} onChange={handleChange} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500" min="0" />
+              <div key={stat.name} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <label className="block text-xs font-medium text-gray-500 mb-1">{stat.label}</label>
+                <input type="number" name={stat.name} value={formData[stat.name]} onChange={handleChange} className="w-full rounded-lg border-gray-300 focus:ring-indigo-500 bg-white text-sm font-semibold" min="0" />
               </div>
             ))}
           </div>
@@ -680,7 +688,7 @@ const WeeklyDataEntry = () => {
         </div>
 
         {/* Submit */}
-        <div className="flex flex-col md:flex-row items-center gap-4 py-8">
+        <div className="flex flex-col md:flex-row items-center gap-4 py-6">
           <button type="submit" disabled={loading} className="w-full md:w-auto px-12 py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 transition flex items-center justify-center space-x-2 disabled:opacity-50 shadow-xl">
             {loading ? <RefreshCw className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
             <span>{formData.id ? 'Update Weekly Data' : 'Submit Weekly Data'}</span>
