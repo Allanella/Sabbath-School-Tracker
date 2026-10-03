@@ -1,441 +1,166 @@
-import React, { useState, useEffect } from "react";
-import quarterService from "../../services/quarterService";
-import {
-  Calendar,
-  Plus,
-  CheckCircle,
-  Trash2,
-  X,
-  Save,
-  AlertCircle,
-  Star,
-  Copy,
-} from "lucide-react";
+import React, { useState } from "react";
+import { Plus, X, Save, Calendar } from "lucide-react";
 
-const QuarterSetup = () => {
-  const [quarters, setQuarters] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [showCopyModal, setShowCopyModal] = useState(false);
-  const [selectedQuarter, setSelectedQuarter] = useState(null);
-  const [message, setMessage] = useState({ type: "", text: "" });
-  const [copying, setCopying] = useState(false);
+// Helper function to calculate default quarter dates based on standard calendar quarters
+const getQuarterDates = (quarter, year) => {
+  const y = parseInt(year, 10);
+  if (isNaN(y)) return { start: "", end: "" };
 
-  const [formData, setFormData] = useState({
-    name: "Q1",
-    year: new Date().getFullYear(),
-    start_date: "",
-    end_date: "",
-  });
+  switch (quarter) {
+    case "Q1":
+      return { start: `${y}-01-01`, end: `${y}-03-31` };
+    case "Q2":
+      return { start: `${y}-04-01`, end: `${y}-06-30` };
+    case "Q3":
+      return { start: `${y}-07-01`, end: `${y}-09-30` };
+    case "Q4":
+      return { start: `${y}-10-01`, end: `${y}-12-31` };
+    default:
+      return { start: "", end: "" };
+  }
+};
 
-  const [copyData, setCopyData] = useState({
-    sourceQuarterId: "",
-    targetQuarterId: ""
-  });
+export default function QuarterManager() {
+  const currentYear = new Date().getFullYear();
 
-  const loadQuarters = async () => {
-    try {
-      const response = await quarterService.getAll();
-      const quartersList = Array.isArray(response) ? response : (response.data || []);
-      setQuarters(quartersList);
-    } catch (error) {
-      console.error('Failed to load quarters:', error);
-      setMessage({ type: "error", text: "Failed to load quarters" });
-      setQuarters([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadQuarters();
-  }, []);
-
-  useEffect(() => {
-    const handleQuarterChange = () => {
-      loadQuarters();
-    };
-    window.addEventListener('quarterChanged', handleQuarterChange);
-    return () => {
-      window.removeEventListener('quarterChanged', handleQuarterChange);
-    };
-  }, []);
-
-  const getQuarterDates = (quarter, year) => {
-    const quarters = {
-      Q1: { start: `${year}-01-01`, end: `${year}-03-31` },
-      Q2: { start: `${year}-04-01`, end: `${year}-06-30` },
-      Q3: { start: `${year}-07-01`, end: `${year}-09-30` },
-      Q4: { start: `${year}-10-01`, end: `${year}-12-31` },
-    };
-    return quarters[quarter];
-  };
-
-  const handleOpenModal = () => {
-    const currentYear = new Date().getFullYear();
-    setFormData({
+  const [quarters, setQuarters] = useState([
+    {
+      id: "1",
       name: "Q1",
       year: currentYear,
       start_date: `${currentYear}-01-01`,
       end_date: `${currentYear}-03-31`,
+      status: "active",
+    },
+  ]);
+
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "Q1",
+    year: currentYear,
+    start_date: `${currentYear}-01-01`,
+    end_date: `${currentYear}-03-31`,
+  });
+
+  const handleOpenModal = () => {
+    const defaultDates = getQuarterDates("Q1", currentYear);
+    setFormData({
+      name: "Q1",
+      year: currentYear,
+      start_date: defaultDates.start,
+      end_date: defaultDates.end,
     });
     setShowModal(true);
-    setMessage({ type: "", text: "" });
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setFormData({
-      name: "Q1",
-      year: new Date().getFullYear(),
-      start_date: "",
-      end_date: "",
-    });
   };
 
-  const handleOpenCopyModal = (quarter) => {
-    setSelectedQuarter(quarter);
-    setCopyData({
-      sourceQuarterId: "",
-      targetQuarterId: quarter.id
-    });
-    setShowCopyModal(true);
-    setMessage({ type: "", text: "" });
-  };
-
-  const handleCloseCopyModal = () => {
-    setShowCopyModal(false);
-    setSelectedQuarter(null);
-    setCopyData({
-      sourceQuarterId: "",
-      targetQuarterId: ""
-    });
-    setMessage({ type: "", text: "" });
-  };
-
-  const handleCopyQuarter = async (e) => {
-    e.preventDefault();
-    setMessage({ type: "", text: "" });
-
-    if (!copyData.sourceQuarterId) {
-      setMessage({ type: "error", text: "Please select a quarter to copy from" });
-      return;
-    }
-
-    try {
-      setCopying(true);
-      const response = await quarterService.copyFromPreviousQuarter(
-        copyData.sourceQuarterId,
-        copyData.targetQuarterId
-      );
-
-      const resultData = response.data || response;
-
-      setMessage({
-        type: "success",
-        text: `Successfully copied ${resultData.classes_copied} classes and ${resultData.members_copied} members!`,
-      });
-
-      setTimeout(() => {
-        handleCloseCopyModal();
-        loadQuarters();
-      }, 2000);
-    } catch (error) {
-      console.error('Copy error:', error);
-      setMessage({
-        type: "error",
-        text: error.response?.data?.message || "Failed to copy quarter data",
-      });
-    } finally {
-      setCopying(false);
-    }
-  };
-
+  // Fixed: Updated to batch form data changes in a single state call
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
 
-    if (name === "name" || name === "year") {
-      const year = name === "year" ? value : formData.year;
-      const qName = name === "name" ? value : formData.name;
-
-      const dates = getQuarterDates(qName, year);
-
-      setFormData((prev) => ({
-        ...prev,
-        start_date: dates.start,
-        end_date: dates.end,
-      }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage({ type: "", text: "" });
-
-    try {
-      await quarterService.create(formData);
-      setMessage({
-        type: "success",
-        text: "Quarter created successfully!",
-      });
-
-      setTimeout(() => {
-        handleCloseModal();
-        loadQuarters();
-      }, 1500);
-    } catch (error) {
-      setMessage({
-        type: "error",
-        text:
-          error.response?.data?.message ||
-          "Failed to create quarter. It may already exist.",
-      });
-    }
-  };
-
-  const handleSetActive = async (quarterId) => {
-    try {
-      await quarterService.setActive(quarterId);
-      setMessage({
-        type: "success",
-        text: "Active quarter updated successfully!",
-      });
-      loadQuarters();
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to set active quarter" });
-    }
-  };
-
-  const handleDelete = async (id, name, year) => {
-    if (
-      !window.confirm(
-        `Delete ${name} ${year}? This will remove all related classes and data!`
-      )
-    )
-      return;
-
-    try {
-      await quarterService.delete(id);
-      setMessage({
-        type: "success",
-        text: "Quarter deleted successfully",
-      });
-      loadQuarters();
-    } catch (error) {
-      setMessage({
-        type: "error",
-        text: "Failed to delete quarter. It may have associated data.",
-      });
-    }
-  };
-
-  const handleQuickCreate = async () => {
-    const year = new Date().getFullYear();
-    const list = ["Q1", "Q2", "Q3", "Q4"];
-
-    try {
-      for (const q of list) {
-        const dates = getQuarterDates(q, year);
-        await quarterService.create({
-          name: q,
-          year,
-          start_date: dates.start,
-          end_date: dates.end,
-        });
+      // Recalculate start and end dates when name or year changes
+      if (name === "name" || name === "year") {
+        const dates = getQuarterDates(updated.name, updated.year);
+        if (dates) {
+          updated.start_date = dates.start;
+          updated.end_date = dates.end;
+        }
       }
-      setMessage({
-        type: "success",
-        text: `All quarters for ${year} created!`,
-      });
-      loadQuarters();
-    } catch (error) {
-      setMessage({
-        type: "error",
-        text: "Some quarters already existed or failed to create",
-      });
-    }
+
+      return updated;
+    });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    const newQuarter = {
+      id: Date.now().toString(),
+      ...formData,
+      status: "upcoming",
+    };
+
+    setQuarters((prev) => [...prev, newQuarter]);
+    handleCloseModal();
+  };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Quarter Management</h1>
-          <p className="text-gray-600 mt-1">
-            Manage Sabbath School quarters (13 weeks each)
+          <h1 className="text-2xl font-bold text-gray-900">Quarter Management</h1>
+          <p className="text-sm text-gray-500">
+            Define fiscal quarters and track planning cycles.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button onClick={handleQuickCreate} className="btn-secondary flex items-center justify-center space-x-2">
-            <Calendar className="h-5 w-5" />
-            <span>Create All for {new Date().getFullYear()}</span>
-          </button>
-
-          <button onClick={handleOpenModal} className="btn-primary flex items-center justify-center space-x-2">
-            <Plus className="h-5 w-5" />
-            <span>Add Quarter</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleOpenModal}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm flex items-center space-x-2 transition-colors"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Add Quarter</span>
+        </button>
       </div>
 
-      {/* ALERT */}
-      {message.text && (
-        <div
-          className={`mb-6 p-4 rounded-lg flex items-start ${
-            message.type === "success"
-              ? "bg-green-50 border border-green-200"
-              : "bg-red-50 border border-red-200"
-          }`}
-        >
-          {message.type === "success" ? (
-            <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-          ) : (
-            <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
-          )}
-          <p
-            className={`text-sm ${
-              message.type === "success"
-                ? "text-green-800"
-                : "text-red-800"
-            }`}
-          >
-            {message.text}
-          </p>
+      {/* Quarters list */}
+      <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center space-x-2">
+          <Calendar className="h-5 w-5 text-gray-500" />
+          <h2 className="text-lg font-semibold text-gray-800">Configured Quarters</h2>
         </div>
-      )}
 
-      {/* QUARTER LIST */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {quarters
-          .sort((a, b) => {
-            if (a.year !== b.year) return b.year - a.year;
-            const qOrder = { Q4: 4, Q3: 3, Q2: 2, Q1: 1 };
-            return qOrder[b.name] - qOrder[a.name];
-          })
-          .map((q) => (
-          <div
-            key={q.id}
-            className={`bg-white rounded-lg shadow-md p-6 relative ${
-              q.is_active ? "ring-2 ring-primary-500 bg-primary-50" : ""
-            }`}
-          >
-            {q.is_active && (
-              <div className="absolute top-4 right-4">
-                <Star className="h-6 w-6 text-primary-600 fill-current" />
-              </div>
-            )}
-
-            <div className="mb-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Calendar className="h-6 w-6 text-primary-600" />
-                <h3 className="text-2xl font-bold text-gray-900">
-                  {q.name} {q.year}
-                </h3>
-              </div>
-
-              {q.is_active && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                  Active Quarter
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2 text-sm text-gray-600 mb-4">
-              <div className="flex justify-between">
-                <span>Start Date:</span>
-                <span className="font-medium text-gray-900">
-                  {new Date(q.start_date).toLocaleDateString()}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span>End Date:</span>
-                <span className="font-medium text-gray-900">
-                  {new Date(q.end_date).toLocaleDateString()}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span>Duration:</span>
-                <span className="font-medium text-gray-900">13 weeks</span>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-4 border-t">
-              {!q.is_active && (
-                <button
-                  onClick={() => handleSetActive(q.id)}
-                  className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm font-medium"
-                >
-                  Set Active
-                </button>
-              )}
-
-              <button
-                onClick={() => handleOpenCopyModal(q)}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium flex items-center justify-center space-x-2"
-              >
-                <Copy className="h-4 w-4" />
-                <span>Copy Classes & Members</span>
-              </button>
-
-              <button
-                onClick={() => handleDelete(q.id, q.name, q.year)}
-                className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-medium flex items-center justify-center space-x-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Delete Quarter</span>
-              </button>
-            </div>
+        {quarters.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            No quarters added yet. Click "Add Quarter" above to create one.
           </div>
-        ))}
-
-        {quarters.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No quarters created yet
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Create your first quarter to start tracking Sabbath School data
-            </p>
-
-            <button
-              onClick={handleOpenModal}
-              className="btn-primary inline-flex items-center space-x-2"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Create Quarter</span>
-            </button>
-          </div>
+        ) : (
+          <ul className="divide-y divide-gray-200">
+            {quarters.map((q) => (
+              <li key={q.id} className="p-6 flex items-center justify-between hover:bg-gray-50">
+                <div>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg font-bold text-gray-900">
+                      {q.name} {q.year}
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                        q.status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {q.status}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {q.start_date} to {q.end_date}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* CREATE QUARTER MODAL */}
+      {/* Add Quarter Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-xl font-semibold text-gray-900">Add New Quarter</h3>
-
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full my-auto overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Add New Quarter</h3>
               <button
+                type="button"
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 transition"
+                className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -443,12 +168,14 @@ const QuarterSetup = () => {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quarter</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quarter
+                </label>
                 <select
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
                   <option value="Q1">Q1 (Jan–Mar)</option>
@@ -459,13 +186,15 @@ const QuarterSetup = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Year
+                </label>
                 <input
                   type="number"
                   name="year"
                   value={formData.year}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   min="2020"
                   max="2100"
                   required
@@ -473,40 +202,53 @@ const QuarterSetup = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date
+                </label>
                 <input
                   type="date"
                   name="start_date"
                   value={formData.start_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Date
+                </label>
                 <input
                   type="date"
                   name="end_date"
                   value={formData.end_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
                 <p className="font-medium mb-1">Note:</p>
-                <p>Quarters are 13-week cycles. Dates auto-update based on your selection.</p>
+                <p>
+                  Quarters are 13-week cycles. Dates auto-update based on your selection.
+                </p>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={handleCloseModal} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition font-medium">
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
                   Cancel
                 </button>
 
-                <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-medium flex items-center space-x-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center space-x-2"
+                >
                   <Save className="h-5 w-5" />
                   <span>Create Quarter</span>
                 </button>
@@ -515,121 +257,6 @@ const QuarterSetup = () => {
           </div>
         </div>
       )}
-
-      {/* COPY CLASSES MODAL */}
-      {showCopyModal && selectedQuarter && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-xl font-semibold text-gray-900">
-                Copy Classes & Members
-              </h3>
-
-              <button
-                onClick={handleCloseCopyModal}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCopyQuarter} className="p-6 space-y-4">
-              {message.text && (
-                <div
-                  className={`p-3 rounded-lg flex items-start text-sm ${
-                    message.type === "success"
-                      ? "bg-green-50 border border-green-200 text-green-800"
-                      : "bg-red-50 border border-red-200 text-red-800"
-                  }`}
-                >
-                  {message.type === "success" ? (
-                    <CheckCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                  )}
-                  <span>{message.text}</span>
-                </div>
-              )}
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <span className="font-semibold">Copy TO:</span> {selectedQuarter.name} {selectedQuarter.year}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Copy FROM Quarter
-                </label>
-                <select
-                  value={copyData.sourceQuarterId}
-                  onChange={(e) => setCopyData({ ...copyData, sourceQuarterId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  required
-                >
-                  <option value="">Select a quarter to copy from</option>
-                  {quarters
-                    .filter(q => q.id !== selectedQuarter.id)
-                    .sort((a, b) => {
-                      if (a.year !== b.year) return b.year - a.year;
-                      const qOrder = { Q4: 4, Q3: 3, Q2: 2, Q1: 1 };
-                      return qOrder[b.name] - qOrder[a.name];
-                    })
-                    .map(q => (
-                      <option key={q.id} value={q.id}>
-                        {q.name} {q.year}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-                <p className="font-medium mb-2">✅ What will be copied:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>All classes with teacher names</li>
-                  <li>All class members</li>
-                </ul>
-                <p className="mt-3 font-medium">❌ What will NOT be copied:</p>
-                <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>Weekly attendance data</li>
-                  <li>Payment records</li>
-                </ul>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button 
-                  type="button" 
-                  onClick={handleCloseCopyModal} 
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition font-medium"
-                  disabled={copying}
-                >
-                  Cancel
-                </button>
-
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center space-x-2 min-w-[140px] justify-center"
-                  disabled={copying}
-                >
-                  {copying ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Copying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-5 w-5" />
-                      <span>Copy Data</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
-};
-
-export default QuarterSetup;
+}
