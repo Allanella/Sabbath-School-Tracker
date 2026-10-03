@@ -1,3 +1,4 @@
+// controllers/quarterController.js
 const supabase = require('../config/database');
 
 const quarterController = {
@@ -6,15 +7,45 @@ const quarterController = {
     try {
       const { name, year, start_date, end_date } = req.body;
 
+      if (!name || !year || !start_date || !end_date) {
+        return res.status(400).json({
+          success: false,
+          message: 'name, year, start_date, and end_date are required fields.'
+        });
+      }
+
+      // Prevent duplicates for the same name and year
+      const { data: existing } = await supabase
+        .from('quarters')
+        .select('id')
+        .eq('name', name)
+        .eq('year', parseInt(year, 10))
+        .maybeSingle();
+
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: `Quarter ${name} for year ${year} already exists.`
+        });
+      }
+
       const { data, error } = await supabase
         .from('quarters')
-        .insert([{ name, year, start_date, end_date }])
+        .insert([
+          {
+            name,
+            year: parseInt(year, 10),
+            start_date,
+            end_date,
+            is_active: false
+          }
+        ])
         .select()
         .single();
 
       if (error) throw error;
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: 'Quarter created successfully',
         data
@@ -35,7 +66,7 @@ const quarterController = {
 
       if (error) throw error;
 
-      res.json({
+      return res.json({
         success: true,
         data: data || []
       });
@@ -51,11 +82,11 @@ const quarterController = {
         .from('quarters')
         .select('*')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
 
-      res.json({
+      return res.json({
         success: true,
         data: data || null
       });
@@ -76,11 +107,13 @@ const quarterController = {
         });
       }
 
-      // Deactivate all quarters
-      await supabase
+      // Deactivate all quarters currently active
+      const { error: deactivateError } = await supabase
         .from('quarters')
         .update({ is_active: false })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .eq('is_active', true);
+
+      if (deactivateError) throw deactivateError;
 
       // Activate selected quarter
       const { data, error } = await supabase
@@ -92,7 +125,7 @@ const quarterController = {
 
       if (error) throw error;
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Active quarter updated',
         data
@@ -107,6 +140,29 @@ const quarterController = {
     try {
       const { id } = req.params;
 
+      // Check if quarter is active before deleting
+      const { data: targetQuarter, error: fetchError } = await supabase
+        .from('quarters')
+        .select('is_active')
+        .eq('id', id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+      if (!targetQuarter) {
+        return res.status(404).json({
+          success: false,
+          message: 'Quarter not found'
+        });
+      }
+
+      if (targetQuarter.is_active) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot delete an active quarter. Set another quarter active first.'
+        });
+      }
+
       const { error } = await supabase
         .from('quarters')
         .delete()
@@ -114,7 +170,7 @@ const quarterController = {
 
       if (error) throw error;
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Quarter deleted successfully'
       });
