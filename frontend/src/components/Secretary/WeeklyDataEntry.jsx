@@ -127,25 +127,38 @@ const WeeklyDataEntry = () => {
     try {
       const currentQuarterId = qId || localStorage.getItem('selectedQuarterId');
       if (!currentQuarterId) {
-        setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar' });
+        setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar.' });
         setClasses([]);
         return;
       }
-      const response = await api.get(`/classes?quarter_id=${currentQuarterId}`);
-      const classesData = response.data?.data || response.data || [];
-      if (Array.isArray(classesData)) {
+
+      // Supports both query param formats and fallback to general endpoint if missing
+      let response;
+      try {
+        response = await api.get('/classes', {
+          params: { quarter_id: currentQuarterId, quarterId: currentQuarterId }
+        });
+      } catch (err) {
+        response = await api.get('/classes');
+      }
+
+      const classesData = 
+        response.data?.classes || 
+        response.data?.data || 
+        (Array.isArray(response.data) ? response.data : []);
+
+      if (Array.isArray(classesData) && classesData.length > 0) {
         setClasses(classesData);
-        if (classesData.length > 0) {
-          setSelectedClass(classesData[0].id);
-        } else {
-          setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
-        }
+        setSelectedClass(classesData[0].id);
+        setMessage({ type: '', text: '' });
       } else {
         setClasses([]);
+        setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
       }
     } catch (error) {
       console.error('Failed to load classes:', error);
       setClasses([]);
+      setMessage({ type: 'error', text: 'Failed to retrieve classes from server.' });
     }
   };
 
