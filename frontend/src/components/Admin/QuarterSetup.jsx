@@ -82,7 +82,6 @@ export default function QuarterSetup() {
       setError(null);
       setSuccess(null);
 
-      // 1. Create the new quarter
       const res = await fetch(API_BASE_URL, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -91,38 +90,24 @@ export default function QuarterSetup() {
           year: formData.year,
           start_date: formData.start_date,
           end_date: formData.end_date,
+          copy_from_quarter_id: formData.copy_from_quarter_id || null,
         }),
       });
 
+      const contentType = res.headers.get("content-type");
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to create quarter");
-      }
-
-      const createdData = await res.json();
-      const newQuarterId = createdData.data?.id || createdData.id;
-
-      // 2. If a source quarter was selected, trigger copy route
-      if (formData.copy_from_quarter_id && newQuarterId) {
-        const copyRes = await fetch(`${API_BASE_URL}/copy`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            source_quarter_id: formData.copy_from_quarter_id,
-            target_quarter_id: newQuarterId,
-          }),
-        });
-
-        if (!copyRes.ok) {
-          const copyErr = await copyRes.json().catch(() => ({}));
-          console.error("Copy warning:", copyErr.message);
-          setSuccess("Quarter created, but copying class/member data failed.");
+        if (contentType && contentType.includes("application/json")) {
+          const errData = await res.json();
+          throw new Error(errData.message || "Failed to create quarter");
         } else {
-          setSuccess("Quarter created and data copied successfully!");
+          const text = await res.text();
+          console.error("Non-JSON Server Response:", text);
+          throw new Error(`Server returned status ${res.status}. Check backend routing.`);
         }
-      } else {
-        setSuccess("Quarter created successfully!");
       }
+
+      const responseData = await res.json();
+      setSuccess(responseData.message || "Quarter created successfully!");
 
       await fetchQuarters();
       handleCloseModal();
@@ -357,7 +342,7 @@ export default function QuarterSetup() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
                   <Copy className="h-4 w-4 text-gray-500" />
-                  <span>Copy Classes & Members From</span>
+                  <span>Copy Members From</span>
                 </label>
                 <select
                   name="copy_from_quarter_id"
@@ -373,7 +358,7 @@ export default function QuarterSetup() {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Copies all active classes and enrolled members into the new quarter.
+                  Optionally copy all members into this newly created quarter.
                 </p>
               </div>
 

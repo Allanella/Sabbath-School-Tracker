@@ -1,20 +1,22 @@
+// routes/quarter.routes.js
 const express = require('express');
 const router = express.Router();
 const quarterController = require('../controllers/quarterController');
-const quarterCopyController = require('../controllers/quarterCopyController');
 const authenticate = require('../middleware/auth');
 const checkRole = require('../middleware/roleCheck');
 
 router.use(authenticate); // All routes require authentication
 
-router.post('/', checkRole('admin'), quarterController.create);
+// GET /api/quarters
 router.get('/', quarterController.getAll);
+
+// GET /api/quarters/active
 router.get('/active', quarterController.getActive);
 
-// Set active quarter - matches frontend POST with quarter_id in body
-router.post('/set-active', checkRole('admin'), quarterController.setActive);
+// POST /api/quarters (handles quarter creation and optional member copy via copy_from_quarter_id)
+router.post('/', checkRole('admin'), quarterController.create);
 
-// Copy classes and members from one quarter to another
-router.post('/copy', checkRole('admin'), quarterCopyController.copyQuarterData);
+// POST /api/quarters/set-active
+router.post('/set-active', checkRole('admin'), quarterController.setActive);
 
 module.exports = router;
