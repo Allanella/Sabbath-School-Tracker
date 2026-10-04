@@ -17,6 +17,4 @@ router.post('/set-active', checkRole('admin'), quarterController.setActive);
 // Copy classes and members from one quarter to another
 router.post('/copy', checkRole('admin'), quarterCopyController.copyQuarterData);
 
-router.delete('/:id', checkRole('admin'), quarterController.delete);
-
 module.exports = router;

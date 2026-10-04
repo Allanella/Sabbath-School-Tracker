@@ -2,10 +2,10 @@
 const supabase = require('../config/database');
 
 const quarterController = {
-  // Create new quarter
+  // Create new quarter with optional member copying from a previous quarter
   create: async (req, res, next) => {
     try {
-      const { name, year, start_date, end_date } = req.body;
+      const { name, year, start_date, end_date, copy_from_quarter_id } = req.body;
 
       if (!name || !year || !start_date || !end_date) {
         return res.status(400).json({
@@ -14,7 +14,7 @@ const quarterController = {
         });
       }
 
-      // Prevent duplicates for the same name and year
+      // 1. Check for duplicates
       const { data: existing } = await supabase
         .from('quarters')
         .select('id')
@@ -29,7 +29,8 @@ const quarterController = {
         });
       }
 
-      const { data, error } = await supabase
+      // 2. Insert new quarter
+      const { data: newQuarter, error: createError } = await supabase
         .from('quarters')
         .insert([
           {
@@ -43,12 +44,36 @@ const quarterController = {
         .select()
         .single();
 
-      if (error) throw error;
+      if (createError) throw createError;
+
+      let copiedCount = 0;
+
+      // 3. Copy members if a source quarter was selected
+      if (copy_from_quarter_id) {
+        const { data: count, error: copyError } = await supabase.rpc(
+          'copy_quarter_members',
+          {
+            p_source_quarter_id: copy_from_quarter_id,
+            p_target_quarter_id: newQuarter.id
+          }
+        );
+
+        if (copyError) {
+          console.error('Error copying members:', copyError);
+        } else {
+          copiedCount = count || 0;
+        }
+      }
 
       return res.status(201).json({
         success: true,
-        message: 'Quarter created successfully',
-        data
+        message: `Quarter created successfully.${
+          copy_from_quarter_id ? ` Copied ${copiedCount} members.` : ''
+        }`,
+        data: {
+          ...newQuarter,
+          copied_members_count: copiedCount
+        }
       });
     } catch (error) {
       next(error);
@@ -107,7 +132,7 @@ const quarterController = {
         });
       }
 
-      // Deactivate all quarters currently active
+      // Deactivate currently active quarter
       const { error: deactivateError } = await supabase
         .from('quarters')
         .update({ is_active: false })
@@ -115,7 +140,7 @@ const quarterController = {
 
       if (deactivateError) throw deactivateError;
 
-      // Activate selected quarter
+      // Activate target quarter
       const { data, error } = await supabase
         .from('quarters')
         .update({ is_active: true })
@@ -129,50 +154,6 @@ const quarterController = {
         success: true,
         message: 'Active quarter updated',
         data
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  // Delete quarter
-  delete: async (req, res, next) => {
-    try {
-      const { id } = req.params;
-
-      // Check if quarter is active before deleting
-      const { data: targetQuarter, error: fetchError } = await supabase
-        .from('quarters')
-        .select('is_active')
-        .eq('id', id)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-
-      if (!targetQuarter) {
-        return res.status(404).json({
-          success: false,
-          message: 'Quarter not found'
-        });
-      }
-
-      if (targetQuarter.is_active) {
-        return res.status(400).json({
-          success: false,
-          message: 'Cannot delete an active quarter. Set another quarter active first.'
-        });
-      }
-
-      const { error } = await supabase
-        .from('quarters')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      return res.json({
-        success: true,
-        message: 'Quarter deleted successfully'
       });
     } catch (error) {
       next(error);

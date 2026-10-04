@@ -1,7 +1,11 @@
-import React, { useState } from "react";
-import { Plus, X, Save, Calendar } from "lucide-react";
+// components/Admin/QuarterSetup.jsx
+import React, { useState, useEffect } from "react";
+import { Plus, X, Save, Calendar, Circle, Copy } from "lucide-react";
 
-// Helper function to calculate default quarter dates based on standard calendar quarters
+const API_BASE_URL = process.env.REACT_APP_API_URL 
+  ? `${process.env.REACT_APP_API_URL}/api/quarters` 
+  : "/api/quarters";
+
 const getQuarterDates = (quarter, year) => {
   const y = parseInt(year, 10);
   if (isNaN(y)) return { start: "", end: "" };
@@ -20,35 +24,147 @@ const getQuarterDates = (quarter, year) => {
   }
 };
 
-export default function QuarterManager() {
+export default function QuarterSetup() {
   const currentYear = new Date().getFullYear();
-
-  const [quarters, setQuarters] = useState([
-    {
-      id: "1",
-      name: "Q1",
-      year: currentYear,
-      start_date: `${currentYear}-01-01`,
-      end_date: `${currentYear}-03-31`,
-      status: "active",
-    },
-  ]);
-
+  const [quarters, setQuarters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [showModal, setShowModal] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "Q1",
     year: currentYear,
     start_date: `${currentYear}-01-01`,
     end_date: `${currentYear}-03-31`,
+    copy_from_quarter_id: "",
   });
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    };
+  };
+
+  useEffect(() => {
+    fetchQuarters();
+  }, []);
+
+  const fetchQuarters = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(API_BASE_URL, {
+        headers: getAuthHeaders(),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch quarters");
+      }
+
+      const responseData = await res.json();
+      const list = responseData.data || responseData;
+      setQuarters(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error("Error fetching quarters:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setSuccess(null);
+
+      // 1. Create the new quarter
+      const res = await fetch(API_BASE_URL, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: formData.name,
+          year: formData.year,
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create quarter");
+      }
+
+      const createdData = await res.json();
+      const newQuarterId = createdData.data?.id || createdData.id;
+
+      // 2. If a source quarter was selected, trigger copy route
+      if (formData.copy_from_quarter_id && newQuarterId) {
+        const copyRes = await fetch(`${API_BASE_URL}/copy`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            source_quarter_id: formData.copy_from_quarter_id,
+            target_quarter_id: newQuarterId,
+          }),
+        });
+
+        if (!copyRes.ok) {
+          const copyErr = await copyRes.json().catch(() => ({}));
+          console.error("Copy warning:", copyErr.message);
+          setSuccess("Quarter created, but copying class/member data failed.");
+        } else {
+          setSuccess("Quarter created and data copied successfully!");
+        }
+      } else {
+        setSuccess("Quarter created successfully!");
+      }
+
+      await fetchQuarters();
+      handleCloseModal();
+    } catch (err) {
+      console.error("Error creating quarter:", err);
+      setError(err.message);
+    }
+  };
+
+  const handleSetActive = async (id) => {
+    try {
+      setError(null);
+      setSuccess(null);
+      const res = await fetch(`${API_BASE_URL}/set-active`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ quarter_id: id }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to set active quarter");
+      }
+
+      setSuccess("Active quarter updated successfully!");
+      await fetchQuarters();
+    } catch (err) {
+      console.error("Error setting active quarter:", err);
+      setError(err.message);
+    }
+  };
 
   const handleOpenModal = () => {
     const defaultDates = getQuarterDates("Q1", currentYear);
+    const activeQ = quarters.find((q) => q.is_active || q.status === "active");
+
     setFormData({
       name: "Q1",
       year: currentYear,
       start_date: defaultDates.start,
       end_date: defaultDates.end,
+      copy_from_quarter_id: activeQ ? (activeQ.id || activeQ._id) : "",
     });
     setShowModal(true);
   };
@@ -57,17 +173,15 @@ export default function QuarterManager() {
     setShowModal(false);
   };
 
-  // Fixed: Updated to batch form data changes in a single state call
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
 
-      // Recalculate start and end dates when name or year changes
       if (name === "name" || name === "year") {
         const dates = getQuarterDates(updated.name, updated.year);
-        if (dates) {
+        if (dates.start && dates.end) {
           updated.start_date = dates.start;
           updated.end_date = dates.end;
         }
@@ -77,27 +191,23 @@ export default function QuarterManager() {
     });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    const newQuarter = {
-      id: Date.now().toString(),
-      ...formData,
-      status: "upcoming",
-    };
-
-    setQuarters((prev) => [...prev, newQuarter]);
-    handleCloseModal();
+  const formatDateString = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quarter Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Quarter Setup</h1>
           <p className="text-sm text-gray-500">
-            Define fiscal quarters and track planning cycles.
+            Create quarters, select active terms, and carry over members.
           </p>
         </div>
 
@@ -111,47 +221,90 @@ export default function QuarterManager() {
         </button>
       </div>
 
-      {/* Quarters list */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex justify-between items-center">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm flex justify-between items-center">
+          <span>{success}</span>
+          <button onClick={() => setSuccess(null)} className="text-green-500 hover:text-green-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center space-x-2">
-          <Calendar className="h-5 w-5 text-gray-500" />
-          <h2 className="text-lg font-semibold text-gray-800">Configured Quarters</h2>
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-gray-500" />
+            <h2 className="text-lg font-semibold text-gray-800">
+              Configured Quarters ({quarters.length})
+            </h2>
+          </div>
         </div>
 
-        {quarters.length === 0 ? (
+        {loading ? (
+          <div className="p-8 text-center text-gray-500">Loading quarters...</div>
+        ) : quarters.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            No quarters added yet. Click "Add Quarter" above to create one.
+            No quarters found. Click "Add Quarter" to create one.
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {quarters.map((q) => (
-              <li key={q.id} className="p-6 flex items-center justify-between hover:bg-gray-50">
-                <div>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg font-bold text-gray-900">
-                      {q.name} {q.year}
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                        q.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {q.status}
-                    </span>
+            {quarters.map((q) => {
+              const qId = q.id || q._id;
+              const isActive = q.status === "active" || q.is_active;
+
+              return (
+                <li
+                  key={qId}
+                  className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-lg font-bold text-gray-900">
+                        {q.name} {q.year}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                          isActive
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {isActive ? "active" : "inactive"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {formatDateString(q.start_date)} to {formatDateString(q.end_date)}
+                    </p>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {q.start_date} to {q.end_date}
-                  </p>
-                </div>
-              </li>
-            ))}
+
+                  <div className="flex items-center space-x-3">
+                    {!isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetActive(qId)}
+                        className="px-3 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors flex items-center space-x-1"
+                      >
+                        <Circle className="h-3.5 w-3.5" />
+                        <span>Set Active</span>
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
 
-      {/* Add Quarter Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full my-auto overflow-hidden">
@@ -202,6 +355,29 @@ export default function QuarterManager() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                  <Copy className="h-4 w-4 text-gray-500" />
+                  <span>Copy Classes & Members From</span>
+                </label>
+                <select
+                  name="copy_from_quarter_id"
+                  value={formData.copy_from_quarter_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">-- Do not copy (Start Fresh) --</option>
+                  {quarters.map((q) => (
+                    <option key={q.id || q._id} value={q.id || q._id}>
+                      {q.name} {q.year} {q.is_active || q.status === "active" ? "(Active)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Copies all active classes and enrolled members into the new quarter.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Date
                 </label>
@@ -227,13 +403,6 @@ export default function QuarterManager() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                <p className="font-medium mb-1">Note:</p>
-                <p>
-                  Quarters are 13-week cycles. Dates auto-update based on your selection.
-                </p>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
