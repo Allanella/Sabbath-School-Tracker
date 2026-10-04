@@ -12,5 +12,6 @@ router.get('/', quarterController.getAll);
 router.get('/active', quarterController.getActive);
 router.post('/', checkRole('admin'), quarterController.create);
 router.post('/set-active', checkRole('admin'), quarterController.setActive);
+router.post('/copy-members', checkRole('admin'), quarterController.copyMembers);
 
 module.exports = router;

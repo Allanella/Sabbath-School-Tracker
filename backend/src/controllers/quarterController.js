@@ -1,4 +1,3 @@
-// controllers/quarterController.js
 const supabase = require('../config/database');
 
 const quarterController = {
@@ -48,7 +47,7 @@ const quarterController = {
 
       let copiedCount = 0;
 
-      // 3. Copy members if a source quarter was selected
+      // 3. Copy members via RPC or fallback if source quarter is provided
       if (copy_from_quarter_id) {
         const { data: count, error: copyError } = await supabase.rpc(
           'copy_quarter_members',
@@ -59,7 +58,7 @@ const quarterController = {
         );
 
         if (copyError) {
-          console.error('Error copying members:', copyError);
+          console.error('Error copying members during creation:', copyError);
         } else {
           copiedCount = count || 0;
         }
@@ -154,6 +153,102 @@ const quarterController = {
         success: true,
         message: 'Active quarter updated',
         data
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Copy classes and active members from a source quarter to a target quarter
+  copyMembers: async (req, res, next) => {
+    try {
+      const { source_quarter_id, target_quarter_id } = req.body;
+
+      console.log('Copying quarter data:', { source_quarter_id, target_quarter_id });
+
+      if (!source_quarter_id || !target_quarter_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'source_quarter_id and target_quarter_id are required'
+        });
+      }
+
+      // 1. Fetch classes from source quarter
+      const { data: sourceClasses, error: classesError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('quarter_id', source_quarter_id);
+
+      if (classesError) {
+        console.error('Error fetching source classes:', classesError);
+        throw classesError;
+      }
+
+      let totalClassesCopied = 0;
+      let totalMembersCopied = 0;
+
+      // 2. Loop through classes and duplicate them into target quarter
+      for (const sourceClass of sourceClasses || []) {
+        const { data: newClass, error: newClassError } = await supabase
+          .from('classes')
+          .insert({
+            quarter_id: target_quarter_id,
+            class_name: sourceClass.class_name,
+            teacher_name: sourceClass.teacher_name,
+            secretary_name: sourceClass.secretary_name || '',
+            secretary_id: sourceClass.secretary_id,
+            church_name: sourceClass.church_name
+          })
+          .select()
+          .single();
+
+        if (newClassError) {
+          console.error(`Error creating class ${sourceClass.class_name}:`, newClassError);
+          continue;
+        }
+
+        totalClassesCopied++;
+
+        // 3. Get active members from source class
+        const { data: sourceMembers, error: membersError } = await supabase
+          .from('class_members')
+          .select('*')
+          .eq('class_id', sourceClass.id)
+          .eq('is_active', true);
+
+        if (membersError) {
+          console.error(`Error fetching members for class ${sourceClass.class_name}:`, membersError);
+          continue;
+        }
+
+        // 4. Insert members into new class
+        if (sourceMembers && sourceMembers.length > 0) {
+          const membersToInsert = sourceMembers.map((member) => ({
+            class_id: newClass.id,
+            member_name: member.member_name,
+            is_active: true
+          }));
+
+          const { data: newMembers, error: insertMembersError } = await supabase
+            .from('class_members')
+            .insert(membersToInsert)
+            .select();
+
+          if (insertMembersError) {
+            console.error(`Error inserting members for ${newClass.class_name}:`, insertMembersError);
+          } else if (newMembers) {
+            totalMembersCopied += newMembers.length;
+          }
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: 'Quarter data copied successfully',
+        data: {
+          classes_copied: totalClassesCopied,
+          members_copied: totalMembersCopied
+        }
       });
     } catch (error) {
       next(error);

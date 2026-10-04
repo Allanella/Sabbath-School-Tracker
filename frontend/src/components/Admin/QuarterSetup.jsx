@@ -1,6 +1,6 @@
 // components/Admin/QuarterSetup.jsx
 import React, { useState, useEffect } from "react";
-import { Plus, X, Save, Calendar, Circle, Copy } from "lucide-react";
+import { Plus, X, Save, Calendar, Circle, Copy, Users } from "lucide-react";
 
 // Support both Vite (import.meta.env) and Create React App (process.env)
 const ENV_URL = 
@@ -37,6 +37,7 @@ export default function QuarterSetup() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "Q1",
@@ -92,12 +93,31 @@ export default function QuarterSetup() {
     }
   };
 
+  const handleCopyMembers = async (sourceQuarterId, targetQuarterId) => {
+    const res = await fetch(`${API_BASE_URL}/copy-members`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        source_quarter_id: sourceQuarterId,
+        target_quarter_id: targetQuarterId,
+      }),
+    });
+
+    const data = await parseResponse(res);
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to copy members to the new quarter");
+    }
+    return data;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setIsSubmitting(true);
       setError(null);
       setSuccess(null);
 
+      // 1. Create the Quarter
       const res = await fetch(API_BASE_URL, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -116,13 +136,30 @@ export default function QuarterSetup() {
         throw new Error(data.message || "Failed to create quarter");
       }
 
-      setSuccess(data.message || "Quarter created successfully!");
+      const newQuarter = data.data || data.quarter || data;
+      const newQuarterId = newQuarter.id || newQuarter._id;
 
+      let successMessage = data.message || "Quarter created successfully!";
+
+      // 2. If copy source selected, call member-copy endpoint
+      if (formData.copy_from_quarter_id && newQuarterId) {
+        try {
+          await handleCopyMembers(formData.copy_from_quarter_id, newQuarterId);
+          successMessage += " Members copied over successfully!";
+        } catch (copyErr) {
+          console.warn("Quarter created but member copy failed:", copyErr);
+          setError(`Quarter created, but copying members failed: ${copyErr.message}`);
+        }
+      }
+
+      setSuccess(successMessage);
       await fetchQuarters();
       handleCloseModal();
     } catch (err) {
       console.error("Error creating quarter:", err);
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -404,17 +441,19 @@ export default function QuarterSetup() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center space-x-2"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center space-x-2 disabled:opacity-50"
                 >
                   <Save className="h-5 w-5" />
-                  <span>Create Quarter</span>
+                  <span>{isSubmitting ? "Creating..." : "Create Quarter"}</span>
                 </button>
               </div>
             </form>
