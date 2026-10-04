@@ -13,14 +13,23 @@ const classController = {
         church_name 
       } = req.body;
 
+      if (!quarter_id || !class_name) {
+        return res.status(400).json({
+          success: false,
+          message: 'quarter_id and class_name are required fields.'
+        });
+      }
+
+      const sanitizedQuarterId = String(quarter_id).trim();
+
       // Check for duplicate class name in same quarter
       const { data: existing } = await supabase
         .from('classes')
         .select('id')
-        .eq('quarter_id', quarter_id)
+        .eq('quarter_id', sanitizedQuarterId)
         .eq('class_name', class_name)
         .is('deleted_at', null)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         return res.status(400).json({
@@ -32,7 +41,7 @@ const classController = {
       const { data, error } = await supabase
         .from('classes')
         .insert([{ 
-          quarter_id, 
+          quarter_id: sanitizedQuarterId, 
           class_name, 
           teacher_name, 
           secretary_id, 
@@ -54,10 +63,23 @@ const classController = {
     }
   },
 
-  // Get all classes (excludes soft-deleted)
+  // Get all classes (excludes soft-deleted, filters by specified or active quarter)
   getAll: async (req, res, next) => {
     try {
-      const { quarter_id } = req.query;
+      let { quarter_id } = req.query;
+
+      // If no quarter_id supplied, default to the active quarter
+      if (!quarter_id) {
+        const { data: activeQuarter } = await supabase
+          .from('quarters')
+          .select('id')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (activeQuarter) {
+          quarter_id = activeQuarter.id;
+        }
+      }
 
       let query = supabase
         .from('classes')
@@ -69,7 +91,7 @@ const classController = {
         .is('deleted_at', null);
 
       if (quarter_id) {
-        query = query.eq('quarter_id', quarter_id);
+        query = query.eq('quarter_id', String(quarter_id).trim());
       }
 
       const { data, error } = await query.order('class_name');
@@ -78,7 +100,7 @@ const classController = {
 
       res.json({
         success: true,
-        data
+        data: data || []
       });
     } catch (error) {
       next(error);
@@ -97,7 +119,7 @@ const classController = {
           quarter:quarters(*),
           secretary:users!classes_secretary_id_fkey(full_name, email)
         `)
-        .eq('id', id)
+        .eq('id', String(id).trim())
         .is('deleted_at', null)
         .single();
 
@@ -106,6 +128,36 @@ const classController = {
       res.json({
         success: true,
         data
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Get active members belonging to a specific class ID
+  getClassMembers: async (req, res, next) => {
+    try {
+      const { class_id } = req.params;
+
+      if (!class_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'class_id is required.'
+        });
+      }
+
+      const { data: members, error } = await supabase
+        .from('class_members')
+        .select('*')
+        .eq('class_id', String(class_id).trim())
+        .eq('is_active', true)
+        .order('member_name', { ascending: true });
+
+      if (error) throw error;
+
+      res.json({
+        success: true,
+        data: members || []
       });
     } catch (error) {
       next(error);
@@ -131,7 +183,7 @@ const classController = {
 
       res.json({
         success: true,
-        data
+        data: data || []
       });
     } catch (error) {
       next(error);
@@ -160,7 +212,6 @@ const classController = {
           secretary:users!classes_secretary_id_fkey(full_name, email)
         `)
         .or(`class_name.ilike.%${searchTerm}%,teacher_name.ilike.%${searchTerm}%,secretary_name.ilike.%${searchTerm}%`)
-        .eq('is_active', true)
         .is('deleted_at', null);
 
       if (error) throw error;
@@ -184,7 +235,7 @@ const classController = {
       const { data, error } = await supabase
         .from('classes')
         .update(updates)
-        .eq('id', id)
+        .eq('id', String(id).trim())
         .select()
         .single();
 
@@ -200,32 +251,31 @@ const classController = {
     }
   },
 
-  // Soft delete class (marks as deleted, never removes data)
+  // Soft delete class
   delete: async (req, res, next) => {
     try {
       const { id } = req.params;
+      const cleanId = String(id).trim();
 
-      // First check if class has any weekly data or payments
+      // Check if class has active records
       const { data: weeklyData } = await supabase
         .from('weekly_data')
         .select('id')
-        .eq('class_id', id)
+        .eq('class_id', cleanId)
         .limit(1);
 
       const { data: members } = await supabase
         .from('class_members')
         .select('id')
-        .eq('class_id', id)
+        .eq('class_id', cleanId)
         .limit(1);
 
-      // Warn if data exists but still allow soft delete
       const hasData = (weeklyData && weeklyData.length > 0) || (members && members.length > 0);
 
-      // Soft delete — set deleted_at timestamp instead of removing
       const { data, error } = await supabase
         .from('classes')
         .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id)
+        .eq('id', cleanId)
         .select()
         .single();
 
@@ -252,7 +302,7 @@ const classController = {
       const { data, error } = await supabase
         .from('classes')
         .update({ deleted_at: null })
-        .eq('id', id)
+        .eq('id', String(id).trim())
         .select()
         .single();
 

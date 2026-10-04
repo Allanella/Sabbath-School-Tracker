@@ -627,8 +627,8 @@ const WeeklyDataEntry = () => {
         {/* Payment Tables (Lesson Study Guides & Morning Watch) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {[
-            { title: 'Lesson Study Guides Offering', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda', badgeColor: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-            { title: 'Morning Watch Offering', eng: paymentsMorningWatchEnglish, lug: paymentsMorningWatchLuganda, setEng: setPaymentsMorningWatchEnglish, setLug: setPaymentsMorningWatchLuganda, typeEng: 'morning_watch_english', typeLug: 'morning_watch_luganda', badgeColor: 'text-indigo-700 bg-indigo-50 border-indigo-100' }
+            { title: 'Lesson Study Guides Offering', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
+            { title: 'Morning Watch Offering', eng: paymentsMorningWatchEnglish, lug: paymentsMorningWatchLuganda, setEng: setPaymentsMorningWatchEnglish, setLug: setPaymentsMorningWatchLuganda, typeEng: 'morning_watch_english', typeLug: 'morning_watch_luganda' }
           ].map((section, idx) => (
             <div key={idx} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
               <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -708,10 +708,14 @@ const WeeklyDataEntry = () => {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-50 border-t-2 border-slate-100 font-bold">
-                      <td className="py-3.5 px-6 text-slate-700 font-bold">Weekly Subtotals</td>
-                      <td className="py-3.5 text-center text-indigo-700 font-extrabold text-sm">{calculateTotal(section.eng).toLocaleString()}</td>
-                      <td className="py-3.5 text-center text-indigo-700 font-extrabold text-sm">{calculateTotal(section.lug).toLocaleString()}</td>
+                    <tr className="bg-slate-50/80 border-t border-slate-200 font-bold text-slate-800">
+                      <td className="py-3 px-6">Total</td>
+                      <td className="py-3 px-4 text-center text-blue-700">
+                        {calculateTotal(section.eng).toLocaleString()} UGX
+                      </td>
+                      <td className="py-3 px-4 text-center text-purple-700">
+                        {calculateTotal(section.lug).toLocaleString()} UGX
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
@@ -720,109 +724,187 @@ const WeeklyDataEntry = () => {
           ))}
         </div>
 
-        {/* Weekly Stats Forms */}
+        {/* Weekly Activities & Metrics Input Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex items-center space-x-2.5 mb-6">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
               <TrendingUp className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Weekly Performance Statistics</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Aggregate record metrics for the entire class this week.</p>
+              <h2 className="text-lg font-bold text-slate-900">Weekly Activity Metrics</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Sabbath school attendance, missionary visits, and lesson study stats.</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Total Attendance', name: 'total_attendance' },
-              { label: 'Member Visits', name: 'member_visits' },
-              { label: 'Bible Studies Done', name: 'members_conducted_bible_studies' },
-              { label: 'Helped Others', name: 'members_helped_others' },
-              { label: 'Studied Lesson', name: 'members_studied_lesson' },
-              { label: 'Number of Visitors', name: 'number_of_visitors' },
-              { label: 'Guides Distributed', name: 'bible_study_guides_distributed' },
-              { label: 'Global Mission Offering (UGX)', name: 'offering_global_mission' }
-            ].map(stat => (
-              <div key={stat.name} className="bg-slate-50/60 rounded-xl p-3 border border-slate-200/50 hover:border-indigo-200 transition">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">{stat.label}</label>
-                <input 
-                  type="number" 
-                  name={stat.name} 
-                  value={formData[stat.name]} 
-                  onChange={handleChange} 
-                  className="w-full rounded-lg border-slate-200 bg-white px-3 py-2 text-slate-800 text-sm font-semibold focus:ring-indigo-500 focus:border-indigo-500" 
-                  min="0" 
-                />
-              </div>
-            ))}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Total Attendance</label>
+              <input
+                type="number"
+                min="0"
+                name="total_attendance"
+                value={formData.total_attendance}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Member Visits</label>
+              <input
+                type="number"
+                min="0"
+                name="member_visits"
+                value={formData.member_visits}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Conducted Bible Studies</label>
+              <input
+                type="number"
+                min="0"
+                name="members_conducted_bible_studies"
+                value={formData.members_conducted_bible_studies}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Helped Others</label>
+              <input
+                type="number"
+                min="0"
+                name="members_helped_others"
+                value={formData.members_helped_others}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Studied Lesson</label>
+              <input
+                type="number"
+                min="0"
+                name="members_studied_lesson"
+                value={formData.members_studied_lesson}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Number of Visitors</label>
+              <input
+                type="number"
+                min="0"
+                name="number_of_visitors"
+                value={formData.number_of_visitors}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Guides Distributed</label>
+              <input
+                type="number"
+                min="0"
+                name="bible_study_guides_distributed"
+                value={formData.bible_study_guides_distributed}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Global Mission Offering (UGX)</label>
+              <input
+                type="number"
+                min="0"
+                step="100"
+                name="offering_global_mission"
+                value={formData.offering_global_mission}
+                onChange={handleChange}
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Remarks / Notes</label>
+            <textarea
+              name="members_summary"
+              rows="3"
+              value={formData.members_summary}
+              onChange={handleChange}
+              placeholder="Add any general remarks or class updates..."
+              className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+            />
           </div>
         </div>
 
-        {/* Review Notes & Summary */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Weekly Summary & Testimony Notes</label>
-          <textarea 
-            name="members_summary" 
-            value={formData.members_summary} 
-            onChange={handleChange} 
-            rows="4" 
-            className="w-full rounded-xl border-slate-200 focus:ring-indigo-500 focus:border-indigo-500 transition py-3 px-4 text-sm text-slate-700" 
-            placeholder="Document testimonies, prayer requests, milestones, or important notices concerning members..."
-          />
-        </div>
-
-        {/* Submission Actions */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 py-4">
-          <button 
-            type="submit" 
-            disabled={loading} 
-            className="w-full sm:w-auto px-10 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200/80 hover:shadow-indigo-300 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+        {/* Form Action Controls */}
+        <div className="flex items-center justify-end space-x-4 pt-4">
+          <button
+            type="button"
+            onClick={() => navigate('/secretary')}
+            className="px-6 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold text-sm hover:bg-slate-50 transition"
           >
-            {loading ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-            <span>{formData.id ? 'Update Weekly Data Entry' : 'Submit Complete Sabbath Record'}</span>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-100 flex items-center space-x-2 transition disabled:opacity-50"
+          >
+            <Save className="h-4 w-4" />
+            <span>{loading ? 'Saving...' : formData.id ? 'Update Record' : 'Save Record'}</span>
           </button>
         </div>
+
       </form>
 
-      {/* Member Creation/Update Dialog Modal */}
+      {/* Member Management Modal */}
       {showMemberModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden transition-all duration-200 transform">
-            <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-slate-900">{editingMember ? 'Edit Class Member' : 'Add New Class Member'}</h3>
-              <button 
-                type="button" 
-                onClick={() => setShowMemberModal(false)} 
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900">
+                {editingMember ? 'Edit Class Member' : 'Add New Class Member'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowMemberModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="py-4 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Member Name</label>
-                <input 
-                  type="text" 
-                  placeholder="E.g., Aliddeki Doreen" 
-                  value={newMemberName} 
-                  onChange={(e) => setNewMemberName(e.target.value)} 
-                  className="w-full rounded-xl border-slate-200 px-4 py-3 text-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Member Name</label>
+                <input
+                  type="text"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  placeholder="Enter full name"
+                  className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                  autoFocus
                 />
               </div>
             </div>
-            <div className="px-6 py-4 bg-slate-50 flex justify-end space-x-2">
-              <button 
-                type="button" 
-                onClick={() => setShowMemberModal(false)} 
-                className="px-4 py-2 text-slate-500 hover:text-slate-700 font-semibold text-sm rounded-lg"
+            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowMemberModal(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition"
               >
                 Cancel
               </button>
-              <button 
-                type="button" 
-                onClick={handleAddMember} 
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-lg shadow-md shadow-indigo-100"
+              <button
+                type="button"
+                onClick={handleAddMember}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition"
               >
-                Save Member
+                {editingMember ? 'Update Member' : 'Add Member'}
               </button>
             </div>
           </div>
