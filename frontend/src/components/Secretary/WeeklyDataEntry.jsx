@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import classService from '../../services/classService';
-import weeklyDataService from '../../services/WeeklyDataService';
 import classMemberService from '../../services/classMemberService';
+import weeklyDataService from '../../services/WeeklyDataService';
 import paymentService from '../../services/paymentService';
 import offlineStorage from '../../utils/offlineStorage';
 import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff, RefreshCw, TrendingUp } from 'lucide-react';
@@ -48,18 +47,95 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
+  // Load Classes Function with Multi-Strategy Fallbacks
+  const loadClasses = useCallback(async (targetQuarterId) => {
+    const activeQuarterId = targetQuarterId || quarterId || localStorage.getItem('selectedQuarterId');
+    
+    if (!activeQuarterId) {
+      setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar.' });
+      setClasses([]);
+      return;
+    }
+
+    try {
+      let rawData = null;
+
+      // Strategy 1: Standard query params (quarter_id / quarterId)
+      try {
+        const res = await api.get('/classes', {
+          params: { quarter_id: activeQuarterId, quarterId: activeQuarterId }
+        });
+        rawData = res.data;
+      } catch (e1) {
+        // Strategy 2: URL param (/classes/quarter/:quarterId)
+        try {
+          const res = await api.get(`/classes/quarter/${activeQuarterId}`);
+          rawData = res.data;
+        } catch (e2) {
+          // Strategy 3: General fetch
+          const res = await api.get('/classes');
+          rawData = res.data;
+        }
+      }
+
+      // Extract array from response payload formats
+      let classList = [];
+      if (Array.isArray(rawData)) {
+        classList = rawData;
+      } else if (Array.isArray(rawData?.classes)) {
+        classList = rawData.classes;
+      } else if (Array.isArray(rawData?.data)) {
+        classList = rawData.data;
+      } else if (Array.isArray(rawData?.data?.classes)) {
+        classList = rawData.data.classes;
+      }
+
+      // Filter locally if backend returned all classes across quarters
+      const filteredClasses = classList.filter(c => {
+        if (!c.quarter_id && !c.quarterId) return true; // keep if backend doesn't attach quarter_id
+        return String(c.quarter_id || c.quarterId) === String(activeQuarterId);
+      });
+
+      const finalClasses = filteredClasses.length > 0 ? filteredClasses : classList;
+
+      if (finalClasses.length > 0) {
+        setClasses(finalClasses);
+        setSelectedClass(finalClasses[0].id);
+        setMessage({ type: '', text: '' });
+      } else {
+        setClasses([]);
+        setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      setClasses([]);
+      setMessage({ type: 'error', text: 'Failed to retrieve classes from server.' });
+    }
+  }, [quarterId]);
+
+  // Handle quarter changes from sidebar or local storage
   useEffect(() => {
+    const activeQ = localStorage.getItem('selectedQuarterId');
+    if (activeQ) {
+      setQuarterId(activeQ);
+      loadClasses(activeQ);
+    } else {
+      loadClasses();
+    }
+
     const handleQuarterChange = (e) => {
       const newQuarterId = e.detail?.quarterId || localStorage.getItem('selectedQuarterId');
-      setQuarterId(newQuarterId);
-      loadClasses(newQuarterId);
+      if (newQuarterId) {
+        setQuarterId(newQuarterId);
+        loadClasses(newQuarterId);
+      }
     };
+
     window.addEventListener('quarterChanged', handleQuarterChange);
     return () => window.removeEventListener('quarterChanged', handleQuarterChange);
-  }, []);
+  }, [loadClasses]);
 
   useEffect(() => {
-    loadClasses(quarterId);
     checkPendingMembers();
   }, []);
 
@@ -72,14 +148,12 @@ const WeeklyDataEntry = () => {
       if (wasOffline && nowOnline) { autoSyncPendingData(); }
     };
     updateOnlineStatus();
-    const handleOnline = () => updateOnlineStatus();
-    const handleOffline = () => updateOnlineStatus();
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    const intervalId = setInterval(updateOnlineStatus, 2000);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    const intervalId = setInterval(updateOnlineStatus, 3000);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
       clearInterval(intervalId);
     };
   }, [isOnline, manualOffline]);
@@ -123,49 +197,10 @@ const WeeklyDataEntry = () => {
     }, 3000);
   };
 
-  const loadClasses = async (qId) => {
-    try {
-      const currentQuarterId = qId || localStorage.getItem('selectedQuarterId');
-      if (!currentQuarterId) {
-        setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar.' });
-        setClasses([]);
-        return;
-      }
-
-      // Supports both query param formats and fallback to general endpoint if missing
-      let response;
-      try {
-        response = await api.get('/classes', {
-          params: { quarter_id: currentQuarterId, quarterId: currentQuarterId }
-        });
-      } catch (err) {
-        response = await api.get('/classes');
-      }
-
-      const classesData = 
-        response.data?.classes || 
-        response.data?.data || 
-        (Array.isArray(response.data) ? response.data : []);
-
-      if (Array.isArray(classesData) && classesData.length > 0) {
-        setClasses(classesData);
-        setSelectedClass(classesData[0].id);
-        setMessage({ type: '', text: '' });
-      } else {
-        setClasses([]);
-        setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
-      }
-    } catch (error) {
-      console.error('Failed to load classes:', error);
-      setClasses([]);
-      setMessage({ type: 'error', text: 'Failed to retrieve classes from server.' });
-    }
-  };
-
   const loadMembers = async () => {
     try {
       const response = await classMemberService.getByClass(selectedClass);
-      const membersData = Array.isArray(response) ? response : (response.data || []);
+      const membersData = Array.isArray(response) ? response : (response?.data || []);
       setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error) {
       console.error('Failed to load members:', error);
@@ -179,11 +214,13 @@ const WeeklyDataEntry = () => {
       const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
       if (!currentQuarterId || !selectedClass) { setPaymentTotals({}); return; }
       const response = await paymentService.getClassPaymentTotals(selectedClass, currentQuarterId);
-      const totalsArray = Array.isArray(response) ? response : (response.data || []);
+      const totalsArray = Array.isArray(response) ? response : (response?.data || []);
       const totalsMap = {};
-      totalsArray.forEach(memberData => {
-        totalsMap[memberData.id] = memberData.totals;
-      });
+      if (Array.isArray(totalsArray)) {
+        totalsArray.forEach(memberData => {
+          totalsMap[memberData.id] = memberData.totals;
+        });
+      }
       setPaymentTotals(totalsMap);
     } catch (error) {
       console.error('Failed to load payment totals:', error);
@@ -197,7 +234,7 @@ const WeeklyDataEntry = () => {
     try {
       await loadMembers();
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data.class_id === selectedClass);
+      const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data?.class_id === selectedClass);
       if (pendingAdds.length > 0) {
         const tempMembers = pendingAdds.map(item => item.data);
         setMembers(prev => [...prev, ...tempMembers]);
@@ -212,8 +249,7 @@ const WeeklyDataEntry = () => {
       const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
       const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
       if (response && response.data) {
-        const data = response.data;
-        setFormData(data);
+        setFormData(response.data);
         setMessage({ type: 'info', text: '📝 Editing existing data for this week.' });
       } else {
         setFormData({
@@ -244,15 +280,17 @@ const WeeklyDataEntry = () => {
           const newMwLug = {};
           const paymentIds = {};
 
-          weekPayments.forEach(member => {
-            if (member.payment) {
-              paymentIds[member.id] = member.payment.id;
-              if (member.payment.lesson_english > 0) newLessonEng[member.id] = member.payment.lesson_english;
-              if (member.payment.lesson_luganda > 0) newLessonLug[member.id] = member.payment.lesson_luganda;
-              if (member.payment.morning_watch_english > 0) newMwEng[member.id] = member.payment.morning_watch_english;
-              if (member.payment.morning_watch_luganda > 0) newMwLug[member.id] = member.payment.morning_watch_luganda;
-            }
-          });
+          if (Array.isArray(weekPayments)) {
+            weekPayments.forEach(member => {
+              if (member.payment) {
+                paymentIds[member.id] = member.payment.id;
+                if (member.payment.lesson_english > 0) newLessonEng[member.id] = member.payment.lesson_english;
+                if (member.payment.lesson_luganda > 0) newLessonLug[member.id] = member.payment.lesson_luganda;
+                if (member.payment.morning_watch_english > 0) newMwEng[member.id] = member.payment.morning_watch_english;
+                if (member.payment.morning_watch_luganda > 0) newMwLug[member.id] = member.payment.morning_watch_luganda;
+              }
+            });
+          }
 
           setPaymentsLessonEnglish(newLessonEng);
           setPaymentsLessonLuganda(newLessonLug);
@@ -507,7 +545,7 @@ const WeeklyDataEntry = () => {
         </div>
       )}
 
-      {/* Header Panel */}
+      {/* Header */}
       <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 ${!isOnline ? 'mt-10' : ''}`}>
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Weekly Data Entry</h1>
@@ -530,7 +568,7 @@ const WeeklyDataEntry = () => {
         </div>
       </div>
 
-      {/* Alert Notices */}
+      {/* Alert Banner */}
       {message.text && !showSuccessToast && (
         <div className={`p-4 rounded-xl flex items-start space-x-3 border ${
           message.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-200' :
@@ -544,7 +582,7 @@ const WeeklyDataEntry = () => {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         
-        {/* Class Selection & Sabbath Metadata */}
+        {/* Class Selection & Controls */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Class</label>
@@ -554,6 +592,7 @@ const WeeklyDataEntry = () => {
               className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               required
             >
+              {classes.length === 0 && <option value="">No classes found</option>}
               {classes.map((c) => (<option key={c.id} value={c.id}>{c.class_name}</option>))}
             </select>
           </div>
@@ -582,7 +621,7 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Member Directory Grid */}
+        {/* Member Directory */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div className="flex items-center space-x-2.5">
@@ -637,7 +676,7 @@ const WeeklyDataEntry = () => {
           )}
         </div>
 
-        {/* Payment Tables (Lesson Study Guides & Morning Watch) */}
+        {/* Payments Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {[
             { title: 'Lesson Study Guides Offering', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
@@ -737,7 +776,7 @@ const WeeklyDataEntry = () => {
           ))}
         </div>
 
-        {/* Weekly Activities & Metrics Input Section */}
+        {/* Activity Inputs */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex items-center space-x-2.5 mb-6">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -854,7 +893,7 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Form Action Controls */}
+        {/* Buttons */}
         <div className="flex items-center justify-end space-x-4 pt-4">
           <button
             type="button"
@@ -875,7 +914,7 @@ const WeeklyDataEntry = () => {
 
       </form>
 
-      {/* Member Management Modal */}
+      {/* Member Modal */}
       {showMemberModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
