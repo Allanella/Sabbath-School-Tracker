@@ -2,9 +2,15 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X, Save, Calendar, Circle, Copy } from "lucide-react";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL 
-  ? `${process.env.REACT_APP_API_URL}/api/quarters` 
-  : "/api/quarters";
+// Support both Vite (import.meta.env) and Create React App (process.env)
+const ENV_URL = 
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) ||
+  (typeof process !== "undefined" && process.env && process.env.REACT_APP_API_URL) ||
+  "";
+
+// Ensure clean base URL without trailing slashes
+const RAW_BASE = ENV_URL ? `${ENV_URL}/api/quarters` : "/api/quarters";
+const API_BASE_URL = RAW_BASE.replace(/\/+$/, "");
 
 const getQuarterDates = (quarter, year) => {
   const y = parseInt(year, 10);
@@ -52,6 +58,16 @@ export default function QuarterSetup() {
     fetchQuarters();
   }, []);
 
+  const parseResponse = async (res) => {
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await res.json();
+    }
+    const htmlText = await res.text();
+    console.error("Non-JSON Response Received:", htmlText);
+    throw new Error(`Server returned HTML (Status ${res.status}). Verify API routing on server.`);
+  };
+
   const fetchQuarters = async () => {
     try {
       setLoading(true);
@@ -61,7 +77,7 @@ export default function QuarterSetup() {
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = await parseResponse(res).catch((e) => ({ message: e.message }));
         throw new Error(errData.message || "Failed to fetch quarters");
       }
 
@@ -94,20 +110,13 @@ export default function QuarterSetup() {
         }),
       });
 
-      const contentType = res.headers.get("content-type");
+      const data = await parseResponse(res);
+
       if (!res.ok) {
-        if (contentType && contentType.includes("application/json")) {
-          const errData = await res.json();
-          throw new Error(errData.message || "Failed to create quarter");
-        } else {
-          const text = await res.text();
-          console.error("Non-JSON Server Response:", text);
-          throw new Error(`Server returned status ${res.status}. Check backend routing.`);
-        }
+        throw new Error(data.message || "Failed to create quarter");
       }
 
-      const responseData = await res.json();
-      setSuccess(responseData.message || "Quarter created successfully!");
+      setSuccess(data.message || "Quarter created successfully!");
 
       await fetchQuarters();
       handleCloseModal();
@@ -127,9 +136,10 @@ export default function QuarterSetup() {
         body: JSON.stringify({ quarter_id: id }),
       });
 
+      const data = await parseResponse(res);
+
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to set active quarter");
+        throw new Error(data.message || "Failed to set active quarter");
       }
 
       setSuccess("Active quarter updated successfully!");
