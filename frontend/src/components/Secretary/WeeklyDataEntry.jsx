@@ -56,10 +56,10 @@ const WeeklyDataEntry = () => {
       let classList = [];
       if (Array.isArray(rawData)) {
         classList = rawData;
-      } else if (Array.isArray(rawData?.classes)) {
-        classList = rawData.classes;
       } else if (Array.isArray(rawData?.data)) {
         classList = rawData.data;
+      } else if (Array.isArray(rawData?.classes)) {
+        classList = rawData.classes;
       } else if (Array.isArray(rawData?.data?.classes)) {
         classList = rawData.data.classes;
       }
@@ -71,6 +71,7 @@ const WeeklyDataEntry = () => {
       }
 
       setClasses(classList);
+      setMessage({ type: '', text: '' });
       setSelectedClass((prev) => {
         const exists = classList.some((c) => String(c.id) === String(prev));
         return exists ? prev : (classList[0]?.id || '');
@@ -554,7 +555,11 @@ const WeeklyDataEntry = () => {
               required
             >
               {classes.length === 0 && <option value="">No classes found</option>}
-              {classes.map((c) => (<option key={c.id} value={c.id}>{c.class_name || c.name || `Class ${c.id}`}</option>))}
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.class_name || c.name || `Class ${c.id}`}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -605,7 +610,7 @@ const WeeklyDataEntry = () => {
 
           {members.length === 0 ? (
             <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-              <p className="text-sm text-slate-500 font-medium">No members registered in this class for the active quarter. Click "Add Member" to register members.</p>
+              <p className="text-sm text-slate-500 font-medium">No members registered in this class. Click "Add Member" to register members.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -794,7 +799,7 @@ const WeeklyDataEntry = () => {
 
       {showMemberModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-900">{editingMember ? 'Edit Class Member' : 'Add New Class Member'}</h3>
               <button 

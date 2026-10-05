@@ -1,4 +1,3 @@
-// routes/classRoutes.js
 const express = require('express');
 const router = express.Router();
 const classController = require('../controllers/classController');
@@ -17,7 +16,7 @@ router.get('/', authenticate, classController.getAll);
 // Get single class
 router.get('/:id', authenticate, classController.getById);
 
-// Get members for a specific class (with optional quarter_id filter)
+// Get members for a specific class
 router.get('/:id/members', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
