@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import classService from '../../services/classService';
 import classMemberService from '../../services/classMemberService';
 import quarterService from '../../services/quarterService';
@@ -13,7 +13,7 @@ const ClassManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Form states
   const [showForm, setShowForm] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
@@ -24,17 +24,29 @@ const ClassManagement = () => {
     quarter_id: ''
   });
 
+  const timerRef = useRef(null);
+
+  const showSuccessMessage = (message) => {
+    setSuccess(message);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setSuccess(''), 4000);
+  };
+
   useEffect(() => {
     loadQuarters();
     loadClasses();
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   const loadQuarters = async () => {
     try {
       const response = await quarterService.getAll();
-      setQuarters(response.data);
-    } catch (error) {
-      console.error('Failed to load quarters:', error);
+      setQuarters(response.data?.data || response.data || []);
+    } catch (err) {
+      console.error('Failed to load quarters:', err);
       setError('Failed to load quarters');
     }
   };
@@ -43,10 +55,10 @@ const ClassManagement = () => {
     setLoading(true);
     try {
       const response = await classService.getAll();
-      setClasses(response.data);
+      setClasses(response.data?.data || response.data || []);
       setError('');
-    } catch (error) {
-      console.error('Failed to load classes:', error);
+    } catch (err) {
+      console.error('Failed to load classes:', err);
       setError('Failed to load classes');
     } finally {
       setLoading(false);
@@ -54,13 +66,14 @@ const ClassManagement = () => {
   };
 
   const loadClassMembers = async (classId) => {
+    if (!classId) return;
     setLoading(true);
     try {
       const response = await classMemberService.getByClass(classId);
-      setClassMembers(response.data?.data || []);
+      setClassMembers(response.data?.data || response.data || []);
       setError('');
-    } catch (error) {
-      console.error('Failed to load class members:', error);
+    } catch (err) {
+      console.error('Failed to load class members:', err);
       setError('Failed to load class members');
       setClassMembers([]);
     } finally {
@@ -68,64 +81,11 @@ const ClassManagement = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      if (editingClass) {
-        await classService.update(editingClass.id, formData);
-        setSuccess('Class updated successfully!');
-      } else {
-        await classService.create(formData);
-        setSuccess('Class created successfully!');
-      }
-
-      loadClasses();
+  const handleToggleForm = () => {
+    if (showForm) {
       resetForm();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error) {
-      console.error('Error saving class:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to save class';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEdit = (classItem) => {
-    setEditingClass(classItem);
-    setFormData({
-      class_name: classItem.class_name,
-      teacher_name: classItem.teacher_name,
-      secretary_name: classItem.secretary_name,
-      quarter_id: classItem.quarter_id
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this class?')) {
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      await classService.delete(id);
-      setSuccess('Class deleted successfully!');
-      loadClasses();
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error) {
-      console.error('Error deleting class:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to delete class';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+    } else {
+      setShowForm(true);
     }
   };
 
@@ -140,8 +100,68 @@ const ClassManagement = () => {
     setShowForm(false);
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      if (editingClass) {
+        await classService.update(editingClass.id, formData);
+        showSuccessMessage('Class updated successfully!');
+      } else {
+        await classService.create(formData);
+        showSuccessMessage('Class created successfully!');
+      }
+
+      await loadClasses();
+      resetForm();
+    } catch (err) {
+      console.error('Error saving class:', err);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to save class';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (classItem) => {
+    setEditingClass(classItem);
+    setFormData({
+      class_name: classItem.class_name || '',
+      teacher_name: classItem.teacher_name || '',
+      secretary_name: classItem.secretary_name || '',
+      quarter_id: classItem.quarter_id || ''
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this class?')) return;
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await classService.delete(id);
+      showSuccessMessage('Class deleted successfully!');
+      await loadClasses();
+      if (selectedClassForMembers === id) {
+        setSelectedClassForMembers('');
+        setClassMembers([]);
+      }
+    } catch (err) {
+      console.error('Error deleting class:', err);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to delete class';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddMember = async () => {
-    // Validation
     if (!newMemberName.trim()) {
       setError('Please enter a member name');
       return;
@@ -152,73 +172,46 @@ const ClassManagement = () => {
       return;
     }
 
-    // Clear previous messages
     setError('');
     setSuccess('');
     setLoading(true);
 
     try {
+      const memberName = newMemberName.trim();
       await classMemberService.create({
         class_id: selectedClassForMembers,
-        member_name: newMemberName.trim()
+        member_name: memberName
       });
 
-      // Success
-      const memberName = newMemberName.trim();
       setNewMemberName('');
-      loadClassMembers(selectedClassForMembers);
-      setSuccess(`✓ "${memberName}" has been added successfully!`);
-      
-      setTimeout(() => setSuccess(''), 4000);
-
-    } catch (error) {
-      console.error('=== FULL ERROR ===', error);
-      
+      await loadClassMembers(selectedClassForMembers);
+      showSuccessMessage(`✓ "${memberName}" has been added successfully!`);
+    } catch (err) {
+      console.error('Error adding member:', err);
       let errorMessage = 'Failed to add member. Please try again.';
-      
-      if (error.response) {
-        console.log('Error status:', error.response.status);
-        console.log('Error data:', error.response.data);
-        
-        // Extract error message from backend
-        if (error.response.data) {
-          if (typeof error.response.data === 'string') {
-            errorMessage = error.response.data;
-          } else if (error.response.data.message) {
-            errorMessage = error.response.data.message;
-          } else if (error.response.data.error) {
-            errorMessage = error.response.data.error;
-          }
+
+      if (err.response) {
+        if (typeof err.response.data === 'string') {
+          errorMessage = err.response.data;
+        } else if (err.response.data?.message) {
+          errorMessage = err.response.data.message;
+        } else if (err.response.data?.error) {
+          errorMessage = err.response.data.error;
+        } else if (err.response.status === 409) {
+          errorMessage = 'This member already exists in the system.';
         }
-        
-        // Fallback based on status code
-        if (errorMessage === 'Failed to add member. Please try again.') {
-          if (error.response.status === 400) {
-            errorMessage = 'Member validation failed. Please check the name.';
-          } else if (error.response.status === 409) {
-            errorMessage = 'This member already exists in the system.';
-          } else if (error.response.status === 500) {
-            errorMessage = 'Server error. Please try again later.';
-          }
-        }
-      } else if (error.request) {
+      } else if (err.request) {
         errorMessage = 'Cannot connect to server. Please check your connection.';
-      } else if (error.message) {
-        errorMessage = error.message;
       }
-      
-      console.log('Final error message:', errorMessage);
+
       setError(errorMessage);
-      
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteMember = async (memberId) => {
-    if (!window.confirm('Are you sure you want to remove this member from the class?')) {
-      return;
-    }
+    if (!window.confirm('Are you sure you want to remove this member from the class?')) return;
 
     setLoading(true);
     setError('');
@@ -226,16 +219,11 @@ const ClassManagement = () => {
 
     try {
       await classMemberService.delete(memberId);
-      setSuccess('✓ Member removed successfully!');
-      loadClassMembers(selectedClassForMembers);
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (error) {
-      console.error('Error removing member:', error);
-      
-      const errorMessage = error.response?.data?.message 
-        || error.response?.data?.error
-        || 'Failed to remove member. Please try again.';
-      
+      showSuccessMessage('✓ Member removed successfully!');
+      await loadClassMembers(selectedClassForMembers);
+    } catch (err) {
+      console.error('Error removing member:', err);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to remove member.';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -262,7 +250,7 @@ const ClassManagement = () => {
           <p className="text-gray-600 mt-1">Manage Sabbath School classes and members</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={handleToggleForm}
           className="btn-primary flex items-center space-x-2"
         >
           {showForm ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
@@ -302,7 +290,7 @@ const ClassManagement = () => {
           <h2 className="text-xl font-semibold mb-6">
             {editingClass ? 'Edit Class' : 'Add New Class'}
           </h2>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -368,16 +356,14 @@ const ClassManagement = () => {
                 <Save className="h-5 w-5" />
                 <span>{editingClass ? 'Update Class' : 'Create Class'}</span>
               </button>
-              
-              {editingClass && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-              )}
+
+              <button
+                type="button"
+                onClick={resetForm}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
             </div>
           </form>
         </div>
@@ -386,7 +372,7 @@ const ClassManagement = () => {
       {/* Classes List */}
       <div className="card">
         <h2 className="text-xl font-semibold mb-6">Existing Classes</h2>
-        
+
         {loading && !classes.length ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
@@ -407,7 +393,7 @@ const ClassManagement = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {classes.map((classItem) => {
-                  const quarter = quarters.find(q => q.id === classItem.quarter_id);
+                  const quarter = quarters.find((q) => String(q.id) === String(classItem.quarter_id));
                   return (
                     <tr key={classItem.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -459,7 +445,6 @@ const ClassManagement = () => {
         </h2>
 
         <div className="space-y-4">
-          {/* Class Selection */}
           <div>
             <label className="label">Select Class</label>
             <select
@@ -476,7 +461,6 @@ const ClassManagement = () => {
             </select>
           </div>
 
-          {/* Add Member Form */}
           {selectedClassForMembers && (
             <>
               <div className="flex space-x-2">
@@ -486,7 +470,7 @@ const ClassManagement = () => {
                   placeholder="Enter member name (e.g., John Doe)"
                   value={newMemberName}
                   onChange={(e) => setNewMemberName(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddMember();
@@ -503,12 +487,11 @@ const ClassManagement = () => {
                 </button>
               </div>
 
-              {/* Members List */}
               <div className="mt-6">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">
                   Class Members ({classMembers.length})
                 </h3>
-                
+
                 {loading && !classMembers.length ? (
                   <div className="text-center py-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
