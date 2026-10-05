@@ -47,36 +47,12 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  // Resilient Class Loader
-  const loadClasses = useCallback(async (targetQuarterId) => {
-    const activeQuarterId = targetQuarterId || quarterId || localStorage.getItem('selectedQuarterId');
-    
-    if (!activeQuarterId) {
-      setMessage({ type: 'error', text: 'Please select a quarter first from the sidebar.' });
-      setClasses([]);
-      return;
-    }
-
+  // Load permanent classes across all quarters
+  const loadClasses = useCallback(async () => {
     try {
-      let rawData = null;
+      const res = await api.get('/classes');
+      const rawData = res.data;
 
-      // Strategy 1: Standard query parameter
-      try {
-        const res = await api.get('/classes', { params: { quarter_id: activeQuarterId } });
-        rawData = res.data;
-      } catch (e1) {
-        // Strategy 2: Scoped quarter endpoint (catches 404 gracefully if missing on backend)
-        try {
-          const res = await api.get(`/classes/quarter/${activeQuarterId}`);
-          rawData = res.data;
-        } catch (e2) {
-          // Strategy 3: General fetch
-          const res = await api.get('/classes');
-          rawData = res.data;
-        }
-      }
-
-      // Unify API response payload structures
       let classList = [];
       if (Array.isArray(rawData)) {
         classList = rawData;
@@ -90,47 +66,29 @@ const WeeklyDataEntry = () => {
 
       if (!classList || classList.length === 0) {
         setClasses([]);
-        setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
+        setMessage({ type: 'error', text: 'No permanent classes found in system. Please create classes first.' });
         return;
       }
 
-      // Local Quarter Filtering
-      const filtered = classList.filter((c) => {
-        const itemQ = c.quarter_id || c.quarterId || c.quarter?.id || c.quarter;
-        if (!itemQ) return true; // Keep class if backend doesn't attach quarter_id property
-        return String(itemQ) === String(activeQuarterId);
-      });
-
-      const finalClasses = filtered.length > 0 ? filtered : classList;
-
-      setClasses(finalClasses);
+      setClasses(classList);
       setSelectedClass((prev) => {
-        const exists = finalClasses.some((c) => String(c.id) === String(prev));
-        return exists ? prev : (finalClasses[0]?.id || '');
+        const exists = classList.some((c) => String(c.id) === String(prev));
+        return exists ? prev : (classList[0]?.id || '');
       });
-      setMessage({ type: '', text: '' });
-
     } catch (error) {
       console.error('Failed to load classes:', error);
       setClasses([]);
       setMessage({ type: 'error', text: 'Failed to retrieve classes from server.' });
     }
-  }, [quarterId]);
+  }, []);
 
   useEffect(() => {
-    const activeQ = localStorage.getItem('selectedQuarterId');
-    if (activeQ) {
-      setQuarterId(activeQ);
-      loadClasses(activeQ);
-    } else {
-      loadClasses();
-    }
+    loadClasses();
 
     const handleQuarterChange = (e) => {
       const newQuarterId = e.detail?.quarterId || localStorage.getItem('selectedQuarterId');
       if (newQuarterId) {
         setQuarterId(newQuarterId);
-        loadClasses(newQuarterId);
       }
     };
 
@@ -167,7 +125,7 @@ const WeeklyDataEntry = () => {
       loadPaymentTotals();
       if (weekNumber) { checkExistingData(); }
     }
-  }, [selectedClass, weekNumber]);
+  }, [selectedClass, weekNumber, quarterId]);
 
   const checkPendingMembers = () => {
     try {
@@ -202,7 +160,8 @@ const WeeklyDataEntry = () => {
 
   const loadMembers = async () => {
     try {
-      const response = await classMemberService.getByClass(selectedClass);
+      const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
+      const response = await classMemberService.getByClass(selectedClass, currentQuarterId);
       const membersData = Array.isArray(response) ? response : (response?.data || []);
       setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error) {
@@ -250,7 +209,7 @@ const WeeklyDataEntry = () => {
   const checkExistingData = async () => {
     try {
       const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
-      const response = await weeklyDataService.getByWeek(selectedClass, weekNumber);
+      const response = await weeklyDataService.getByWeek(selectedClass, weekNumber, currentQuarterId);
       if (response && response.data) {
         setFormData(response.data);
         setMessage({ type: 'info', text: '📝 Editing existing data for this week.' });
@@ -352,11 +311,13 @@ const WeeklyDataEntry = () => {
       setMessage({ type: 'error', text: 'Please enter a member name.' });
       return;
     }
+    const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
     const isActuallyOnline = navigator.onLine && !manualOffline;
+
     if (!isActuallyOnline) {
       try {
         const tempId = `temp-${Date.now()}`;
-        const newMember = { id: tempId, member_name: newMemberName.trim(), class_id: selectedClass, isLocal: true };
+        const newMember = { id: tempId, member_name: newMemberName.trim(), class_id: selectedClass, quarter_id: currentQuarterId, isLocal: true };
         setMembers([...members, newMember]);
         setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
         const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
@@ -375,7 +336,7 @@ const WeeklyDataEntry = () => {
         await classMemberService.update(editingMember.id, { member_name: newMemberName });
         showToast('✅ Member updated successfully!');
       } else {
-        await classMemberService.create({ class_id: selectedClass, member_name: newMemberName });
+        await classMemberService.create({ class_id: selectedClass, quarter_id: currentQuarterId, member_name: newMemberName });
         showToast('✅ Member added successfully!');
       }
       setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
@@ -421,7 +382,7 @@ const WeeklyDataEntry = () => {
       for (const item of localMembers) {
         try {
           if (item.action === 'create') {
-            await classMemberService.create({ class_id: item.data.class_id, member_name: item.data.member_name });
+            await classMemberService.create({ class_id: item.data.class_id, quarter_id: item.data.quarter_id, member_name: item.data.member_name });
             syncedCount++;
           } else if (item.action === 'delete' && !item.memberId.startsWith('temp-')) {
             await classMemberService.delete(item.memberId);
@@ -455,6 +416,7 @@ const WeeklyDataEntry = () => {
 
     const dataToSubmit = {
       class_id: selectedClass,
+      quarter_id: currentQuarterId,
       week_number: parseInt(weekNumber),
       ...formData,
       members_paid_lesson_english: formatPaymentsForSave(paymentsLessonEnglish),
@@ -548,7 +510,6 @@ const WeeklyDataEntry = () => {
         </div>
       )}
 
-      {/* Header */}
       <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 ${!isOnline ? 'mt-10' : ''}`}>
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Weekly Data Entry</h1>
@@ -571,7 +532,6 @@ const WeeklyDataEntry = () => {
         </div>
       </div>
 
-      {/* Alert Banner */}
       {message.text && !showSuccessToast && (
         <div className={`p-4 rounded-xl flex items-start space-x-3 border ${
           message.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-200' :
@@ -584,8 +544,6 @@ const WeeklyDataEntry = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        
-        {/* Class Selection & Controls */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Class</label>
@@ -624,7 +582,6 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Member Directory */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div className="flex items-center space-x-2.5">
@@ -648,7 +605,7 @@ const WeeklyDataEntry = () => {
 
           {members.length === 0 ? (
             <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-              <p className="text-sm text-slate-500 font-medium">No members added to this class yet.</p>
+              <p className="text-sm text-slate-500 font-medium">No members registered in this class for the active quarter. Click "Add Member" to register members.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -679,7 +636,6 @@ const WeeklyDataEntry = () => {
           )}
         </div>
 
-        {/* Payments Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {[
             { title: 'Lesson Study Guides Offering', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
@@ -775,7 +731,6 @@ const WeeklyDataEntry = () => {
           ))}
         </div>
 
-        {/* Weekly Metrics Summary */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
           <div className="flex items-center space-x-2.5 pb-4 border-b border-slate-100">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -825,7 +780,6 @@ const WeeklyDataEntry = () => {
           </div>
         </div>
 
-        {/* Submit Actions */}
         <div className="flex justify-end pt-4">
           <button
             type="submit"
@@ -838,7 +792,6 @@ const WeeklyDataEntry = () => {
         </div>
       </form>
 
-      {/* Member Creation/Edit Modal */}
       {showMemberModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">

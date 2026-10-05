@@ -1,12 +1,13 @@
+// routes/classMemberRoutes.js
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
 const supabase = require('../config/database');
 
-// Get all class members (with optional class filter)
+// Get all class members (with optional class_id and quarter_id filters)
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { class_id } = req.query;
+    const { class_id, quarter_id } = req.query;
 
     let query = supabase
       .from('class_members')
@@ -16,6 +17,10 @@ router.get('/', authenticate, async (req, res) => {
 
     if (class_id) {
       query = query.eq('class_id', class_id);
+    }
+
+    if (quarter_id) {
+      query = query.eq('quarter_id', quarter_id);
     }
 
     const { data, error } = await query;
@@ -28,6 +33,40 @@ router.get('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get class members error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch class members'
+    });
+  }
+});
+
+// Get members for a specific class (via route param)
+router.get('/class/:classId', authenticate, async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { quarter_id } = req.query;
+
+    let query = supabase
+      .from('class_members')
+      .select('*')
+      .eq('class_id', classId)
+      .eq('is_active', true)
+      .order('member_name');
+
+    if (quarter_id) {
+      query = query.eq('quarter_id', quarter_id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      data: data || []
+    });
+  } catch (error) {
+    console.error('Get members by class error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch class members'
@@ -64,15 +103,28 @@ router.get('/:id', authenticate, async (req, res) => {
 // Create new class member
 router.post('/', authenticate, async (req, res) => {
   try {
-    const { class_id, member_name } = req.body;
+    const { class_id, quarter_id, member_name } = req.body;
+
+    if (!class_id || !member_name) {
+      return res.status(400).json({
+        success: false,
+        message: 'class_id and member_name are required'
+      });
+    }
+
+    const payload = {
+      class_id,
+      member_name,
+      is_active: true
+    };
+
+    if (quarter_id) {
+      payload.quarter_id = quarter_id;
+    }
 
     const { data, error } = await supabase
       .from('class_members')
-      .insert([{
-        class_id,
-        member_name,
-        is_active: true
-      }])
+      .insert([payload])
       .select()
       .single();
 
@@ -126,7 +178,6 @@ router.delete('/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Soft delete - set is_active to false
     const { error } = await supabase
       .from('class_members')
       .update({ is_active: false })
