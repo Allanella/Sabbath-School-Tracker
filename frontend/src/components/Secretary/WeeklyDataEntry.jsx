@@ -47,7 +47,7 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  // Direct Quarter-Based Class Loader
+  // Resilient Class Loader
   const loadClasses = useCallback(async (targetQuarterId) => {
     const activeQuarterId = targetQuarterId || quarterId || localStorage.getItem('selectedQuarterId');
     
@@ -60,21 +60,23 @@ const WeeklyDataEntry = () => {
     try {
       let rawData = null;
 
-      // Primary fetch strategy: endpoint scoped specifically to the active quarter
+      // Strategy 1: Standard query parameter
       try {
-        const res = await api.get(`/classes/quarter/${activeQuarterId}`);
+        const res = await api.get('/classes', { params: { quarter_id: activeQuarterId } });
         rawData = res.data;
       } catch (e1) {
+        // Strategy 2: Scoped quarter endpoint (catches 404 gracefully if missing on backend)
         try {
-          const res = await api.get('/classes', { params: { quarter_id: activeQuarterId } });
+          const res = await api.get(`/classes/quarter/${activeQuarterId}`);
           rawData = res.data;
         } catch (e2) {
+          // Strategy 3: General fetch
           const res = await api.get('/classes');
           rawData = res.data;
         }
       }
 
-      // Unify response payload structure
+      // Unify API response payload structures
       let classList = [];
       if (Array.isArray(rawData)) {
         classList = rawData;
@@ -92,11 +94,19 @@ const WeeklyDataEntry = () => {
         return;
       }
 
-      // Trust the response returned by the backend endpoint
-      setClasses(classList);
-      setSelectedClass(prev => {
-        const exists = classList.some(c => String(c.id) === String(prev));
-        return exists ? prev : (classList[0]?.id || '');
+      // Local Quarter Filtering
+      const filtered = classList.filter((c) => {
+        const itemQ = c.quarter_id || c.quarterId || c.quarter?.id || c.quarter;
+        if (!itemQ) return true; // Keep class if backend doesn't attach quarter_id property
+        return String(itemQ) === String(activeQuarterId);
+      });
+
+      const finalClasses = filtered.length > 0 ? filtered : classList;
+
+      setClasses(finalClasses);
+      setSelectedClass((prev) => {
+        const exists = finalClasses.some((c) => String(c.id) === String(prev));
+        return exists ? prev : (finalClasses[0]?.id || '');
       });
       setMessage({ type: '', text: '' });
 
