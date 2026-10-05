@@ -47,7 +47,7 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  // Load Classes Function with Robust Quarter Parsing
+  // Direct Quarter-Based Class Loader
   const loadClasses = useCallback(async (targetQuarterId) => {
     const activeQuarterId = targetQuarterId || quarterId || localStorage.getItem('selectedQuarterId');
     
@@ -60,25 +60,21 @@ const WeeklyDataEntry = () => {
     try {
       let rawData = null;
 
-      // Strategy 1: URL Param /classes/quarter/:quarterId
+      // Primary fetch strategy: endpoint scoped specifically to the active quarter
       try {
         const res = await api.get(`/classes/quarter/${activeQuarterId}`);
         rawData = res.data;
       } catch (e1) {
-        // Strategy 2: Query params
         try {
-          const res = await api.get('/classes', {
-            params: { quarter_id: activeQuarterId, quarterId: activeQuarterId }
-          });
+          const res = await api.get('/classes', { params: { quarter_id: activeQuarterId } });
           rawData = res.data;
         } catch (e2) {
-          // Strategy 3: General fetch
           const res = await api.get('/classes');
           rawData = res.data;
         }
       }
 
-      // Extract array from response payload formats
+      // Unify response payload structure
       let classList = [];
       if (Array.isArray(rawData)) {
         classList = rawData;
@@ -90,25 +86,18 @@ const WeeklyDataEntry = () => {
         classList = rawData.data.classes;
       }
 
-      if (classList.length === 0) {
+      if (!classList || classList.length === 0) {
         setClasses([]);
         setMessage({ type: 'error', text: 'No classes available for this quarter. Please create classes first.' });
         return;
       }
 
-      // Flexible Quarter ID Filtering
-      const filteredClasses = classList.filter(c => {
-        const itemQuarter = c.quarter_id || c.quarterId || c.quarter?.id || c.quarter;
-        // If the backend didn't tag a quarter ID at all, keep it as fallback
-        if (!itemQuarter) return true;
-        return String(itemQuarter) === String(activeQuarterId);
+      // Trust the response returned by the backend endpoint
+      setClasses(classList);
+      setSelectedClass(prev => {
+        const exists = classList.some(c => String(c.id) === String(prev));
+        return exists ? prev : (classList[0]?.id || '');
       });
-
-      // Use filtered list if matched, otherwise trust full list returned by backend API
-      const finalClasses = filteredClasses.length > 0 ? filteredClasses : classList;
-
-      setClasses(finalClasses);
-      setSelectedClass(finalClasses[0]?.id || '');
       setMessage({ type: '', text: '' });
 
     } catch (error) {
@@ -118,7 +107,6 @@ const WeeklyDataEntry = () => {
     }
   }, [quarterId]);
 
-  // Handle quarter changes from sidebar or local storage
   useEffect(() => {
     const activeQ = localStorage.getItem('selectedQuarterId');
     if (activeQ) {
