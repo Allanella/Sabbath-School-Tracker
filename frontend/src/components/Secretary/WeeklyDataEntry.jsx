@@ -62,7 +62,9 @@ const WeeklyDataEntry = () => {
 
   const loadClasses = useCallback(async () => {
     try {
-      const res = await api.get('/classes');
+      const currentQuarterId = localStorage.getItem('selectedQuarterId') || '';
+      const url = currentQuarterId ? `/classes?quarter_id=${currentQuarterId}` : '/classes';
+      const res = await api.get(url);
       const rawData = res.data;
 
       let classList = [];
@@ -95,7 +97,10 @@ const WeeklyDataEntry = () => {
 
     const handleQuarterChange = (e) => {
       const newQuarterId = e.detail?.quarterId || localStorage.getItem('selectedQuarterId');
-      if (newQuarterId) setQuarterId(newQuarterId);
+      if (newQuarterId) {
+        setQuarterId(newQuarterId);
+        loadClasses();
+      }
     };
 
     window.addEventListener('quarterChanged', handleQuarterChange);
@@ -751,91 +756,35 @@ const WeeklyDataEntry = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Total Attendance</label>
-              <input
-                type="number"
-                name="total_attendance"
-                min="0"
-                value={formData.total_attendance}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="total_attendance" min="0" value={formData.total_attendance} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Member Visits</label>
-              <input
-                type="number"
-                name="member_visits"
-                min="0"
-                value={formData.member_visits}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="member_visits" min="0" value={formData.member_visits} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Conducted Bible Studies</label>
-              <input
-                type="number"
-                name="members_conducted_bible_studies"
-                min="0"
-                value={formData.members_conducted_bible_studies}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="members_conducted_bible_studies" min="0" value={formData.members_conducted_bible_studies} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Helped Others</label>
-              <input
-                type="number"
-                name="members_helped_others"
-                min="0"
-                value={formData.members_helped_others}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="members_helped_others" min="0" value={formData.members_helped_others} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Studied Lesson</label>
-              <input
-                type="number"
-                name="members_studied_lesson"
-                min="0"
-                value={formData.members_studied_lesson}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="members_studied_lesson" min="0" value={formData.members_studied_lesson} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Number of Visitors</label>
-              <input
-                type="number"
-                name="number_of_visitors"
-                min="0"
-                value={formData.number_of_visitors}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="number_of_visitors" min="0" value={formData.number_of_visitors} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Study Guides Distributed</label>
-              <input
-                type="number"
-                name="bible_study_guides_distributed"
-                min="0"
-                value={formData.bible_study_guides_distributed}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="bible_study_guides_distributed" min="0" value={formData.bible_study_guides_distributed} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Global Mission Offering (UGX)</label>
-              <input
-                type="number"
-                name="offering_global_mission"
-                min="0"
-                value={formData.offering_global_mission}
-                onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              />
+              <input type="number" name="offering_global_mission" min="0" value={formData.offering_global_mission} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
           </div>
 
@@ -869,11 +818,7 @@ const WeeklyDataEntry = () => {
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-6 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h3 className="text-lg font-bold text-slate-900">{editingMember ? 'Edit Class Member' : 'Add New Class Member'}</h3>
-              <button
-                type="button"
-                onClick={() => setShowMemberModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-              >
+              <button type="button" onClick={() => setShowMemberModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -889,18 +834,10 @@ const WeeklyDataEntry = () => {
               />
             </div>
             <div className="flex items-center justify-end space-x-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowMemberModal(false)}
-                className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 font-semibold text-sm rounded-xl transition"
-              >
+              <button type="button" onClick={() => setShowMemberModal(false)} className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 font-semibold text-sm rounded-xl transition">
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleAddMember}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-indigo-100"
-              >
+              <button type="button" onClick={handleAddMember} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-indigo-100">
                 {editingMember ? 'Save Changes' : 'Add Member'}
               </button>
             </div>
