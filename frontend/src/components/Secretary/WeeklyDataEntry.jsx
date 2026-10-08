@@ -737,19 +737,18 @@ const WeeklyDataEntry = () => {
           ))}
         </div>
 
-        {/* Weekly Metrics Inputs Section */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-          <div className="flex items-center space-x-2.5 pb-4 border-b border-slate-100">
+          <div className="flex items-center space-x-2.5 border-b border-slate-100 pb-4">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
               <TrendingUp className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Weekly Statistics & Metrics</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Enter attendance figures, study guides, and missionary activity totals.</p>
+              <h2 className="text-lg font-bold text-slate-900">Sabbath School Metrics</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Record attendance, study activities, and mission contributions</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Total Attendance</label>
               <input
@@ -758,7 +757,7 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.total_attendance}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -769,18 +768,18 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.member_visits}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Bible Studies Conducted</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Conducted Bible Studies</label>
               <input
                 type="number"
                 name="members_conducted_bible_studies"
                 min="0"
                 value={formData.members_conducted_bible_studies}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -791,7 +790,7 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.members_helped_others}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -802,7 +801,7 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.members_studied_lesson}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -813,7 +812,7 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.number_of_visitors}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -824,7 +823,7 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.bible_study_guides_distributed}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -835,7 +834,7 @@ const WeeklyDataEntry = () => {
                 min="0"
                 value={formData.offering_global_mission}
                 onChange={handleChange}
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               />
             </div>
           </div>
@@ -844,11 +843,11 @@ const WeeklyDataEntry = () => {
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Summary / Notes</label>
             <textarea
               name="members_summary"
-              rows={3}
+              rows="3"
               value={formData.members_summary}
               onChange={handleChange}
-              placeholder="Additional notes or remarks regarding this week's data..."
-              className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              placeholder="Additional notes or comments regarding this week's data..."
+              className="w-full rounded-xl border-slate-200 bg-slate-50/50 p-4 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
             />
           </div>
         </div>
@@ -857,58 +856,53 @@ const WeeklyDataEntry = () => {
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-base rounded-xl flex items-center space-x-2 shadow-lg shadow-indigo-200 transition duration-150"
+            className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base rounded-2xl flex items-center space-x-3 shadow-xl shadow-indigo-100 transition duration-150 disabled:opacity-50"
           >
-            <Save className="h-5 w-5" />
+            <Save className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
             <span>{loading ? 'Saving Data...' : formData.id ? 'Update Weekly Data' : 'Submit Weekly Data'}</span>
           </button>
         </div>
       </form>
 
-      {/* Member Add/Edit Modal */}
       {showMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <h3 className="font-bold text-slate-900 text-lg">
-                {editingMember ? 'Edit Member Name' : 'Add New Class Member'}
-              </h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-100 space-y-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-bold text-slate-900">{editingMember ? 'Edit Class Member' : 'Add New Class Member'}</h3>
               <button
                 type="button"
                 onClick={() => setShowMemberModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Full Name</label>
-                <input
-                  type="text"
-                  value={newMemberName}
-                  onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-                  autoFocus
-                />
-              </div>
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowMemberModal(false)}
-                  className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 font-semibold text-sm rounded-xl transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAddMember}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow-md transition"
-                >
-                  {editingMember ? 'Save Changes' : 'Add Member'}
-                </button>
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Member Name</label>
+              <input
+                type="text"
+                value={newMemberName}
+                onChange={(e) => setNewMemberName(e.target.value)}
+                placeholder="Enter member's full name"
+                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                autoFocus
+              />
+            </div>
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowMemberModal(false)}
+                className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 font-semibold text-sm rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddMember}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition shadow-lg shadow-indigo-100"
+              >
+                {editingMember ? 'Save Changes' : 'Add Member'}
+              </button>
             </div>
           </div>
         </div>
