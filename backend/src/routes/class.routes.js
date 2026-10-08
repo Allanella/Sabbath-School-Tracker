@@ -22,15 +22,25 @@ router.get('/:id/members', authenticate, async (req, res) => {
     const { id } = req.params;
     const { quarter_id } = req.query;
 
+    // Guard against literal un-evaluated template strings or missing IDs
+    if (!id || id === '${classId}' || id.includes('${')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or missing class ID parameter'
+      });
+    }
+
+    // Join with the classes relation so quarter_id filtering works properly
     let query = supabase
       .from('class_members')
-      .select('*')
+      .select('*, classes!inner(id, class_name, quarter_id)')
       .eq('class_id', id)
       .eq('is_active', true)
       .order('member_name');
 
+    // Filter via the joined classes table since quarter_id does not exist on class_members
     if (quarter_id) {
-      query = query.eq('quarter_id', quarter_id);
+      query = query.eq('classes.quarter_id', quarter_id);
     }
 
     const { data, error } = await query;
