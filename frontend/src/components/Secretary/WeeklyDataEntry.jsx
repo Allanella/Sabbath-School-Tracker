@@ -5,7 +5,20 @@ import classMemberService from '../../services/classMemberService';
 import weeklyDataService from '../../services/WeeklyDataService';
 import paymentService from '../../services/paymentService';
 import offlineStorage from '../../utils/offlineStorage';
-import { Save, AlertCircle, CheckCircle, Plus, Edit2, Trash2, X, Users, DollarSign, WifiOff, RefreshCw, TrendingUp } from 'lucide-react';
+import {
+  Save,
+  AlertCircle,
+  CheckCircle,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+  Users,
+  DollarSign,
+  WifiOff,
+  RefreshCw,
+  TrendingUp,
+} from 'lucide-react';
 
 const WeeklyDataEntry = () => {
   const navigate = useNavigate();
@@ -47,22 +60,16 @@ const WeeklyDataEntry = () => {
     members_summary: '',
   });
 
-  // Load permanent classes across all quarters
   const loadClasses = useCallback(async () => {
     try {
       const res = await api.get('/classes');
       const rawData = res.data;
 
       let classList = [];
-      if (Array.isArray(rawData)) {
-        classList = rawData;
-      } else if (Array.isArray(rawData?.data)) {
-        classList = rawData.data;
-      } else if (Array.isArray(rawData?.classes)) {
-        classList = rawData.classes;
-      } else if (Array.isArray(rawData?.data?.classes)) {
-        classList = rawData.data.classes;
-      }
+      if (Array.isArray(rawData)) classList = rawData;
+      else if (Array.isArray(rawData?.data)) classList = rawData.data;
+      else if (Array.isArray(rawData?.classes)) classList = rawData.classes;
+      else if (Array.isArray(rawData?.data?.classes)) classList = rawData.data.classes;
 
       if (!classList || classList.length === 0) {
         setClasses([]);
@@ -74,7 +81,7 @@ const WeeklyDataEntry = () => {
       setMessage({ type: '', text: '' });
       setSelectedClass((prev) => {
         const exists = classList.some((c) => String(c.id) === String(prev));
-        return exists ? prev : (classList[0]?.id || '');
+        return exists ? prev : classList[0]?.id || '';
       });
     } catch (error) {
       console.error('Failed to load classes:', error);
@@ -88,9 +95,7 @@ const WeeklyDataEntry = () => {
 
     const handleQuarterChange = (e) => {
       const newQuarterId = e.detail?.quarterId || localStorage.getItem('selectedQuarterId');
-      if (newQuarterId) {
-        setQuarterId(newQuarterId);
-      }
+      if (newQuarterId) setQuarterId(newQuarterId);
     };
 
     window.addEventListener('quarterChanged', handleQuarterChange);
@@ -107,7 +112,7 @@ const WeeklyDataEntry = () => {
       const wasOffline = !isOnline;
       const nowOnline = actualStatus && !manualOffline;
       setIsOnline(nowOnline);
-      if (wasOffline && nowOnline) { autoSyncPendingData(); }
+      if (wasOffline && nowOnline) autoSyncPendingData();
     };
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
@@ -124,7 +129,7 @@ const WeeklyDataEntry = () => {
     if (selectedClass) {
       loadMembersWithLocal();
       loadPaymentTotals();
-      if (weekNumber) { checkExistingData(); }
+      if (weekNumber) checkExistingData();
     }
   }, [selectedClass, weekNumber, quarterId]);
 
@@ -132,7 +137,7 @@ const WeeklyDataEntry = () => {
     try {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       setPendingMembersCount(localMembers.length);
-    } catch (error) {
+    } catch {
       setPendingMembersCount(0);
     }
   };
@@ -142,7 +147,7 @@ const WeeklyDataEntry = () => {
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       const pendingData = await offlineStorage.getPendingCount();
       if (localMembers.length > 0 || pendingData > 0) {
-        if (localMembers.length > 0) { await syncPendingMembers(true); }
+        if (localMembers.length > 0) await syncPendingMembers(true);
         showToast('✅ Data synced successfully!');
       }
     } catch (error) {
@@ -163,7 +168,7 @@ const WeeklyDataEntry = () => {
     try {
       const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
       const response = await classMemberService.getByClass(selectedClass, currentQuarterId);
-      const membersData = Array.isArray(response) ? response : (response?.data || []);
+      const membersData = Array.isArray(response) ? response : response?.data || [];
       setMembers(Array.isArray(membersData) ? membersData : []);
     } catch (error) {
       console.error('Failed to load members:', error);
@@ -175,12 +180,15 @@ const WeeklyDataEntry = () => {
     try {
       setLoadingTotals(true);
       const currentQuarterId = quarterId || localStorage.getItem('selectedQuarterId');
-      if (!currentQuarterId || !selectedClass) { setPaymentTotals({}); return; }
+      if (!currentQuarterId || !selectedClass) {
+        setPaymentTotals({});
+        return;
+      }
       const response = await paymentService.getClassPaymentTotals(selectedClass, currentQuarterId);
-      const totalsArray = Array.isArray(response) ? response : (response?.data || []);
+      const totalsArray = Array.isArray(response) ? response : response?.data || [];
       const totalsMap = {};
       if (Array.isArray(totalsArray)) {
-        totalsArray.forEach(memberData => {
+        totalsArray.forEach((memberData) => {
           totalsMap[memberData.id] = memberData.totals;
         });
       }
@@ -197,10 +205,10 @@ const WeeklyDataEntry = () => {
     try {
       await loadMembers();
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
-      const pendingAdds = localMembers.filter(m => m.action === 'create' && m.data?.class_id === selectedClass);
+      const pendingAdds = localMembers.filter((m) => m.action === 'create' && m.data?.class_id === selectedClass);
       if (pendingAdds.length > 0) {
-        const tempMembers = pendingAdds.map(item => item.data);
-        setMembers(prev => [...prev, ...tempMembers]);
+        const tempMembers = pendingAdds.map((item) => item.data);
+        setMembers((prev) => [...prev, ...tempMembers]);
       }
     } catch (error) {
       console.error('Error loading members with local:', error);
@@ -216,10 +224,15 @@ const WeeklyDataEntry = () => {
         setMessage({ type: 'info', text: '📝 Editing existing data for this week.' });
       } else {
         setFormData({
-          sabbath_date: '', total_attendance: 0, member_visits: 0,
-          members_conducted_bible_studies: 0, members_helped_others: 0,
-          members_studied_lesson: 0, number_of_visitors: 0,
-          bible_study_guides_distributed: 0, offering_global_mission: 0,
+          sabbath_date: '',
+          total_attendance: 0,
+          member_visits: 0,
+          members_conducted_bible_studies: 0,
+          members_helped_others: 0,
+          members_studied_lesson: 0,
+          number_of_visitors: 0,
+          bible_study_guides_distributed: 0,
+          offering_global_mission: 0,
           members_summary: '',
         });
         setMessage({ type: '', text: '' });
@@ -244,7 +257,7 @@ const WeeklyDataEntry = () => {
           const paymentIds = {};
 
           if (Array.isArray(weekPayments)) {
-            weekPayments.forEach(member => {
+            weekPayments.forEach((member) => {
               if (member.payment) {
                 paymentIds[member.id] = member.payment.id;
                 if (member.payment.lesson_english > 0) newLessonEng[member.id] = member.payment.lesson_english;
@@ -282,11 +295,7 @@ const WeeklyDataEntry = () => {
   };
 
   const handlePaymentChange = (memberId, amount, setPayments) => {
-    setPayments(prev => ({ ...prev, [memberId]: parseFloat(amount) || 0 }));
-  };
-
-  const calculateTotal = (payments) => {
-    return Object.values(payments).reduce((sum, amount) => sum + (parseFloat(amount) || 0), 0);
+    setPayments((prev) => ({ ...prev, [memberId]: parseFloat(amount) || 0 }));
   };
 
   const getCumulativeTotal = (memberId, paymentType) => {
@@ -298,9 +307,9 @@ const WeeklyDataEntry = () => {
   const formatPaymentsForSave = (payments) => {
     if (!payments || Object.keys(payments).length === 0) return '';
     const entries = Object.entries(payments)
-      .filter(([id, amount]) => amount && amount > 0)
+      .filter(([, amount]) => amount && amount > 0)
       .map(([id, amount]) => {
-        const member = members.find(m => m.id === id);
+        const member = members.find((m) => m.id === id);
         return member ? `${member.member_name}: ${amount}` : null;
       })
       .filter(Boolean);
@@ -320,7 +329,9 @@ const WeeklyDataEntry = () => {
         const tempId = `temp-${Date.now()}`;
         const newMember = { id: tempId, member_name: newMemberName.trim(), class_id: selectedClass, quarter_id: currentQuarterId, isLocal: true };
         setMembers([...members, newMember]);
-        setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
+        setNewMemberName('');
+        setEditingMember(null);
+        setShowMemberModal(false);
         const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
         localMembers.push({ action: 'create', data: newMember, timestamp: Date.now() });
         localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
@@ -340,7 +351,9 @@ const WeeklyDataEntry = () => {
         await classMemberService.create({ class_id: selectedClass, quarter_id: currentQuarterId, member_name: newMemberName });
         showToast('✅ Member added successfully!');
       }
-      setNewMemberName(''); setEditingMember(null); setShowMemberModal(false);
+      setNewMemberName('');
+      setEditingMember(null);
+      setShowMemberModal(false);
       loadMembers();
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save member' });
@@ -357,7 +370,7 @@ const WeeklyDataEntry = () => {
     if (!window.confirm('Are you sure you want to remove this member?')) return;
     const isActuallyOnline = navigator.onLine && !manualOffline;
     if (!isActuallyOnline) {
-      setMembers(members.filter(m => m.id !== memberId));
+      setMembers(members.filter((m) => m.id !== memberId));
       const localMembers = JSON.parse(localStorage.getItem('pendingMembers') || '[]');
       localMembers.push({ action: 'delete', memberId, timestamp: Date.now() });
       localStorage.setItem('pendingMembers', JSON.stringify(localMembers));
@@ -418,7 +431,7 @@ const WeeklyDataEntry = () => {
     const dataToSubmit = {
       class_id: selectedClass,
       quarter_id: currentQuarterId,
-      week_number: parseInt(weekNumber),
+      week_number: parseInt(weekNumber, 10),
       ...formData,
       members_paid_lesson_english: formatPaymentsForSave(paymentsLessonEnglish),
       members_paid_lesson_luganda: formatPaymentsForSave(paymentsLessonLuganda),
@@ -444,7 +457,7 @@ const WeeklyDataEntry = () => {
         await weeklyDataService.submit(dataToSubmit);
       }
 
-      const currentWeek = parseInt(weekNumber);
+      const currentWeek = parseInt(weekNumber, 10);
       const memberIds = new Set([
         ...Object.keys(paymentsLessonEnglish),
         ...Object.keys(paymentsLessonLuganda),
@@ -493,6 +506,11 @@ const WeeklyDataEntry = () => {
     }
   };
 
+  const sections = [
+    { title: 'Lesson Study Guides Offering', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
+    { title: 'Morning Watch Offering', eng: paymentsMorningWatchEnglish, lug: paymentsMorningWatchLuganda, setEng: setPaymentsMorningWatchEnglish, setLug: setPaymentsMorningWatchLuganda, typeEng: 'morning_watch_english', typeLug: 'morning_watch_luganda' },
+  ];
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8 bg-gray-50/50 min-h-screen">
       {showSuccessToast && (
@@ -518,8 +536,9 @@ const WeeklyDataEntry = () => {
         </div>
         <div className="flex items-center space-x-3 self-end sm:self-center">
           {pendingMembersCount > 0 && (
-            <button 
-              onClick={() => syncPendingMembers(false)} 
+            <button
+              type="button"
+              onClick={() => syncPendingMembers(false)}
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl flex items-center space-x-2 shadow-lg shadow-indigo-100 transition duration-150"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -548,9 +567,9 @@ const WeeklyDataEntry = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Class</label>
-            <select 
-              value={selectedClass} 
-              onChange={(e) => setSelectedClass(e.target.value)} 
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
               className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
               required
             >
@@ -564,25 +583,25 @@ const WeeklyDataEntry = () => {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Week Number (1-13)</label>
-            <input 
-              type="number" 
-              min="1" 
-              max="13" 
-              value={weekNumber} 
-              onChange={(e) => setWeekNumber(e.target.value)} 
+            <input
+              type="number"
+              min="1"
+              max="13"
+              value={weekNumber}
+              onChange={(e) => setWeekNumber(e.target.value)}
               className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              required 
+              required
             />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Sabbath Date</label>
-            <input 
-              type="date" 
-              name="sabbath_date" 
-              value={formData.sabbath_date} 
-              onChange={handleChange} 
+            <input
+              type="date"
+              name="sabbath_date"
+              value={formData.sabbath_date}
+              onChange={handleChange}
               className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-              required 
+              required
             />
           </div>
         </div>
@@ -598,9 +617,9 @@ const WeeklyDataEntry = () => {
                 <p className="text-xs text-slate-500 mt-0.5">{members.length} members registered in this class</p>
               </div>
             </div>
-            <button 
-              type="button" 
-              onClick={() => { setEditingMember(null); setNewMemberName(''); setShowMemberModal(true); }} 
+            <button
+              type="button"
+              onClick={() => { setEditingMember(null); setNewMemberName(''); setShowMemberModal(true); }}
               className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-sm rounded-xl flex items-center space-x-2 transition"
             >
               <Plus className="h-4 w-4" />
@@ -618,17 +637,17 @@ const WeeklyDataEntry = () => {
                 <div key={member.id} className="flex items-center justify-between px-4 py-3 bg-slate-50/40 hover:bg-slate-50 rounded-xl border border-slate-200/60 group hover:border-indigo-300 transition-all duration-150">
                   <span className="font-semibold text-slate-800 text-sm">{member.member_name}</span>
                   <div className="flex space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                    <button 
-                      type="button" 
-                      onClick={() => handleEditMember(member)} 
+                    <button
+                      type="button"
+                      onClick={() => handleEditMember(member)}
                       className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                       title="Edit Member"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
-                    <button 
-                      type="button" 
-                      onClick={() => handleDeleteMember(member.id)} 
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMember(member.id)}
                       className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
                       title="Remove Member"
                     >
@@ -642,12 +661,9 @@ const WeeklyDataEntry = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {[
-            { title: 'Lesson Study Guides Offering', eng: paymentsLessonEnglish, lug: paymentsLessonLuganda, setEng: setPaymentsLessonEnglish, setLug: setPaymentsLessonLuganda, typeEng: 'lesson_english', typeLug: 'lesson_luganda' },
-            { title: 'Morning Watch Offering', eng: paymentsMorningWatchEnglish, lug: paymentsMorningWatchLuganda, setEng: setPaymentsMorningWatchEnglish, setLug: setPaymentsMorningWatchLuganda, typeEng: 'morning_watch_english', typeLug: 'morning_watch_luganda' }
-          ].map((section, idx) => (
+          {sections.map((section, idx) => (
             <div key={idx} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="px-6 py-4 px-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center space-x-2">
                   <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
                     <DollarSign className="h-4.5 w-4.5" />
@@ -671,7 +687,7 @@ const WeeklyDataEntry = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {members.map(m => {
+                    {members.map((m) => {
                       const prevEng = getCumulativeTotal(m.id, section.typeEng);
                       const prevLug = getCumulativeTotal(m.id, section.typeLug);
                       const hasPayments = prevEng > 0 || prevLug > 0;
@@ -680,56 +696,41 @@ const WeeklyDataEntry = () => {
                           <td className="py-3.5 px-6">
                             <div className="font-semibold text-slate-800">{m.member_name}</div>
                             {hasPayments && (
-                              <div className="text-xs text-emerald-600 font-medium mt-0.5">
-                                Cumulative: {(prevEng + prevLug).toLocaleString()} UGX paid
+                              <div className="text-xs text-slate-400 mt-0.5">
+                                Total paid: UGX {(prevEng + prevLug).toLocaleString()}
                               </div>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex flex-col items-center space-y-1.5">
-                              {prevEng > 0 && (
-                                <span className="text-[11px] text-blue-700 font-bold bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
-                                  {prevEng.toLocaleString()}
-                                </span>
-                              )}
-                              <input
-                                type="number"
-                                step="100"
-                                value={section.eng[m.id] || ''}
-                                onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)}
-                                placeholder="0"
-                                className="w-24 text-center rounded-lg border-slate-200 bg-slate-50/50 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
-                              />
+                          <td className="py-3 px-4 text-center">
+                            <div className="text-xs font-medium text-slate-500 mb-1">
+                              {prevEng > 0 ? `Prev: UGX ${prevEng.toLocaleString()}` : '-'}
                             </div>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={section.eng[m.id] || ''}
+                              onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setEng)}
+                              className="w-28 text-center rounded-lg border-slate-200 bg-slate-50/50 py-1.5 px-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                            />
                           </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex flex-col items-center space-y-1.5">
-                              {prevLug > 0 && (
-                                <span className="text-[11px] text-purple-700 font-bold bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-full">
-                                  {prevLug.toLocaleString()}
-                                </span>
-                              )}
-                              <input
-                                type="number"
-                                step="100"
-                                value={section.lug[m.id] || ''}
-                                onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)}
-                                placeholder="0"
-                                className="w-24 text-center rounded-lg border-slate-200 bg-slate-50/50 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition"
-                              />
+                          <td className="py-3 px-4 text-center">
+                            <div className="text-xs font-medium text-slate-500 mb-1">
+                              {prevLug > 0 ? `Prev: UGX ${prevLug.toLocaleString()}` : '-'}
                             </div>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              value={section.lug[m.id] || ''}
+                              onChange={(e) => handlePaymentChange(m.id, e.target.value, section.setLug)}
+                              className="w-28 text-center rounded-lg border-slate-200 bg-slate-50/50 py-1.5 px-2 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+                            />
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot>
-                    <tr className="bg-slate-50/80 font-bold text-slate-800 border-t border-slate-200">
-                      <td className="py-3 px-6 text-xs uppercase tracking-wider">Weekly Total</td>
-                      <td className="py-3 px-4 text-center text-blue-700">{calculateTotal(section.eng).toLocaleString()} UGX</td>
-                      <td className="py-3 px-4 text-center text-purple-700">{calculateTotal(section.lug).toLocaleString()} UGX</td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
             </div>
@@ -737,105 +738,78 @@ const WeeklyDataEntry = () => {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-          <div className="flex items-center space-x-2.5 pb-4 border-b border-slate-100">
+          <div className="flex items-center space-x-2">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
               <TrendingUp className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">Weekly Activity & Metrics</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Summary data for Sabbath school reporting</p>
-            </div>
+            <h2 className="text-lg font-bold text-slate-900">Sabbath School Weekly Indicators</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { label: 'Total Attendance', name: 'total_attendance' },
-              { label: 'Member Visits', name: 'member_visits' },
-              { label: 'Conducted Bible Studies', name: 'members_conducted_bible_studies' },
-              { label: 'Helped Others (Missionary Work)', name: 'members_helped_others' },
-              { label: 'Daily Lesson Study Count', name: 'members_studied_lesson' },
-              { label: 'Number of Visitors', name: 'number_of_visitors' },
-              { label: 'Study Guides Distributed', name: 'bible_study_guides_distributed' },
-              { label: 'Global Mission Offering (UGX)', name: 'offering_global_mission' },
-            ].map((field) => (
-              <div key={field.name}>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">{field.label}</label>
-                <input
-                  type="number"
-                  name={field.name}
-                  value={formData[field.name]}
-                  onChange={handleChange}
-                  min="0"
-                  className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-                />
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Total Attendance</label>
+              <input type="number" min="0" name="total_attendance" value={formData.total_attendance} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Member Visits</label>
+              <input type="number" min="0" name="member_visits" value={formData.member_visits} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Conducted Bible Studies</label>
+              <input type="number" min="0" name="members_conducted_bible_studies" value={formData.members_conducted_bible_studies} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Helped Others</label>
+              <input type="number" min="0" name="members_helped_others" value={formData.members_helped_others} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Studied Lesson</label>
+              <input type="number" min="0" name="members_studied_lesson" value={formData.members_studied_lesson} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Number of Visitors</label>
+              <input type="number" min="0" name="number_of_visitors" value={formData.number_of_visitors} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Guides Distributed</label>
+              <input type="number" min="0" name="bible_study_guides_distributed" value={formData.bible_study_guides_distributed} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Global Mission Offering (UGX)</label>
+              <input type="number" min="0" name="offering_global_mission" value={formData.offering_global_mission} onChange={handleChange} className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Members Summary / Notes</label>
-            <textarea
-              name="members_summary"
-              rows="3"
-              value={formData.members_summary}
-              onChange={handleChange}
-              placeholder="Enter additional class notes or weekly activity highlights..."
-              className="w-full rounded-xl border-slate-200 bg-slate-50/50 p-4 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-            />
+            <textarea name="members_summary" rows="3" value={formData.members_summary} onChange={handleChange} placeholder="Add any specific observations or weekly remarks..." className="w-full rounded-xl border-slate-200 bg-slate-50/50 p-4 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition text-sm" />
           </div>
         </div>
 
         <div className="flex justify-end pt-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold rounded-xl flex items-center space-x-2 shadow-xl shadow-indigo-100 transition duration-150"
-          >
-            <Save className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            <span>{loading ? 'Saving Data...' : 'Save Weekly Report'}</span>
+          <button type="submit" disabled={loading} className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 flex items-center space-x-2 transition disabled:opacity-50">
+            <Save className="h-5 w-5" />
+            <span>{loading ? 'Saving...' : formData.id ? 'Update Record' : 'Save Weekly Entry'}</span>
           </button>
         </div>
       </form>
 
       {showMemberModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">{editingMember ? 'Edit Class Member' : 'Add New Class Member'}</h3>
-              <button 
-                type="button" 
-                onClick={() => setShowMemberModal(false)} 
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition"
-              >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900">{editingMember ? 'Edit Member' : 'Add New Member'}</h3>
+              <button type="button" onClick={() => setShowMemberModal(false)} className="text-slate-400 hover:text-slate-600 rounded-lg p-1">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Member Name</label>
-              <input
-                type="text"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                placeholder="Enter full name"
-                className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-3 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
-                autoFocus
-              />
+              <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="Enter full name" className="w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 py-2.5 text-slate-800 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
             </div>
-            <div className="flex space-x-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowMemberModal(false)}
-                className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAddMember}
-                className="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md transition"
-              >
-                {editingMember ? 'Update Member' : 'Add Member'}
-              </button>
+            <div className="flex justify-end space-x-3 pt-2">
+              <button type="button" onClick={() => setShowMemberModal(false)} className="px-4 py-2 text-slate-600 font-semibold text-sm rounded-xl hover:bg-slate-100 transition">Cancel</button>
+              <button type="button" onClick={handleAddMember} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow-md transition">{editingMember ? 'Save Changes' : 'Add Member'}</button>
             </div>
           </div>
         </div>

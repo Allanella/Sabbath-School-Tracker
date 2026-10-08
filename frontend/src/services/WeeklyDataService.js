@@ -2,59 +2,53 @@ import api from './api';
 
 const weeklyDataService = {
   submit: async (data) => {
-    const response = await api.post('/weekly-data', data);
-    return response;
+    return await api.post('/weekly-data', data);
   },
 
   getByClass: async (classId) => {
-    const response = await api.get(`/weekly-data/class/${classId}`);
-    return response;
+    return await api.get(`/weekly-data/class/${classId}`);
   },
 
-  getByWeek: async (classId, weekNumber) => {
+  getByWeek: async (classId, weekNumber, quarterId = '') => {
     try {
-      // api interceptor already returns response.data
-      // so response here is { success, data: {...} } or { success, data: null }
-      const response = await api.get(`/weekly-data/class/${classId}/week/${weekNumber}`);
+      const url = `/weekly-data/class/${classId}/week/${weekNumber}${
+        quarterId ? `?quarter_id=\${quarterId}` : ''
+      }`;
+      const response = await api.get(url);
 
-      // response is already unwrapped by interceptor
-      // backend returns { success: true, data: {...} }
-      if (response && response.data) {
-        return { data: response.data }; // wrap back so checkExistingData can do response.data
+      // Handle un-wrapped API responses cleanly
+      const record = response?.data !== undefined ? response.data : response;
+      if (record && Object.keys(record).length > 0) {
+        return { data: record };
       }
 
-      // Fallback: fetch all class data and filter
+      // Fallback manual lookup
       const allData = await api.get(`/weekly-data/class/${classId}`);
-      const weeks = Array.isArray(allData) ? allData : (allData?.data || []);
-      const found = weeks.find(d => d.week_number === parseInt(weekNumber));
-      return found ? { data: found } : { data: null };
+      const weeks = Array.isArray(allData) ? allData : allData?.data || [];
+      const found = weeks.find((d) => Number(d.week_number) === Number(weekNumber));
 
+      return { data: found || null };
     } catch (error) {
       console.error('Error fetching week data:', error);
-
-      // Fallback on error
       try {
         const allData = await api.get(`/weekly-data/class/${classId}`);
-        const weeks = Array.isArray(allData) ? allData : (allData?.data || []);
-        const found = weeks.find(d => d.week_number === parseInt(weekNumber));
-        return found ? { data: found } : { data: null };
+        const weeks = Array.isArray(allData) ? allData : allData?.data || [];
+        const found = weeks.find((d) => Number(d.week_number) === Number(weekNumber));
+        return { data: found || null };
       } catch (fallbackError) {
         console.error('Fallback also failed:', fallbackError);
       }
-
       return { data: null };
     }
   },
 
   update: async (id, data) => {
-    const response = await api.put(`/weekly-data/${id}`, data);
-    return response;
+    return await api.put(`/weekly-data/${id}`, data);
   },
 
   delete: async (id) => {
-    const response = await api.delete(`/weekly-data/${id}`);
-    return response;
-  }
+    return await api.delete(`/weekly-data/${id}`);
+  },
 };
 
 export default weeklyDataService;
