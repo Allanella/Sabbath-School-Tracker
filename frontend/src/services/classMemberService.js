@@ -2,8 +2,7 @@ import api from './api';
 
 const classMemberService = {
   getByClass: async (classId, quarterId = '') => {
-    const params = quarterId ? { quarter_id: quarterId } : {};
-    const response = await api.get(`/classes/${classId}/members`, { params });
+    const response = await api.get(`/class-members/class/${classId}`);
     return response?.data ?? response;
   },
 

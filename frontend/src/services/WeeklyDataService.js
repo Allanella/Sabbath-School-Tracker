@@ -7,14 +7,13 @@ const weeklyDataService = {
   },
 
   getByClass: async (classId) => {
-    const response = await api.get(`/weekly-data/class/\${classId}`);
+    const response = await api.get(`/weekly-data/class/${classId}`);
     return response?.data ?? response;
   },
 
   getByWeek: async (classId, weekNumber, quarterId = '') => {
     try {
-      // Fixed string interpolation template literal syntax
-      const url = `/weekly-data/class/\${classId}/week/${weekNumber}${
+      const url = `/weekly-data/class/${classId}/week/${weekNumber}${
         quarterId ? `?quarter_id=${quarterId}` : ''
       }`;
       const response = await api.get(url);
@@ -25,7 +24,7 @@ const weeklyDataService = {
       }
 
       // Fallback manual lookup
-      const allDataResponse = await api.get(`/weekly-data/class/\${classId}`);
+      const allDataResponse = await api.get(`/weekly-data/class/${classId}`);
       const rawData = allDataResponse?.data ?? allDataResponse;
       const weeks = Array.isArray(rawData) ? rawData : rawData?.data || [];
       const found = weeks.find((d) => Number(d.week_number) === Number(weekNumber));
@@ -34,7 +33,7 @@ const weeklyDataService = {
     } catch (error) {
       console.error('Error fetching week data:', error);
       try {
-        const allDataResponse = await api.get(`/weekly-data/class/\${classId}`);
+        const allDataResponse = await api.get(`/weekly-data/class/${classId}`);
         const rawData = allDataResponse?.data ?? allDataResponse;
         const weeks = Array.isArray(rawData) ? rawData : rawData?.data || [];
         const found = weeks.find((d) => Number(d.week_number) === Number(weekNumber));
@@ -47,12 +46,12 @@ const weeklyDataService = {
   },
 
   update: async (id, data) => {
-    const response = await api.put(`/weekly-data/\${id}`, data);
+    const response = await api.put(`/weekly-data/${id}`, data);
     return response?.data ?? response;
   },
 
   delete: async (id) => {
-    const response = await api.delete(`/weekly-data/\${id}`);
+    const response = await api.delete(`/weekly-data/${id}`);
     return response?.data ?? response;
   },
 };
