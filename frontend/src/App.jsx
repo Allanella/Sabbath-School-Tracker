@@ -19,6 +19,7 @@ const UserManagement = lazy(() => import('./components/Admin/UserManagement'));
 const QuarterSetup = lazy(() => import('./components/Admin/QuarterSetup'));
 const ClassManagement = lazy(() => import('./components/Admin/ClassManagement'));
 const ClassSetup = lazy(() => import('./components/Admin/ClassSetup'));
+const MemberManagement = lazy(() => import('./components/Admin/MemberManagement'));
 const SecretaryDashboard = lazy(() => import('./components/Secretary/SecretaryDashboard'));
 const WeeklyDataEntry = lazy(() => import('./components/Secretary/WeeklyDataEntry'));
 const PaymentManagement = lazy(() => import('./components/Secretary/PaymentManagement'));
@@ -58,6 +59,7 @@ function App() {
                 <Route path="admin/quarters" element={<QuarterSetup />} />
                 <Route path="admin/classes" element={<ClassManagement />} />
                 <Route path="admin/classes/setup" element={<ClassSetup />} />
+                <Route path="admin/members" element={<MemberManagement />} />
 
                 {/* Secretary Routes */}
                 <Route path="secretary" element={<SecretaryDashboard />} />
@@ -91,4 +93,3 @@ function App() {
 }
 
 export default App;
-

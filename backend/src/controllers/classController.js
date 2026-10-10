@@ -120,7 +120,7 @@ exports.getDeleted = async (req, res) => {
 // Create new class
 exports.create = async (req, res) => {
   try {
-    const { class_name, name } = req.body;
+    const { class_name, name, quarter_id } = req.body;
     const title = class_name || name;
 
     if (!title) {
@@ -130,9 +130,12 @@ exports.create = async (req, res) => {
       });
     }
 
+    const insertData = { class_name: title, is_active: true };
+    if (quarter_id) insertData.quarter_id = quarter_id;
+
     const { data, error } = await supabase
       .from('classes')
-      .insert([{ class_name: title, is_active: true }])
+      .insert([insertData])
       .select()
       .single();
 

@@ -61,10 +61,8 @@ const Layout = () => {
       const response = await quarterService.getAll();
       const allQuarters = Array.isArray(response) ? response : (response.data || []);
 
-      // Only show Q1 and Q2 of 2026
-      const quartersList = allQuarters.filter(q =>
-        q.year === 2026
-      );
+      // Show all quarters (not filtered by year)
+      const quartersList = allQuarters;
 
       setQuarters(quartersList);
 
@@ -268,6 +266,18 @@ const Layout = () => {
               >
                 <Users className="h-5 w-5" />
                 <span>Class Setup</span>
+              </Link>
+
+              <Link
+                to="/admin/members"
+                className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition ${
+                  location.pathname === "/admin/members"
+                    ? "bg-indigo-700"
+                    : "text-gray-200 hover:bg-indigo-700"
+                }`}
+              >
+                <Users className="h-5 w-5" />
+                <span>Member Management</span>
               </Link>
             </>
           )}
