@@ -3,6 +3,7 @@ const router = express.Router();
 const supabase = require('../config/database');
 const authenticate = require('../middleware/auth');
 const checkRole = require('../middleware/roleCheck');
+const { hashPassword } = require('../utils/passwordHelper');
 
 router.use(authenticate);
 
@@ -28,7 +29,7 @@ router.get('/secretaries', async (req, res, next) => {
     const { data, error } = await supabase
       .from('users')
       .select('id, full_name, email')
-      .eq('role', 'ss_secretary')  // Changed from 'secretary' to 'ss_secretary'
+      .eq('role', 'ss_secretary')
       .eq('is_active', true)
       .order('full_name');
 
@@ -44,34 +45,43 @@ router.get('/secretaries', async (req, res, next) => {
 router.put('/:id', checkRole('admin'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { password, ...rest } = req.body;
+
+    const updates = { ...rest };
+
+    // If a new password was provided, hash it before saving
+    if (password) {
+      updates.password_hash = await hashPassword(password);
+    }
+
+    // Never send raw 'password' field to Supabase
+    delete updates.password;
 
     const { data, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('id, email, full_name, role, is_active, created_at')
       .single();
 
     if (error) throw error;
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'User updated successfully',
-      data 
+      data
     });
   } catch (error) {
     next(error);
   }
 });
 
-// Delete user (admin only) - NEW ENDPOINT
+// Delete user (admin only)
 router.delete('/:id', checkRole('admin'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const currentUserId = req.user.userId;
 
-    // Prevent self-deletion
     if (id === currentUserId) {
       return res.status(400).json({
         success: false,
@@ -79,7 +89,6 @@ router.delete('/:id', checkRole('admin'), async (req, res, next) => {
       });
     }
 
-    // Check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('id, email')
@@ -93,7 +102,6 @@ router.delete('/:id', checkRole('admin'), async (req, res, next) => {
       });
     }
 
-    // Delete user
     const { error: deleteError } = await supabase
       .from('users')
       .delete()
