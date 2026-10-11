@@ -1,231 +1,94 @@
+const express = require('express');
+const router = express.Router();
 const supabase = require('../config/database');
+const authenticate = require('../middleware/auth');
+const checkRole = require('../middleware/roleCheck');
 
-// Get all classes
-exports.getAll = async (req, res) => {
+router.use(authenticate);
+
+// Get members by class
+router.get('/class/:class_id', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .order('id', { ascending: true });
+    const { class_id } = req.params;
+    const { quarter_id } = req.query;
 
+    let query = supabase
+      .from('class_members')
+      .select('*')
+      .eq('class_id', class_id)
+      .order('member_name');
+
+    if (quarter_id) query = query.eq('quarter_id', quarter_id);
+
+    const { data, error } = await query;
     if (error) throw error;
 
-    res.json({
-      success: true,
-      data: data || []
-    });
+    res.json({ success: true, data: data || [] });
   } catch (error) {
-    console.error('Get all classes error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch classes',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
-};
+});
 
-// Get single class by ID
-exports.getById = async (req, res) => {
+// Add a member to a class
+router.post('/', checkRole('admin', 'ss_secretary'), async (req, res) => {
   try {
-    const { id } = req.params;
+    const { class_id, quarter_id, member_name } = req.body;
 
-    const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-
-    res.json({
-      success: true,
-      data
-    });
-  } catch (error) {
-    console.error('Get class by ID error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch class',
-      error: error.message
-    });
-  }
-};
-
-// Search classes
-exports.search = async (req, res) => {
-  try {
-    const { q } = req.query;
-
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        message: 'Search query parameter "q" is required'
-      });
+    if (!class_id || !member_name) {
+      return res.status(400).json({ success: false, message: 'class_id and member_name are required' });
     }
 
     const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .ilike('class_name', `%${q}%`);
-
-    if (error) throw error;
-
-    res.json({
-      success: true,
-      data: data || []
-    });
-  } catch (error) {
-    console.error('Search classes error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to search classes',
-      error: error.message
-    });
-  }
-};
-
-// Get deleted classes
-exports.getDeleted = async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('classes')
-      .select('*')
-      .eq('is_active', false);
-
-    if (error) throw error;
-
-    res.json({
-      success: true,
-      data: data || []
-    });
-  } catch (error) {
-    console.error('Get deleted classes error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch deleted classes',
-      error: error.message
-    });
-  }
-};
-
-// Create new class
-exports.create = async (req, res) => {
-  try {
-    const { class_name, name } = req.body;
-    const title = class_name || name;
-
-    if (!title) {
-      return res.status(400).json({
-        success: false,
-        message: 'Class name is required'
-      });
-    }
-
-    const { data, error } = await supabase
-      .from('classes')
-      .insert([{ class_name: title, is_active: true }])
+      .from('class_members')
+      .insert([{ class_id, quarter_id, member_name }])
       .select()
       .single();
 
     if (error) throw error;
 
-    res.status(201).json({
-      success: true,
-      message: 'Class created successfully',
-      data
-    });
+    res.status(201).json({ success: true, message: 'Member added successfully', data });
   } catch (error) {
-    console.error('Create class error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create class',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
-};
+});
 
-// Update class
-exports.update = async (req, res) => {
+// Update a member
+router.put('/:id', checkRole('admin', 'ss_secretary'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { class_name, name } = req.body;
-    const title = class_name || name;
+    const { member_name } = req.body;
 
     const { data, error } = await supabase
-      .from('classes')
-      .update({ class_name: title })
+      .from('class_members')
+      .update({ member_name })
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
 
-    res.json({
-      success: true,
-      message: 'Class updated successfully',
-      data
-    });
+    res.json({ success: true, message: 'Member updated successfully', data });
   } catch (error) {
-    console.error('Update class error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update class',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
-};
+});
 
-// Restore class
-exports.restore = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { data, error } = await supabase
-      .from('classes')
-      .update({ is_active: true })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.json({
-      success: true,
-      message: 'Class restored successfully',
-      data
-    });
-  } catch (error) {
-    console.error('Restore class error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to restore class',
-      error: error.message
-    });
-  }
-};
-
-// Delete class (Soft delete)
-exports.delete = async (req, res) => {
+// Delete a member
+router.delete('/:id', checkRole('admin', 'ss_secretary'), async (req, res) => {
   try {
     const { id } = req.params;
 
     const { error } = await supabase
-      .from('classes')
-      .update({ is_active: false })
+      .from('class_members')
+      .delete()
       .eq('id', id);
 
     if (error) throw error;
 
-    res.json({
-      success: true,
-      message: 'Class deleted successfully'
-    });
+    res.json({ success: true, message: 'Member deleted successfully' });
   } catch (error) {
-    console.error('Delete class error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete class',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
-};
+});
+
+module.exports = router;
