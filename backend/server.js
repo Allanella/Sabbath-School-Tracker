@@ -19,7 +19,6 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, server-to-server)
     if (!origin) return callback(null, true);
 
     if (
@@ -49,8 +48,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // -------------------- CACHING MIDDLEWARE --------------------
-app.use(staticCache()); // Cache static resources
-app.use(conditionalRequest()); // Add ETag support
+app.use(staticCache());
+app.use(conditionalRequest());
 
 // -------------------- ROUTES IMPORTS --------------------
 const authRoutes = require(path.join(ROUTES_PATH, 'auth.routes'));
@@ -69,7 +68,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/quarters', quarterRoutes);
 app.use('/api/weekly-data', weeklyDataRoutes);
-app.use('/api/reports', apiCache(600000), reportRoutes); // Cache reports for 10 minutes
+app.use('/api/reports', apiCache(600000), reportRoutes);
 app.use('/api/class-members', classMemberRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/member-payments', memberPaymentRoutes);
@@ -133,6 +132,15 @@ app.use((req, res) => {
     path: req.path,
   });
 });
+
+// -------------------- KEEP-ALIVE PING --------------------
+if (process.env.NODE_ENV === 'production') {
+  setInterval(() => {
+    fetch('https://sabbath-school-tracker-backend.onrender.com/health')
+      .then(() => console.log('✅ Keep-alive ping sent'))
+      .catch(err => console.log('❌ Keep-alive ping failed:', err.message));
+  }, 14 * 60 * 1000); // every 14 minutes
+}
 
 // -------------------- START SERVER --------------------
 app.listen(PORT, () => {
