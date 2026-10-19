@@ -43,6 +43,12 @@ self.addEventListener('fetch', (event) => {
   // Only handle http and https requests to avoid chrome-extension errors
   if (!(event.request.url.indexOf('http') === 0)) return;
 
+  // Never intercept API calls - let them go directly to the network
+  if (event.request.url.includes('onrender.com') ||
+      event.request.url.includes('/api/')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
