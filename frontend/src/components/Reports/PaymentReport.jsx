@@ -74,7 +74,7 @@ const PaymentReport = () => {
         : (totalsResponse.data || []);
 
       // Get weekly data for offerings and attendance stats
-      const weeklyResponse = await weeklyDataService.getByClass(selectedClass);
+      const weeklyResponse = await weeklyDataService.getAll(selectedClass, selectedQuarter);
       const weeklyData = Array.isArray(weeklyResponse)
         ? weeklyResponse
         : (weeklyResponse.data || []);
