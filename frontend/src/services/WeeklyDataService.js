@@ -10,6 +10,12 @@ const weeklyDataService = {
     return response;
   },
 
+  // Get weekly data by class ID
+  getByClass: async (classId) => {
+    const response = await api.get(`/weekly-data/class/${classId}`);
+    return response?.data ?? response;
+  },
+
   // Get weekly data for a specific week
   getByWeek: async (classId, weekNumber, quarterId) => {
     const params = new URLSearchParams();
