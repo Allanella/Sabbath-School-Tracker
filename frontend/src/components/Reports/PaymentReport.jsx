@@ -52,7 +52,7 @@ const PaymentReport = () => {
   const loadClasses = async (quarterId) => {
     try {
       const response = await classService.getAll(quarterId);
-      const classList = Array.isArray(response) ? response : (response.data || []);
+      const classList = Array.isArray(response) ? response : (response.data?.data || response.data || []);
       setClasses(classList);
       setSelectedClass('');
       setReportData(null);

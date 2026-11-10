@@ -7,7 +7,7 @@ const classService = {
   },
   getByQuarter: (quarterId) => api.get(`/classes?quarter_id=${quarterId}`),
   getById: (id) => api.get(`/classes/${id}`),
-  search: (query) => api.get(`/classes/search?query=${query}`),
+  search: (query) => api.get(`/classes/search?q=${query}`),
   getMyClasses: () => api.get('/classes/my-classes'),
   create: (classData) => api.post('/classes', classData),
   update: (id, classData) => api.put(`/classes/${id}`, classData),
