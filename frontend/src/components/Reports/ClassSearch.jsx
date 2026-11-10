@@ -23,7 +23,7 @@ const ClassSearch = () => {
 
     try {
       const response = await classService.search(searchTerm);
-      const results = Array.isArray(response) ? response : (response.data || []);
+      const results = Array.isArray(response) ? response : (response.data?.data || response.data || []);
       setSearchResults(results);
 
       if (results.length === 0) {
